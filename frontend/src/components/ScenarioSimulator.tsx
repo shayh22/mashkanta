@@ -1,4 +1,14 @@
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import type { StressMatrix } from '../lib/types';
 import { formatCompact, formatCurrency, formatSignedCurrency } from '../lib/format';
 import { Card } from './ui';
@@ -22,7 +32,10 @@ export function ScenarioSimulator({
     increase: Math.round(scenario.paymentIncrease),
     maxPayment: scenario.maxPayment,
     breach: scenario.breachesCapacity,
+    // A zero here is a result, not a gap: the mix simply carries no exposure to this shock.
+    immune: Math.round(scenario.paymentIncrease) <= 0,
   }));
+  const immuneCount = data.filter((entry) => entry.immune).length;
 
   return (
     <Card
@@ -62,10 +75,21 @@ export function ScenarioSimulator({
               {data.map((entry) => (
                 <Cell key={entry.label} fill={entry.breach ? '#F43F5E' : '#4F46E5'} />
               ))}
+              {/* A bar of height zero draws nothing, which reads as missing data rather than as
+                  immunity. This marks those scenarios at the baseline instead. */}
+              <LabelList dataKey="increase" content={<ImmuneMarker />} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {immuneCount > 0 && (
+        <p className="mt-2 text-xs text-emerald-700">
+          <span className="me-1 inline-block h-1.5 w-4 rounded-full bg-emerald-500 align-middle" aria-hidden />
+          {immuneCount === 1 ? 'תרחיש אחד אינו משפיע' : `${immuneCount} תרחישים אינם משפיעים`} על
+          ההחזר כלל — התמהיל אינו חשוף להם. אפס כאן הוא תוצאה, לא נתון חסר.
+        </p>
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="card-muted">
@@ -149,5 +173,34 @@ function StressTooltip({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Draws an emerald rule on the baseline for a scenario whose impact is exactly zero.
+ *
+ * Recharts renders nothing at all for a zero-height bar, so without this the inflation scenarios
+ * of a mix carrying no CPI-linked principal look like a broken chart — when in fact they are the
+ * best news the panel has to report.
+ */
+function ImmuneMarker(props: { x?: number; y?: number; width?: number; value?: number }) {
+  const { x = 0, y = 0, width = 0, value = 0 } = props;
+  if (value > 0 || width <= 0) {
+    return null;
+  }
+  return (
+    <g>
+      <rect x={x} y={y - 3} width={width} height={3} rx={1.5} fill="#10B981" />
+      <text
+        x={x + width / 2}
+        y={y - 8}
+        textAnchor="middle"
+        fill="#059669"
+        fontSize={10}
+        fontWeight={600}
+      >
+        ללא השפעה
+      </text>
+    </g>
   );
 }

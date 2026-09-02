@@ -73,13 +73,18 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
 
                 <CurrencyField
                   label="סכום ההלוואה המבוקש"
-                  hint={`הסכום המרבי לסיווג זה: ${formatCurrency(metrics.maxLoan)}`}
+                  hint={
+                    metrics.isClamped
+                      ? `הוקטן מ-${formatCurrency(metrics.requestedLoanAmount)} כדי לעמוד בתקרה של ${formatPercent(metrics.maxLtv, 0)} לסיווג זה. הסכום המקורי יחזור אם תשנו את הסיווג או את שווי הנכס.`
+                      : `הסכום המרבי לסיווג זה: ${formatCurrency(metrics.maxLoan)}`
+                  }
                   value={profile.loanAmount}
                   min={100_000}
                   max={Math.max(100_000, metrics.maxLoan)}
                   step={10_000}
                   onChange={(value) => setProfile({ loanAmount: value })}
                   invalid={metrics.ltvExceeded}
+                  notice={metrics.isClamped}
                 />
 
                 <RangeField
