@@ -1,6 +1,5 @@
 package il.mashkanta.engine;
 
-import il.mashkanta.domain.AmortizationMethod;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -143,15 +142,5 @@ public class AmortizationEngine {
             principal += spec.amount();
         }
         return MixResult.combine(results, principal, horizon, scenario);
-    }
-
-    /** Convenience overload used by the optimizer's hot loop. */
-    public MixResult priceMix(TrackSpec[] specs, MacroScenario scenario) {
-        return priceMix(List.of(specs), scenario);
-    }
-
-    /** True when the method defers principal, which changes how the UI labels the schedule. */
-    public static boolean defersPrincipal(AmortizationMethod method) {
-        return method == AmortizationMethod.BALLOON || method == AmortizationMethod.GRACE;
     }
 }

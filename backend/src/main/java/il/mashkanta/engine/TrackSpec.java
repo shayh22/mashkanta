@@ -60,11 +60,6 @@ public record TrackSpec(
         return new TrackSpec(type, amount, termMonths, annualRate, 0, method, graceMonths);
     }
 
-    /** A prime or variable track quoted the way banks quote it — as a margin over the anchor. */
-    public static TrackSpec ofMargin(TrackType type, double amount, int termMonths, double margin) {
-        return new TrackSpec(type, amount, termMonths, 0, margin, AmortizationMethod.SPITZER, 0);
-    }
-
     /** The annual nominal rate charged during the given 1-based month. */
     public double annualRateAt(int month, MacroScenario scenario) {
         if (type.isPrimeAnchored()) {

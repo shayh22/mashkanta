@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Israeli financial UIs are right-to-left; the dir attribute on <html> drives Tailwind's
+       logical properties (ms-/me-/ps-/pe-) throughout the app. */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  /* Shekel amounts and rates line up column-wise only with tabular figures. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Latin numerals inside Hebrew text otherwise inherit RTL ordering. */
+  .ltr-nums {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card;
+  }
+
+  .card-muted {
+    @apply rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-muted;
+  }
+
+  .hint {
+    @apply mt-1.5 text-xs text-ink-soft;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base
+           text-ink transition placeholder:text-slate-400
+           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm
+           font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700;
+  }
+
+  .btn-ghost {
+    @apply btn border border-slate-300 bg-white text-ink-muted hover:bg-slate-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
+           backdrop-blur-md;
+  }
+
+  .badge-ok {
+    @apply badge bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/20;
+  }
+
+  .badge-warn {
+    @apply badge bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/20;
+  }
+
+  .badge-danger {
+    @apply badge bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/20;
+  }
+
+  .badge-neutral {
+    @apply badge bg-slate-500/10 text-slate-600 ring-1 ring-inset ring-slate-500/20;
+  }
+}
+
+/* The native range thumb is unstyled in most browsers; these rules make the sliders
+   feel like part of the design system rather than an OS control. */
+input[type='range'] {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  @apply h-5 w-5 appearance-none rounded-full border-2 border-white bg-brand-600 shadow;
+}
+
+input[type='range']::-moz-range-thumb {
+  @apply h-5 w-5 rounded-full border-2 border-white bg-brand-600 shadow;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}

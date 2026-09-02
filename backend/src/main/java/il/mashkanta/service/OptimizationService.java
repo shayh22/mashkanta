@@ -9,7 +9,6 @@ import il.mashkanta.engine.MixResult;
 import il.mashkanta.engine.TrackResult;
 import il.mashkanta.engine.TrackSpec;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -499,10 +498,5 @@ public class OptimizationService {
             }
             return (double) sum / (2.0 * GRID_STEPS);
         }
-    }
-
-    /** Exposed for tests: the grid the optimizer searches. */
-    public static List<TrackType> candidateTracks() {
-        return Arrays.asList(CANDIDATES);
     }
 }

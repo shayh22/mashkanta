@@ -37,14 +37,4 @@ public record TrackResult(
         double nominalIrr,
         double realIrr,
         List<ScheduleRow> schedule) {
-
-    /** Total cost above the borrowed principal — interest plus indexation. */
-    public double totalCostOverPrincipal() {
-        return totalPaid - amount;
-    }
-
-    public TrackResult withoutSchedule() {
-        return new TrackResult(type, method, amount, termMonths, initialRate, initialPayment, maxPayment,
-                finalPayment, totalPaid, totalInterest, totalIndexation, nominalIrr, realIrr, List.of());
-    }
 }

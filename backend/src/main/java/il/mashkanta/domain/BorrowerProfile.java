@@ -57,11 +57,6 @@ public record BorrowerProfile(
         return loanAmount / propertyValue;
     }
 
-    /** The borrower's own equity contribution. */
-    public double equity() {
-        return Math.max(0, propertyValue - loanAmount);
-    }
-
     /** Income left for a mortgage payment once existing obligations are served. */
     public double disposableIncome() {
         return Math.max(0, monthlyNetIncome - existingMonthlyObligations);

@@ -15,7 +15,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4173}")
+    // localhost and 127.0.0.1 are distinct origins to a browser: a same-origin POST through the
+    // Vite proxy carries whichever the developer typed, and omitting one produces a 403 on POST
+    // while GET — which sends no Origin header — keeps working.
+    @Value("${app.cors.allowed-origins:"
+            + "http://localhost:5173,http://127.0.0.1:5173,"
+            + "http://localhost:4173,http://127.0.0.1:4173}")
     private String[] allowedOrigins;
 
     @Override

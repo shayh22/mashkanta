@@ -143,9 +143,11 @@ public class MarketBaselineService {
         Map<Key, MarketRate> map = new HashMap<>();
         String source = "בנק ישראל — ריביות ממוצעות חודשיות";
 
-        put(map, TrackType.PRIME, LtvTier.UP_TO_45, 0.0490, 0.0525, 0.0565, 4200, source);
-        put(map, TrackType.PRIME, LtvTier.FROM_45_TO_60, 0.0505, 0.0540, 0.0580, 5100, source);
-        put(map, TrackType.PRIME, LtvTier.ABOVE_60, 0.0520, 0.0555, 0.0595, 6800, source);
+        // Prime is quoted as a margin off the 5.75% prime rate. A well-negotiated deal is around
+        // prime minus 0.7; prime minus 0.2 is what an un-negotiated first offer looks like.
+        put(map, TrackType.PRIME, LtvTier.UP_TO_45, 0.0475, 0.0505, 0.0545, 4200, source);
+        put(map, TrackType.PRIME, LtvTier.FROM_45_TO_60, 0.0485, 0.0515, 0.0555, 5100, source);
+        put(map, TrackType.PRIME, LtvTier.ABOVE_60, 0.0495, 0.0525, 0.0565, 6800, source);
 
         put(map, TrackType.FIXED_UNLINKED, LtvTier.UP_TO_45, 0.0455, 0.0495, 0.0540, 3900, source);
         put(map, TrackType.FIXED_UNLINKED, LtvTier.FROM_45_TO_60, 0.0470, 0.0512, 0.0558, 4700, source);

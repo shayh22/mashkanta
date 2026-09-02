@@ -4,7 +4,6 @@ import il.mashkanta.domain.BorrowerProfile;
 import il.mashkanta.domain.ComplianceLevel;
 import il.mashkanta.domain.TrackType;
 import il.mashkanta.engine.MixResult;
-import il.mashkanta.engine.TrackResult;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -145,29 +144,5 @@ public class RegulatoryValidationService {
         return ComplianceFinding.ok("FIXED_FLOOR", title, String.format(
                 "%.1f%% מההלוואה בריבית קבועה, מעל הרף של שליש.",
                 fixedShare * 100), fixedShare, RegulatoryLimits.MIN_FIXED_SHARE);
-    }
-
-    /** Fast pre-check used inside the optimizer loop, where building findings would be wasteful. */
-    public boolean isStructurallyCompliant(List<TrackResult> tracks, double principal) {
-        if (principal <= 0) {
-            return false;
-        }
-        double prime = 0;
-        double variable = 0;
-        double fixed = 0;
-        for (TrackResult track : tracks) {
-            if (track.type() == TrackType.PRIME) {
-                prime += track.amount();
-            }
-            if (track.type().isVariableRate()) {
-                variable += track.amount();
-            } else {
-                fixed += track.amount();
-            }
-        }
-        double tolerance = RegulatoryLimits.SHARE_TOLERANCE;
-        return prime / principal <= RegulatoryLimits.MAX_PRIME_SHARE + tolerance
-                && variable / principal <= RegulatoryLimits.MAX_VARIABLE_SHARE + tolerance
-                && fixed / principal >= RegulatoryLimits.MIN_FIXED_SHARE - tolerance;
     }
 }
