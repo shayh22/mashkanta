@@ -1,0 +1,7 @@
+# Deploying with the Wrangler CLI:  npx wrangler pages deploy dist
+#
+# The Cloudflare dashboard's GitHub integration does not read this file — configure the build
+# there instead (root directory "frontend", build command "npm run build", output "dist").
+name = "mashkanta"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"

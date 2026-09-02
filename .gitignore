@@ -10,6 +10,10 @@ dist/
 dist-ssr/
 *.local
 .vite/
+*.tsbuildinfo
+
+# Cloudflare
+.wrangler/
 
 # Environment
 .env

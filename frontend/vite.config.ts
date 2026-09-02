@@ -26,12 +26,17 @@ export default defineConfig({
           if (!id.includes('node_modules')) {
             return undefined;
           }
-          // Only the framework belongs in the eagerly loaded vendor chunk. Everything else in
-          // node_modules is pulled in by the charting library, which the results page lazy-loads,
-          // so keeping it out of vendor is what makes the first paint cheap.
+          // Only the framework belongs in the eagerly loaded vendor chunk.
           if (/node_modules\/(react|react-dom|scheduler|@tanstack)\//.test(id)) {
             return 'vendor';
           }
+          // pdf.js is only reached when someone drops an approval-in-principle on the upload
+          // screen. It must not ride along with the charts, which every results page loads.
+          if (/node_modules\/pdfjs-dist/.test(id)) {
+            return 'pdf';
+          }
+          // Everything else here is pulled in by the charting library, which the results page
+          // lazy-loads, so keeping it out of vendor is what makes the first paint cheap.
           return 'charts';
         },
       },

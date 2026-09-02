@@ -1,0 +1,2 @@
+# Single-page app: any unmatched path renders the shell and the client routes it.
+/*    /index.html   200
