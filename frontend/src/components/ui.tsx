@@ -66,11 +66,13 @@ export function LevelBadge({ level, children }: { level: ComplianceLevel; childr
 export function Field({
   label,
   hint,
+  hintTone = 'muted',
   children,
   htmlFor,
 }: {
   label: string;
   hint?: string;
+  hintTone?: 'muted' | 'notice';
   children: ReactNode;
   htmlFor?: string;
 }) {
@@ -80,7 +82,9 @@ export function Field({
         {label}
       </label>
       {children}
-      {hint && <p className="hint">{hint}</p>}
+      {hint && (
+        <p className={hintTone === 'notice' ? 'hint font-medium text-amber-600' : 'hint'}>{hint}</p>
+      )}
     </div>
   );
 }
@@ -100,6 +104,7 @@ export function CurrencyField({
   step,
   onChange,
   invalid = false,
+  notice = false,
 }: {
   label: string;
   hint?: string;
@@ -109,10 +114,13 @@ export function CurrencyField({
   step: number;
   onChange: (value: number) => void;
   invalid?: boolean;
+  /** Draws attention to the hint without implying the value is wrong — used when a
+      regulatory ceiling is holding the value below what was asked for. */
+  notice?: boolean;
 }) {
   const id = useId();
   return (
-    <Field label={label} hint={hint} htmlFor={id}>
+    <Field label={label} hint={hint} hintTone={notice ? 'notice' : 'muted'} htmlFor={id}>
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           {/* The symbol sits at the visual right, matching he-IL currency order. The input runs
