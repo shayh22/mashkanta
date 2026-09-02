@@ -242,4 +242,28 @@ Worth stating plainly, since this is a financial tool:
 - **The platform accesses no private or authenticated banking data**, holds no lender credentials,
   and never authenticates against a bank.
 
+### Specified but not built
+
+Stated plainly so the gap between this repository and SPECIFICATION.md is visible:
+
+- **Authentication and IAM** (§9.2 — OAuth2/OIDC, JWT, RBAC). There are no user accounts: the
+  application is anonymous and stateless, and stores nothing that identifies a borrower. Adding
+  accounts is a prerequisite for the advisor and admin roles the specification describes.
+- **Immutable audit logging** (§9.2). Not implemented.
+- **Kubernetes manifests and horizontal pod autoscaling** (§8.1). Docker images and a compose file
+  are provided; the cluster topology is not.
+- **OCR of scanned documents** (§3.2.3). Only the text layer is read. `TextExtractor` reports a scan
+  explicitly rather than returning an empty extraction, so wiring in Tesseract or a vision model is
+  a matter of implementing one seam.
+- **Competitor aggregator benchmarking** (§3.2.2). Not implemented.
+- **Redis** (§8.2). The baseline table is a single in-memory reference swapped atomically by the
+  ingestion worker, which is faster than a network cache and needs no invalidation protocol. A
+  distributed cache only becomes necessary once the ingestion worker is separated from the API.
+
+One deliberate deviation: §6.2 specifies parallelised Monte Carlo simulation for the optimizer.
+The implementation uses exhaustive enumeration over a 5% grid instead, exploiting the linearity of
+amortization in principal. It searches the same space in a comparable time budget while being
+deterministic — the same inputs always yield the same recommendation, which matters for a tool
+borrowers will use to make a decision they cannot easily reverse.
+
 This is a comparison tool built on public data. It is not financial advice.
