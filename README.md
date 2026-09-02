@@ -13,81 +13,116 @@ Full functional requirements are in [SPECIFICATION.md](SPECIFICATION.md).
 
 | Capability | Where |
 | --- | --- |
-| Prices a mix you were quoted, with regulatory checks, stress tests and a market score | `POST /api/v1/mortgage/simulate` |
-| Builds the tailored optimal mix and prices the three Bank of Israel baskets beside it | `POST /api/v1/mortgage/optimize` |
-| Tests whether refinancing pays, net of the early repayment fee | `POST /api/v1/mortgage/refinance` |
-| Extracts tracks and rates from an approval-in-principle, stripping identifying data first | `POST /api/v1/documents/upload-approval` |
-| Serves the market rate distribution by track and LTV bucket | `GET /api/v1/market-baseline/current` |
-| Accepts anonymised community observations of real offers | `POST /api/v1/community/offers` |
+| Builds the tailored optimal mix and prices the three Bank of Israel baskets beside it | `engine/optimizer.ts` |
+| Prices a mix you were quoted, with regulatory checks, stress tests and a market score | `engine/opportunity.ts` |
+| Extracts tracks and rates from an approval-in-principle, stripping identifying data first | `engine/documents.ts` |
+| Enforces the Bank of Israel LTV, payment-ratio and track-share limits | `engine/regulatory.ts` |
+| Stress tests against four rate shocks, four inflation paths and two combined scenarios | `engine/stress.ts` |
+| Ranks every lender on the same mix | `engine/banks.ts` |
 
-Interactive API documentation is served at `/swagger-ui.html` when the backend is running.
-
----
+The Java service in `backend/` exposes the same capabilities over HTTP (`/api/v1/mortgage/simulate`,
+`/optimize`, `/refinance`, `/documents/upload-approval`, `/market-baseline/current`) and is kept as
+the reference implementation — see below.
 
 ## Running it
 
-### Everything at once
-
-```bash
-docker compose up --build
-```
-
-The frontend is then on <http://localhost:8081> and the API on <http://localhost:8080>. nginx proxies
-`/api` to the backend, so the browser sees a single origin and CORS is not involved.
-
-### Backend on its own
-
-```bash
-cd backend
-mvn spring-boot:run          # H2 in memory, schema created at startup
-mvn test                     # 65 tests
-```
-
-With PostgreSQL instead:
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres \
-DATABASE_URL=jdbc:postgresql://localhost:5432/mashkanta \
-DATABASE_USER=mashkanta DATABASE_PASSWORD=secret \
-mvn spring-boot:run          # Flyway owns the schema; Hibernate only validates it
-```
-
-### Frontend on its own
+The calculator is a static site — no server, no database, nothing to deploy but files.
 
 ```bash
 cd frontend
 npm install
-npm run dev                  # http://localhost:5173, proxies /api to localhost:8080
-npm run build && npm run preview
+npm run dev          # http://localhost:5173
+npm test             # 23 engine tests
 npm run typecheck
+npm run build        # -> dist/, ready to upload anywhere
 ```
 
----
+### Deploying to Cloudflare Pages
+
+The whole app is static, so it fits Cloudflare's free tier with no request cap: *"Requests to static
+assets are free and unlimited."*
+
+**From the dashboard** (GitHub-connected — pushes deploy automatically):
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | None / Vite |
+| Root directory | `frontend` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+**From the CLI:**
+
+```bash
+cd frontend && npm run build
+npx wrangler pages deploy dist
+```
+
+`public/_headers` and `public/_redirects` are copied into the build and handle the security headers
+and the single-page-app fallback. The Content-Security-Policy in `_headers` was verified against the
+running app, including pdf.js starting its worker.
+
+### The Java backend
+
+`backend/` is still here and still passes its 65 tests. It is no longer required to run the app — it
+is the reference implementation the TypeScript engine was ported from, and
+`frontend/src/engine/parity.check.ts` re-verifies the two against each other:
+
+```bash
+cd backend && mvn spring-boot:run          # terminal 1
+cd frontend && npx tsx src/engine/parity.check.ts   # terminal 2
+```
+
+Keep it if you later want server-side features (shared crowdsourced data, saved comparisons); delete
+it if you don't.
 
 ## Architecture
 
 ```
-                         ┌──────────────────────────────┐
-   Browser ──────────────│  React 18 + TS + Tailwind    │
-   (RTL, Hebrew)         │  Zustand · TanStack Query    │
-                         └──────────────┬───────────────┘
-                                        │ /api (same origin via nginx)
-                         ┌──────────────▼───────────────┐
-                         │   Spring Boot 3.3 · Java 21  │
-                         ├──────────────────────────────┤
-                         │ AmortizationEngine  (pure)   │
-                         │ OptimizationService (search) │
-                         │ RegulatoryValidationService  │
-                         │ StressTestService            │
-                         │ MarketBaselineService        │
-                         │ DocumentProcessingService    │
-                         └───────┬──────────────┬───────┘
-                                 │              │
-                    ┌────────────▼───┐    ┌─────▼──────────────┐
-                    │  PostgreSQL    │    │ Public data feeds  │
-                    │  (anonymised)  │    │ BoI · CBS · TASE   │
-                    └────────────────┘    └────────────────────┘
+                    ┌──────────────────────────────────────┐
+   Browser ─────────│  React 18 + TS + Tailwind (RTL)      │
+                    │  Zustand · TanStack Query            │
+                    │  ┌────────────────────────────────┐  │
+                    │  │  src/engine — the whole model  │  │
+                    │  │  amortization · optimizer      │  │
+                    │  │  regulation · stress · scoring │  │
+                    │  │  PII redaction · PDF parsing   │  │
+                    │  └────────────────────────────────┘  │
+                    └──────────────────┬───────────────────┘
+                                       │ static files only
+                            ┌──────────▼──────────┐
+                            │  Cloudflare Pages   │
+                            └─────────────────────┘
+
+   backend/  — the Java reference implementation the engine was ported from.
+               Not required to run the app; kept as the parity target.
 ```
+
+Everything runs in the browser. That is not a compromise for this app — it is the right shape for
+it, because the model is a **stateless calculator**: pure arithmetic with no I/O in the hot path and
+no server-side secret. Consequences worth stating:
+
+- **Free and unmetered.** Static assets on Cloudflare have no request cap. A Worker backend was the
+  first instinct, but the free Workers plan allows 10 ms of CPU per invocation and the optimizer
+  needs ~60 ms — it would not fit. In the browser, 60 ms is imperceptible.
+- **No round trip.** Recalculation is instant.
+- **The document never leaves the device.** PII redaction used to be a promise about what a server
+  did with your identity number; now the file is simply never transmitted.
+
+The engine is deliberately free of browser dependencies, so the same modules can move into a Worker
+unchanged if the app ever needs a paid plan and server-side execution.
+
+### Verified against the Java implementation
+
+The port is not "believed equivalent" — it is checked. `parity.check.ts` runs both engines over the
+same borrower profiles and diffs the results:
+
+```
+worst relative drift across all comparisons: 0.00002992%
+```
+
+Lifetime cost matches to the shekel, and the optimizer selects the identical mix at every risk
+tolerance from 1 to 10.
 
 ### The calculation engine
 
@@ -169,14 +204,16 @@ and still re-blends the crowdsourced data nightly.
 
 ## Privacy engineering
 
-The document pipeline's ordering *is* the security control, not a policy on top of one:
+In the browser build the guarantee is structural rather than procedural: **the document is never
+transmitted**, so there is no server to trust with it. The pipeline still redacts before parsing, so
+identifying data does not reach the parser, the extraction result, or anything the user might export:
 
 1. Text is extracted from the upload into a string.
 2. `PiiRedactionService` consumes that string and produces a sanitised one.
 3. Everything downstream — the parser, the job record, the market baseline — sees only the sanitised
    string.
-4. The upload buffer is zeroed in the same method that read it, so the raw document exists for the
-   duration of one call and is never written to disk or to the database.
+4. Nothing is uploaded. In the Java service the upload buffer was additionally zeroed in the same
+   method that read it, so the raw document existed for one call and never reached disk.
 
 Identity numbers are validated against the official check digit before redaction. That distinction
 matters in both directions: a nine-digit loan reference is not silently destroyed, and a real
@@ -191,29 +228,28 @@ path tried to write it.
 ## Testing
 
 ```bash
-cd backend && mvn test        # 65 tests
-cd frontend && npm run typecheck
+cd frontend && npm test      # 23 engine tests (vitest)
+cd backend  && mvn test      # 65 tests on the reference implementation
 ```
 
-The backend suite covers:
+The TypeScript tests are ports of the Java ones, asserting the same values, so a divergence in
+either engine shows up as a failure rather than as a quiet difference in someone's mortgage:
 
 - The engine against textbook annuity values (₪1,000,000 at 5% over 30 years is 5,368.22 a month),
   full amortization to a zero balance, indexation, prime repricing, five-year anchor windows, grace
   and balloon deferral.
-- Every regulatory threshold, in both the passing and the breaching direction.
 - Optimizer invariants: the recommendation is compliant at every risk tolerance, the allocation sums
   to the loan, tolerance moves the mix monotonically, the baskets carry their mandated shares, and an
   infeasible borrower gets an explicit list of what was relaxed.
-- The refinance edge case worth knowing about: refinancing at exactly the rate the break fee is
-  discounted at is a **wash** — the discounting fee is defined as the lender's lost present value at
-  that rate, so the borrower hands the entire gain straight back. A refinance only pays when the new
-  rate beats the published average the fee is computed against.
-- The API contract end to end, including that an uploaded approval comes back with its identifying
-  data already gone.
-
----
+- The Java suite additionally covers every regulatory threshold in both directions, the refinance
+  break-even edge case, and the old HTTP contract end to end.
 
 ## Configuration
+
+The static app needs none — the published anchors are seeded constants and every macro assumption is
+adjustable in the wizard.
+
+The Java service, if you run it, still reads:
 
 | Property | Default | Purpose |
 | --- | --- | --- |
@@ -221,9 +257,6 @@ The backend suite covers:
 | `app.ingestion.enabled` | `false` | Opt in to fetching the public feeds. |
 | `app.ingestion.cpi-url` / `prime-url` / `bond-url` | empty | Public feed endpoints. Unset means the seeded anchors are kept. |
 | `SPRING_PROFILES_ACTIVE=postgres` | — | PostgreSQL with Flyway migrations instead of in-memory H2. |
-| `VITE_API_BASE_URL` | empty | Absolute API origin for the frontend. Empty means same-origin. |
-
----
 
 ## Scope and limitations
 
@@ -236,7 +269,7 @@ Worth stating plainly, since this is a financial tool:
   The comparison holds the mix constant across lenders so the ranking reflects pricing alone.
 - **The engine models rate paths, not rate forecasts.** Scenarios are parallel shifts; it does not
   model a yield curve, a term structure, or correlated shocks.
-- **OCR of scanned documents is not implemented.** `TextExtractor` reads the text layer that every
+- **OCR of scanned documents is not implemented.** The extractor reads the text layer that every
   major Israeli lender's approval carries, and reports clearly when a file is a scan instead of
   silently returning nothing.
 - **The platform accesses no private or authenticated banking data**, holds no lender credentials,
@@ -256,9 +289,15 @@ Stated plainly so the gap between this repository and SPECIFICATION.md is visibl
   explicitly rather than returning an empty extraction, so wiring in Tesseract or a vision model is
   a matter of implementing one seam.
 - **Competitor aggregator benchmarking** (§3.2.2). Not implemented.
-- **Redis** (§8.2). The baseline table is a single in-memory reference swapped atomically by the
-  ingestion worker, which is faster than a network cache and needs no invalidation protocol. A
-  distributed cache only becomes necessary once the ingestion worker is separated from the API.
+- **Redis** (§8.2). Not applicable to the static build; the baseline table is a constant compiled
+  into the bundle.
+- **Live rate ingestion in the browser build.** The scheduled Bank of Israel and CBS ingestion lives
+  in the Java service. The static app ships the seeded table and lets the borrower override prime and
+  inflation, which is honest but not live. Wiring it up means either running the Java service or
+  publishing a small JSON feed the app fetches at startup.
+- **Crowdsourced submissions** are not wired into the static build. They need somewhere to write; a
+  Worker plus D1 would fit the free plan comfortably, since a single insert costs about a
+  millisecond of CPU.
 
 One deliberate deviation: §6.2 specifies parallelised Monte Carlo simulation for the optimizer.
 The implementation uses exhaustive enumeration over a 5% grid instead, exploiting the linearity of
