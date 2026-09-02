@@ -1,7 +1,13 @@
-# Deploying with the Wrangler CLI:  npx wrangler pages deploy dist
+# Deployed as a Worker serving static assets — the shape Cloudflare's build pipeline uses when the
+# deploy command is `npx wrangler deploy`.
 #
-# The Cloudflare dashboard's GitHub integration does not read this file — configure the build
-# there instead (root directory "frontend", build command "npm run build", output "dist").
+# There is deliberately no `main` entry point: the whole app is static, so no Worker script runs and
+# asset requests are served straight from Cloudflare's edge.
 name = "mashkanta"
-pages_build_output_dir = "dist"
 compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./dist"
+# Unmatched paths render the SPA shell and let the client route them. This is the native mechanism,
+# used instead of a catch-all rule in _redirects so it cannot shadow real asset paths.
+not_found_handling = "single-page-application"
