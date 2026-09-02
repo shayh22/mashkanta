@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: mashkanta-backend
+  datasource:
+    url: jdbc:h2:mem:mashkanta;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      # H2 is an ephemeral development database; Flyway owns the schema on PostgreSQL.
+      ddl-auto: create-drop
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Jerusalem
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  jackson:
+    default-property-inclusion: non_null
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  cors:
+    # localhost and 127.0.0.1 are different origins to a browser; both dev and preview ports
+    # are listed so a same-origin POST through the Vite proxy is not rejected.
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173
+  ingestion:
+    # Remote fetching is opt-in: without configured feed URLs the platform serves its seeded
+    # Bank of Israel and CBS anchors rather than inventing numbers.
+    enabled: false
+    cpi-url: ""
+    prime-url: ""
+    bond-url: ""
+
+logging:
+  level:
+    il.mashkanta: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/mashkanta}
+    driver-class-name: org.postgresql.Driver
+    username: ${DATABASE_USER:mashkanta}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
