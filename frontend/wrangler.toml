@@ -6,6 +6,11 @@
 name = "mashkanta"
 compatibility_date = "2026-09-01"
 
+# Publish on <name>.<subdomain>.workers.dev. This is the documented default, but it is stated
+# explicitly so a deploy cannot end up with no reachable URL because something upstream flipped it.
+# The account must also have claimed a workers.dev subdomain — that part is a dashboard action.
+workers_dev = true
+
 [assets]
 directory = "./dist"
 # Unmatched paths render the SPA shell and let the client route them. This is the native mechanism,
