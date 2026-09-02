@@ -37,30 +37,48 @@ npm run typecheck
 npm run build        # -> dist/, ready to upload anywhere
 ```
 
-### Deploying to Cloudflare Pages
+### Deploying to Cloudflare
 
-The whole app is static, so it fits Cloudflare's free tier with no request cap: *"Requests to static
-assets are free and unlimited."*
+The whole app is static, so it fits the free tier with no request cap: *"Requests to static assets
+are free and unlimited."*
 
-**From the dashboard** (GitHub-connected — pushes deploy automatically):
+It is configured for **Workers Static Assets**, which is what Cloudflare's build pipeline uses when
+the deploy command is `npx wrangler deploy`. `frontend/wrangler.toml` carries:
+
+```toml
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+```
+
+There is no `main` entry point, because no Worker script needs to run — asset requests are served
+straight from the edge.
+
+Build settings in the dashboard:
 
 | Setting | Value |
 | --- | --- |
-| Framework preset | None / Vite |
 | Root directory | `frontend` |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 
-**From the CLI:**
+**The `name` in wrangler.toml must match your Worker's name**, or the deploy creates a second Worker
+called `mashkanta` alongside your project.
+
+`public/_headers` is copied into `dist/` by Vite and is read natively by Workers Static Assets. The
+Content-Security-Policy in it was verified against the running app, including pdf.js starting its
+worker.
+
+Deploying by hand:
 
 ```bash
-cd frontend && npm run build
-npx wrangler pages deploy dist
+cd frontend && npm run build && npx wrangler deploy
+npx wrangler deploy --dry-run     # validate the config without shipping
 ```
 
-`public/_headers` and `public/_redirects` are copied into the build and handle the security headers
-and the single-page-app fallback. The Content-Security-Policy in `_headers` was verified against the
-running app, including pdf.js starting its worker.
+If you would rather use **Pages** than Workers, change the deploy command to
+`npx wrangler pages deploy dist` and delete the `[assets]` block — the two deploy paths read
+different configuration and cannot both be described in one file.
 
 ### The Java backend
 
