@@ -7,9 +7,10 @@ import { MortgageWizard } from './components/MortgageWizard';
 import { OfferReview } from './pages/OfferReview';
 import { ResultsDashboard } from './pages/ResultsDashboard';
 import { RefinancePage } from './pages/RefinancePage';
+import { ConsolidationPage } from './pages/ConsolidationPage';
 import { ErrorCard, LoadingCard } from './components/ui';
 
-type View = 'wizard' | 'results' | 'upload' | 'refinance';
+type View = 'wizard' | 'results' | 'upload' | 'refinance' | 'consolidation';
 
 export default function App() {
   const [view, setView] = useState<View>('wizard');
@@ -77,6 +78,8 @@ export default function App() {
 
         {view === 'refinance' && <RefinancePage />}
 
+        {view === 'consolidation' && <ConsolidationPage />}
+
         {view === 'upload' && (
           <div className="space-y-5">
             <OfferReview />
@@ -107,6 +110,7 @@ function Header({
     { id: 'results', label: 'תוצאות', enabled: hasResults },
     { id: 'upload', label: 'בדיקת הצעה שקיבלתי', enabled: true },
     { id: 'refinance', label: 'בדיקת מיחזור', enabled: true },
+    { id: 'consolidation', label: 'איחוד הלוואות', enabled: true },
   ];
 
   return (
