@@ -43,13 +43,13 @@ export function ResultsDashboard({
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
       {result.relaxedConstraints.length > 0 && (
-        <div className="card border-amber-200 bg-amber-50/60" role="alert">
-          <h2 className="text-sm font-semibold text-amber-800">לא כל האילוצים ניתנים לקיום</h2>
-          <p className="mt-1 text-sm text-amber-700">
+        <div className="card border-amber-500/30 bg-amber-500/10" role="alert">
+          <h2 className="text-sm font-semibold text-caution">לא כל האילוצים ניתנים לקיום</h2>
+          <p className="mt-1 text-sm text-caution">
             כדי למצוא תמהיל כלשהו נאלצנו לוותר על האילוצים הבאים. התוצאה שלהלן אינה מייצגת הלוואה
             שניתן לאשר כמות שהיא:
           </p>
-          <ul className="mt-2 list-inside list-disc text-sm text-amber-700">
+          <ul className="mt-2 list-inside list-disc text-sm text-caution">
             {result.relaxedConstraints.map((constraint) => (
               <li key={constraint}>{RELAXED_LABELS[constraint] ?? constraint}</li>
             ))}
@@ -126,7 +126,7 @@ export function ResultsDashboard({
         >
           <div className="grid gap-4 sm:grid-cols-2">
             {result.alternatives.map((alternative) => (
-              <article key={alternative.id} className="rounded-2xl border border-slate-200 p-4">
+              <article key={alternative.id} className="rounded-2xl border border-line p-4">
                 <h3 className="text-sm font-semibold text-ink">{alternative.name}</h3>
                 <ul className="mt-2 space-y-1 text-xs text-ink-muted">
                   {alternative.summary.allocations.map((allocation) => (
@@ -186,10 +186,10 @@ function TermSensitivity({
       title="השפעת התקופה"
       subtitle="אותו תמהיל בדיוק, בתקופות שונות. קיצור התקופה מייקר את ההחזר החודשי ומוזיל דרמטית את העלות הכוללת."
     >
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-xs text-ink-soft">
+            <tr className="border-b border-line text-xs text-ink-soft">
               <th className="py-2 text-start font-medium">תקופה</th>
               <th className="py-2 text-start font-medium">החזר חודשי</th>
               <th className="py-2 text-start font-medium">עלות כוללת</th>
@@ -197,7 +197,7 @@ function TermSensitivity({
               <th className="py-2 text-start font-medium">כשירות</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line/60">
             {options.map((option) => {
               const selected = option.termMonths === chosen;
               const chosenOption = options.find((entry) => entry.termMonths === chosen);
@@ -213,7 +213,7 @@ function TermSensitivity({
                   </td>
                   <td className="tabular py-2.5">{formatCurrency(option.initialPayment)}</td>
                   <td className="tabular py-2.5">{formatCurrency(option.totalPaid)}</td>
-                  <td className={`tabular py-2.5 ${delta < 0 ? 'text-emerald-600' : 'text-ink-soft'}`}>
+                  <td className={`tabular py-2.5 ${delta < 0 ? 'text-positive' : 'text-ink-soft'}`}>
                     {delta === 0 ? '—' : formatCurrency(delta)}
                   </td>
                   <td className="py-2.5">

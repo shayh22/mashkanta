@@ -39,14 +39,14 @@ function BankCard({ quote }: { quote: BankQuote }) {
   return (
     <article
       className={`rounded-2xl border p-4 transition ${
-        isBest ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white hover:bg-slate-50/60'
+        isBest ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-line bg-surface hover:bg-surface-muted/60'
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span
             className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-              isBest ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
+              isBest ? 'bg-emerald-500 text-white' : 'bg-line text-ink-soft'
             }`}
           >
             {quote.rank}

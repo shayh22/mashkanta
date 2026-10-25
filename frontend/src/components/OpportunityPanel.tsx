@@ -39,13 +39,13 @@ export function OpportunityPanel({ opportunity }: { opportunity: OpportunityRepo
         </div>
         <div>
           <dt className="text-xs text-ink-soft">עשירון עליון בשוק</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold text-emerald-600">
+          <dd className="tabular mt-0.5 text-lg font-semibold text-positive">
             {formatPercent(opportunity.bestWeightedRate)}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-ink-soft">חיסכון פוטנציאלי</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold text-emerald-600">
+          <dd className="tabular mt-0.5 text-lg font-semibold text-positive">
             {formatCurrency(opportunity.potentialSaving)}
           </dd>
         </div>
@@ -60,14 +60,14 @@ export function OpportunityPanel({ opportunity }: { opportunity: OpportunityRepo
       {opportunity.tracks.length > 0 && (
         <ul className="mt-5 space-y-2">
           {opportunity.tracks.map((track) => (
-            <li key={track.track} className="rounded-xl bg-slate-50 px-3 py-2">
+            <li key={track.track} className="rounded-xl bg-surface-muted px-3 py-2">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-sm font-medium text-ink">{track.hebrewName}</span>
                 <span className="tabular text-sm text-ink-muted">
                   {formatPercent(track.offeredRate)} מול ממוצע {formatPercent(track.medianRate)}
                 </span>
               </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line">
                 <div
                   className={`h-full rounded-full ${
                     track.percentile <= 0.35

@@ -3,7 +3,7 @@ import type { TrackType } from '../../lib/types';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { TRACK_LABEL, TRACK_OPTIONS } from '../../lib/trackOptions';
 import { useRefinance } from '../../store/refinanceStore';
-import { Card, NumberInput, RangeField, SegmentedControl, Toggle } from '../ui';
+import { ScrollRegion, Card, NumberInput, RangeField, SegmentedControl, Toggle } from '../ui';
 
 const ROUTE_TITLES: Record<RouteKind, { title: string; subtitle: string }> = {
   INTERNAL: { title: 'מיחזור פנימי', subtitle: 'באותו בנק — ללא עלויות מעבר' },
@@ -69,7 +69,7 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
         </div>
       ) : (
         <div className="mt-5">
-          <div className="-mx-1 overflow-x-auto px-1">
+          <ScrollRegion label="טבלת מסלולים מוצעים">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-line text-xs text-ink-soft">
@@ -134,7 +134,7 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
                     <td className="py-2 text-end">
                       <button
                         type="button"
-                        className="text-xs font-medium text-rose-600"
+                        className="text-xs font-medium text-negative"
                         onClick={() => state.removeProposed(track.id)}
                       >
                         הסרה
@@ -144,7 +144,7 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
           <button type="button" className="btn-ghost mt-3" onClick={state.addProposed}>
             הוספת מסלול מוצע
           </button>

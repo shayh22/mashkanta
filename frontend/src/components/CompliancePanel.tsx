@@ -28,7 +28,7 @@ export function CompliancePanel({ compliance }: { compliance: ComplianceReport }
         <Ratio label="בתרחיש קיצון" value={compliance.stressedPti} limit={0.4} />
       </dl>
 
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-line/60">
         {compliance.findings.map((finding) => (
           <li key={finding.code} className="flex items-start gap-3 py-3">
             <span
@@ -57,10 +57,10 @@ function Ratio({ label, value, limit }: { label: string; value: number; limit: n
   return (
     <div>
       <dt className="text-xs text-ink-soft">{label}</dt>
-      <dd className={`tabular mt-0.5 text-lg font-semibold ${over ? 'text-amber-600' : 'text-ink'}`}>
+      <dd className={`tabular mt-0.5 text-lg font-semibold ${over ? 'text-caution' : 'text-ink'}`}>
         {formatPercent(value, 1)}
       </dd>
-      <p className="text-xs text-ink-soft">מתוך {formatPercent(limit, 0)}</p>
+      <dd className="text-xs text-ink-soft">מתוך {formatPercent(limit, 0)}</dd>
     </div>
   );
 }

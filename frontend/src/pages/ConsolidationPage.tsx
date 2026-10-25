@@ -1,4 +1,10 @@
-import { BeforeAfterPanel, RegulatoryPanel, ShorteningSimulator } from '../components/consolidation/ConsolidationResults';
+import {
+  BeforeAfterPanel,
+  ConsolidationRisk,
+  ConsolidationWaterfall,
+  RegulatoryPanel,
+  ShorteningSimulator,
+} from '../components/consolidation/ConsolidationResults';
 import { DebtsTable, HouseholdCard, TermsCard } from '../components/consolidation/ConsolidationInputs';
 import { useConsolidationAnalysis } from '../store/consolidationStore';
 
@@ -20,6 +26,14 @@ export function ConsolidationPage() {
         </div>
       </div>
       <DebtsTable analysis={analysis} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="min-w-0">
+          <ConsolidationWaterfall analysis={analysis} />
+        </div>
+        <div className="min-w-0">
+          <ConsolidationRisk analysis={analysis} />
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="min-w-0">
           <BeforeAfterPanel analysis={analysis} />

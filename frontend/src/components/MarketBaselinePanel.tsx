@@ -47,15 +47,15 @@ export function MarketBaselinePanel({ baseline, highlightLtv }: { baseline: Base
       subtitle={`ריביות ממוצעות לפי מסלול ושיעור מימון · עודכן ${baseline.lastRefreshed}`}
       action={<span className="badge-neutral">פריים {formatPercent(baseline.anchors.prime)}</span>}
     >
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-xs text-ink-soft">
+            <tr className="border-b border-line text-xs text-ink-soft">
               <th className="py-2 text-start font-medium">מסלול</th>
               {(Object.keys(TIER_LABELS) as (keyof typeof TIER_LABELS)[]).map((tier) => (
                 <th
                   key={tier}
-                  className={`py-2 text-start font-medium ${tier === highlightTier ? 'text-brand-600' : ''}`}
+                  className={`py-2 text-start font-medium ${tier === highlightTier ? 'text-brand-700' : ''}`}
                 >
                   {TIER_LABELS[tier]}
                   {tier === highlightTier && <span className="ms-1">•</span>}
@@ -63,7 +63,7 @@ export function MarketBaselinePanel({ baseline, highlightLtv }: { baseline: Base
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line/60">
             {TRACK_ORDER.map((track) => (
               <tr key={track}>
                 <td className="py-2.5 font-medium text-ink">{TRACK_NAMES[track]}</td>
@@ -77,7 +77,7 @@ export function MarketBaselinePanel({ baseline, highlightLtv }: { baseline: Base
                       <span className="tabular block font-medium text-ink">
                         {formatPercent(rate.medianRate)}
                       </span>
-                      <span className="tabular block text-xs text-emerald-600">
+                      <span className="tabular block text-xs text-positive">
                         עשירון עליון {formatPercent(rate.bestRate)}
                       </span>
                     </td>
