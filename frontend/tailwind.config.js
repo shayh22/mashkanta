@@ -10,6 +10,8 @@ export default {
       },
       colors: {
         canvas: '#F8FAFC',
+        line: '#E2E8F0',
+        surface: '#FFFFFF',
         ink: {
           DEFAULT: '#0F172A',
           muted: '#334155',

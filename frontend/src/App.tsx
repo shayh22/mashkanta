@@ -6,9 +6,10 @@ import { useWizard } from './store/wizardStore';
 import { MortgageWizard } from './components/MortgageWizard';
 import { OfferReview } from './pages/OfferReview';
 import { ResultsDashboard } from './pages/ResultsDashboard';
+import { RefinancePage } from './pages/RefinancePage';
 import { ErrorCard, LoadingCard } from './components/ui';
 
-type View = 'wizard' | 'results' | 'upload';
+type View = 'wizard' | 'results' | 'upload' | 'refinance';
 
 export default function App() {
   const [view, setView] = useState<View>('wizard');
@@ -74,6 +75,8 @@ export default function App() {
           />
         )}
 
+        {view === 'refinance' && <RefinancePage />}
+
         {view === 'upload' && (
           <div className="space-y-5">
             <OfferReview />
@@ -103,6 +106,7 @@ function Header({
     { id: 'wizard', label: 'חישוב תמהיל', enabled: true },
     { id: 'results', label: 'תוצאות', enabled: hasResults },
     { id: 'upload', label: 'בדיקת הצעה שקיבלתי', enabled: true },
+    { id: 'refinance', label: 'בדיקת מיחזור', enabled: true },
   ];
 
   return (

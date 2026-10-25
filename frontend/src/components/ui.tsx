@@ -320,3 +320,87 @@ export function ErrorCard({ title, message, details = [] }: { title: string; mes
     </div>
   );
 }
+
+/**
+ * A compact numeric cell for editable tables. `scale` lets a percentage field show 4.5 while the
+ * engine stores 0.045, so no component ever multiplies by 100 by hand.
+ */
+export function NumberInput({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  scale = 1,
+  digits = 2,
+  className = '',
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  scale?: number;
+  digits?: number;
+  className?: string;
+}) {
+  return (
+    <input
+      className={`input tabular py-1.5 ${className}`}
+      type="number"
+      dir="ltr"
+      inputMode="decimal"
+      min={min}
+      max={max}
+      step={step}
+      aria-label={label}
+      value={Number((value * scale).toFixed(digits))}
+      onChange={(event) => {
+        const parsed = Number(event.target.value);
+        onChange(Number.isFinite(parsed) ? parsed / scale : 0);
+      }}
+    />
+  );
+}
+
+/** An accessible on/off switch. */
+export function Toggle({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: string;
+}) {
+  const id = useId();
+  return (
+    <div className="flex items-start gap-3">
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+          checked ? 'bg-brand-600' : 'bg-slate-300'
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+            checked ? '-translate-x-[22px]' : '-translate-x-0.5'
+          }`}
+          aria-hidden
+        />
+      </button>
+      <label htmlFor={id} className="cursor-pointer">
+        <span className="block text-sm font-medium text-ink-muted">{label}</span>
+        {hint && <span className="hint mt-0.5 block">{hint}</span>}
+      </label>
+    </div>
+  );
+}

@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  /* Categorical chart series, validated for colour-vision deficiency against the light surface. */
+  :root {
+    --chart-1: #4f46e5;
+    --chart-2: #d97706;
+  }
+
   html {
     /* Israeli financial UIs are right-to-left; the dir attribute on <html> drives Tailwind's
        logical properties (ms-/me-/ps-/pe-) throughout the app. */
