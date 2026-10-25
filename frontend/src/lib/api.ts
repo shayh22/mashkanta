@@ -89,7 +89,7 @@ function currentAnchors(): MacroAnchors {
   };
 }
 
-function scenarioOf(macro?: MacroRequest): EngineScenario {
+export function scenarioOf(macro?: MacroRequest): EngineScenario {
   const anchors = currentAnchors();
   return baselineScenario(
     macro?.prime ?? anchors.prime,
