@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { scenarioOf } from '../lib/api';
 import type { ExistingTrack } from '../engine/prepayment';
 import {
@@ -13,17 +14,38 @@ import {
   type SwitchingCosts,
 } from '../engine/refinance';
 import { useWizard } from './wizardStore';
+import { browserStorage, storageKey, uniqueId } from './persistence';
 
 export type ProposalMode = 'AUTO' | 'MANUAL';
 
-let nextId = 1;
-/** Row ids only need to be unique within the session; they key React lists and pair tracks. */
-export const newTrackId = () => `t${nextId++}`;
+/** Row ids key React lists and pair an existing track with its proposed replacement. */
+export const newTrackId = () => uniqueId('t');
 
 const DEFAULT_TRACKS: ExistingTrack[] = [
-  { id: newTrackId(), type: 'PRIME', balance: 420_000, annualRate: 0.0625, remainingMonths: 264, monthsElapsed: 48 },
-  { id: newTrackId(), type: 'FIXED_UNLINKED', balance: 380_000, annualRate: 0.061, remainingMonths: 264, monthsElapsed: 48 },
-  { id: newTrackId(), type: 'FIXED_LINKED', balance: 260_000, annualRate: 0.039, remainingMonths: 204, monthsElapsed: 48 },
+  {
+    id: newTrackId(),
+    type: 'PRIME',
+    balance: 420_000,
+    annualRate: 0.0625,
+    remainingMonths: 264,
+    monthsElapsed: 48,
+  },
+  {
+    id: newTrackId(),
+    type: 'FIXED_UNLINKED',
+    balance: 380_000,
+    annualRate: 0.061,
+    remainingMonths: 264,
+    monthsElapsed: 48,
+  },
+  {
+    id: newTrackId(),
+    type: 'FIXED_LINKED',
+    balance: 260_000,
+    annualRate: 0.039,
+    remainingMonths: 204,
+    monthsElapsed: 48,
+  },
 ];
 
 interface RefinanceState {
@@ -68,58 +90,92 @@ const INITIAL = {
   routes: DEFAULT_ROUTES,
 };
 
-export const useRefinance = create<RefinanceState>((set) => ({
-  ...INITIAL,
+export const useRefinance = create<RefinanceState>()(
+  persist(
+    (set) => ({
+      ...INITIAL,
 
-  setPropertyValue: (propertyValue) => set({ propertyValue }),
-  setTracks: (tracks) => set({ tracks }),
-  addTrack: () =>
-    set((state) => ({
-      tracks: [
-        ...state.tracks,
-        { id: newTrackId(), type: 'FIXED_UNLINKED', balance: 200_000, annualRate: 0.055, remainingMonths: 240, monthsElapsed: 36 },
-      ],
-    })),
-  updateTrack: (id, patch) =>
-    set((state) => ({ tracks: state.tracks.map((track) => (track.id === id ? { ...track, ...patch } : track)) })),
-  removeTrack: (id) => set((state) => ({ tracks: state.tracks.filter((track) => track.id !== id) })),
+      setPropertyValue: (propertyValue) => set({ propertyValue }),
+      setTracks: (tracks) => set({ tracks }),
+      addTrack: () =>
+        set((state) => ({
+          tracks: [
+            ...state.tracks,
+            {
+              id: newTrackId(),
+              type: 'FIXED_UNLINKED',
+              balance: 200_000,
+              annualRate: 0.055,
+              remainingMonths: 240,
+              monthsElapsed: 36,
+            },
+          ],
+        })),
+      updateTrack: (id, patch) =>
+        set((state) => ({
+          tracks: state.tracks.map((track) => (track.id === id ? { ...track, ...patch } : track)),
+        })),
+      removeTrack: (id) => set((state) => ({ tracks: state.tracks.filter((track) => track.id !== id) })),
 
-  setProposalMode: (proposalMode, seed) =>
-    set((state) => ({
-      proposalMode,
-      // Switching to manual starts from the automatic proposal, so the borrower edits a sensible
-      // mix rather than an empty table.
-      manualProposal: proposalMode === 'MANUAL' && state.manualProposal.length === 0 && seed ? seed : state.manualProposal,
-    })),
-  setPercentile: (percentile) => set({ percentile }),
-  updateProposed: (id, patch) =>
-    set((state) => ({
-      manualProposal: state.manualProposal.map((track) => (track.id === id ? { ...track, ...patch } : track)),
-    })),
-  addProposed: () =>
-    set((state) => ({
-      manualProposal: [
-        ...state.manualProposal,
-        { id: newTrackId(), type: 'FIXED_UNLINKED', amount: 100_000, annualRate: 0.05, termMonths: 240 },
-      ],
-    })),
-  removeProposed: (id) =>
-    set((state) => ({ manualProposal: state.manualProposal.filter((track) => track.id !== id) })),
+      setProposalMode: (proposalMode, seed) =>
+        set((state) => ({
+          proposalMode,
+          // Switching to manual starts from the automatic proposal, so the borrower edits a sensible
+          // mix rather than an empty table.
+          manualProposal:
+            proposalMode === 'MANUAL' && state.manualProposal.length === 0 && seed
+              ? seed
+              : state.manualProposal,
+        })),
+      setPercentile: (percentile) => set({ percentile }),
+      updateProposed: (id, patch) =>
+        set((state) => ({
+          manualProposal: state.manualProposal.map((track) =>
+            track.id === id ? { ...track, ...patch } : track,
+          ),
+        })),
+      addProposed: () =>
+        set((state) => ({
+          manualProposal: [
+            ...state.manualProposal,
+            { id: newTrackId(), type: 'FIXED_UNLINKED', amount: 100_000, annualRate: 0.05, termMonths: 240 },
+          ],
+        })),
+      removeProposed: (id) =>
+        set((state) => ({ manualProposal: state.manualProposal.filter((track) => track.id !== id) })),
 
-  setNoticeGiven: (noticeGiven) => set({ noticeGiven }),
-  setDayOfMonth: (dayOfMonth) => set({ dayOfMonth: Math.min(31, Math.max(1, Math.round(dayOfMonth))) }),
-  setDiscountRate: (discountRate) => set({ discountRate }),
-  setRouteCost: (kind, patch) =>
-    set((state) => ({
-      routes: {
-        ...state.routes,
-        [kind]: { ...state.routes[kind], costs: { ...state.routes[kind].costs, ...patch } },
-      },
-    })),
-  setRouteDelta: (kind, rateDelta) =>
-    set((state) => ({ routes: { ...state.routes, [kind]: { ...state.routes[kind], rateDelta } } })),
-  reset: () => set(INITIAL),
-}));
+      setNoticeGiven: (noticeGiven) => set({ noticeGiven }),
+      setDayOfMonth: (dayOfMonth) => set({ dayOfMonth: Math.min(31, Math.max(1, Math.round(dayOfMonth))) }),
+      setDiscountRate: (discountRate) => set({ discountRate }),
+      setRouteCost: (kind, patch) =>
+        set((state) => ({
+          routes: {
+            ...state.routes,
+            [kind]: { ...state.routes[kind], costs: { ...state.routes[kind].costs, ...patch } },
+          },
+        })),
+      setRouteDelta: (kind, rateDelta) =>
+        set((state) => ({ routes: { ...state.routes, [kind]: { ...state.routes[kind], rateDelta } } })),
+      reset: () => set(INITIAL),
+    }),
+    {
+      name: storageKey('refinance'),
+      version: 1,
+      storage: browserStorage,
+      partialize: (state) => ({
+        propertyValue: state.propertyValue,
+        tracks: state.tracks,
+        proposalMode: state.proposalMode,
+        percentile: state.percentile,
+        manualProposal: state.manualProposal,
+        noticeGiven: state.noticeGiven,
+        dayOfMonth: state.dayOfMonth,
+        discountRate: state.discountRate,
+        routes: state.routes,
+      }),
+    },
+  ),
+);
 
 export function outstandingBalance(tracks: readonly ExistingTrack[]): number {
   return tracks.reduce((sum, track) => sum + Math.max(0, track.balance), 0);

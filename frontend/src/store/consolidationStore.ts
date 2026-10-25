@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import {
   analyseConsolidation,
   recommendDebt,
@@ -9,9 +10,9 @@ import {
   type PropertyPosition,
 } from '../engine/consolidation';
 import { DEFAULT_PRIME } from '../engine/scenario';
+import { browserStorage, storageKey, uniqueId } from './persistence';
 
-let nextId = 1;
-const newDebtId = () => `d${nextId++}`;
+const newDebtId = () => uniqueId('d');
 
 /** Prime plus a typical all-purpose margin, and a fixed rate a little above it. */
 export const DEFAULT_TERMS: ConsolidationTerms = {
@@ -24,10 +25,46 @@ export const DEFAULT_TERMS: ConsolidationTerms = {
 };
 
 const DEFAULT_DEBTS: ConsumerDebt[] = [
-  { id: newDebtId(), kind: 'CAR', label: 'הלוואת רכב', balance: 95_000, annualRate: 0.089, monthlyPayment: 2_350, remainingMonths: 48, include: true },
-  { id: newDebtId(), kind: 'NON_BANK', label: 'הלוואה חוץ-בנקאית', balance: 60_000, annualRate: 0.135, monthlyPayment: 1_650, remainingMonths: 46, include: true },
-  { id: newDebtId(), kind: 'OVERDRAFT', label: 'מינוס קבוע', balance: 25_000, annualRate: 0.115, monthlyPayment: 900, remainingMonths: 36, include: true },
-  { id: newDebtId(), kind: 'CREDIT_CARD', label: 'עסקת קרדיט', balance: 9_000, annualRate: 0.12, monthlyPayment: 820, remainingMonths: 12, include: false },
+  {
+    id: newDebtId(),
+    kind: 'CAR',
+    label: 'הלוואת רכב',
+    balance: 95_000,
+    annualRate: 0.089,
+    monthlyPayment: 2_350,
+    remainingMonths: 48,
+    include: true,
+  },
+  {
+    id: newDebtId(),
+    kind: 'NON_BANK',
+    label: 'הלוואה חוץ-בנקאית',
+    balance: 60_000,
+    annualRate: 0.135,
+    monthlyPayment: 1_650,
+    remainingMonths: 46,
+    include: true,
+  },
+  {
+    id: newDebtId(),
+    kind: 'OVERDRAFT',
+    label: 'מינוס קבוע',
+    balance: 25_000,
+    annualRate: 0.115,
+    monthlyPayment: 900,
+    remainingMonths: 36,
+    include: true,
+  },
+  {
+    id: newDebtId(),
+    kind: 'CREDIT_CARD',
+    label: 'עסקת קרדיט',
+    balance: 9_000,
+    annualRate: 0.12,
+    monthlyPayment: 820,
+    remainingMonths: 12,
+    include: false,
+  },
 ];
 
 const DEFAULT_PROPERTY: PropertyPosition = {
@@ -67,28 +104,58 @@ const INITIAL = {
   reinvestShare: 0.5,
 };
 
-export const useConsolidation = create<ConsolidationState>((set) => ({
-  ...INITIAL,
-  setNetIncome: (netIncome) => set({ netIncome: Math.max(0, netIncome) }),
-  setProperty: (patch) => set((state) => ({ property: { ...state.property, ...patch } })),
-  setTerms: (patch) => set((state) => ({ terms: { ...state.terms, ...patch } })),
-  addDebt: () =>
-    set((state) => ({
-      debts: [
-        ...state.debts,
-        { id: newDebtId(), kind: 'OTHER', label: 'הלוואה נוספת', balance: 30_000, annualRate: 0.09, monthlyPayment: 950, remainingMonths: 36, include: true },
-      ],
-    })),
-  updateDebt: (id, patch) =>
-    set((state) => ({ debts: state.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)) })),
-  removeDebt: (id) => set((state) => ({ debts: state.debts.filter((debt) => debt.id !== id) })),
-  applyRecommendations: (blendedRate) =>
-    set((state) => ({
-      debts: state.debts.map((debt) => ({ ...debt, include: recommendDebt(debt, blendedRate).action === 'CONSOLIDATE' })),
-    })),
-  setReinvestShare: (reinvestShare) => set({ reinvestShare: Math.min(1, Math.max(0, reinvestShare)) }),
-  reset: () => set(INITIAL),
-}));
+export const useConsolidation = create<ConsolidationState>()(
+  persist(
+    (set) => ({
+      ...INITIAL,
+      setNetIncome: (netIncome) => set({ netIncome: Math.max(0, netIncome) }),
+      setProperty: (patch) => set((state) => ({ property: { ...state.property, ...patch } })),
+      setTerms: (patch) => set((state) => ({ terms: { ...state.terms, ...patch } })),
+      addDebt: () =>
+        set((state) => ({
+          debts: [
+            ...state.debts,
+            {
+              id: newDebtId(),
+              kind: 'OTHER',
+              label: 'הלוואה נוספת',
+              balance: 30_000,
+              annualRate: 0.09,
+              monthlyPayment: 950,
+              remainingMonths: 36,
+              include: true,
+            },
+          ],
+        })),
+      updateDebt: (id, patch) =>
+        set((state) => ({
+          debts: state.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)),
+        })),
+      removeDebt: (id) => set((state) => ({ debts: state.debts.filter((debt) => debt.id !== id) })),
+      applyRecommendations: (blendedRate) =>
+        set((state) => ({
+          debts: state.debts.map((debt) => ({
+            ...debt,
+            include: recommendDebt(debt, blendedRate).action === 'CONSOLIDATE',
+          })),
+        })),
+      setReinvestShare: (reinvestShare) => set({ reinvestShare: Math.min(1, Math.max(0, reinvestShare)) }),
+      reset: () => set(INITIAL),
+    }),
+    {
+      name: storageKey('consolidation'),
+      version: 1,
+      storage: browserStorage,
+      partialize: (state) => ({
+        netIncome: state.netIncome,
+        debts: state.debts,
+        property: state.property,
+        terms: state.terms,
+        reinvestShare: state.reinvestShare,
+      }),
+    },
+  ),
+);
 
 /** The analysis, recomputed only when an input changes. */
 export function useConsolidationAnalysis(): ConsolidationAnalysis {
@@ -96,5 +163,8 @@ export function useConsolidationAnalysis(): ConsolidationAnalysis {
   const debts = useConsolidation((state) => state.debts);
   const property = useConsolidation((state) => state.property);
   const terms = useConsolidation((state) => state.terms);
-  return useMemo(() => analyseConsolidation({ netIncome, debts, property, terms }), [netIncome, debts, property, terms]);
+  return useMemo(
+    () => analyseConsolidation({ netIncome, debts, property, terms }),
+    [netIncome, debts, property, terms],
+  );
 }
