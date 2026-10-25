@@ -189,6 +189,22 @@ input[type='range']::-moz-range-thumb {
     display: none !important;
   }
 
+  /* "Print the action plan" prints that card alone, full width, wherever it sits on the page. */
+  body[data-print='report'] * {
+    visibility: hidden;
+  }
+
+  body[data-print='report'] .report,
+  body[data-print='report'] .report * {
+    visibility: visible;
+  }
+
+  body[data-print='report'] .report {
+    position: absolute;
+    inset: 0 0 auto 0;
+    border: none;
+  }
+
   .card {
     box-shadow: none;
     backdrop-filter: none;
