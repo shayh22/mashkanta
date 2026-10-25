@@ -55,14 +55,14 @@ export function ReportExportModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl focus:outline-none"
+        className="w-full max-w-lg rounded-2xl bg-surface p-6 shadow-xl focus:outline-none"
       >
         <h2 className="text-lg font-semibold text-ink">שיתוף וייצוא</h2>
         <p className="mt-1 text-sm text-ink-soft">
           שמרו את ההשוואה כקובץ PDF או שלחו את התקציר ליועץ המשכנתאות שלכם.
         </p>
 
-        <pre className="mt-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-xs text-ink-muted">
+        <pre className="mt-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-surface-muted p-3 text-xs text-ink-muted">
           {summary}
         </pre>
 

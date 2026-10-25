@@ -4,7 +4,7 @@ import { formatCurrency, formatPercent } from '../../lib/format';
 import { TRACK_OPTIONS } from '../../lib/trackOptions';
 import { newTrackId, outstandingBalance, useRefinance } from '../../store/refinanceStore';
 import { ApprovalUploader } from '../ApprovalUploader';
-import { Card, CurrencyField, NumberInput } from '../ui';
+import { ScrollRegion, Card, CurrencyField, NumberInput } from '../ui';
 
 /**
  * The mortgage as it stands today, one row per track — what a payoff statement (דוח יתרות לסילוק)
@@ -61,7 +61,7 @@ export function ExistingTracksEditor() {
         {tracks.length === 0 ? (
           <p className="py-6 text-center text-sm text-ink-soft">הוסיפו מסלול או העלו מסמך כדי להתחיל.</p>
         ) : (
-          <div className="-mx-1 overflow-x-auto px-1">
+          <ScrollRegion label="טבלת מסלולים קיימים">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-line text-xs text-ink-soft">
@@ -136,7 +136,7 @@ export function ExistingTracksEditor() {
                     <td className="py-2 text-end">
                       <button
                         type="button"
-                        className="text-xs font-medium text-rose-600"
+                        className="text-xs font-medium text-negative"
                         onClick={() => removeTrack(track.id)}
                         aria-label={`הסרת מסלול ${TRACK_OPTIONS.find((o) => o.value === track.type)?.label ?? ''}`}
                       >
@@ -150,7 +150,7 @@ export function ExistingTracksEditor() {
             <p className="mt-3 text-sm text-ink-muted">
               סך היתרה לסילוק: <span className="tabular font-semibold">{formatCurrency(balance)}</span>
             </p>
-          </div>
+          </ScrollRegion>
         )}
       </Card>
 

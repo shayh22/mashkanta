@@ -1,0 +1,79 @@
+// End-to-end smoke check: every mode, desktop and phone, light and dark.
+//
+//   npm run build && npx vite preview --port 4173 &
+//   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
+//
+// Fails on any console error, uncaught exception, horizontal page overflow, or axe-core
+// violation of serious/critical impact. Uses the Playwright that ships with the environment.
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+
+const require = createRequire(import.meta.url);
+let playwright;
+try {
+  playwright = require('playwright');
+} catch {
+  playwright = require(`${process.env.NODE_PATH ?? '/usr/lib/node_modules'}/playwright`);
+}
+const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+
+const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
+const MODES = ['mortgage', 'refinance', 'consolidation'];
+const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, height: 780 } };
+
+const browser = await playwright.chromium.launch();
+const problems = [];
+
+for (const [device, viewport] of Object.entries(VIEWPORTS)) {
+  for (const scheme of ['light', 'dark']) {
+    const page = await browser.newPage({ viewport, colorScheme: scheme });
+    const tag = (mode) => `${device}/${scheme}/${mode}`;
+    let current = 'load';
+    page.on('console', (message) => message.type() === 'error' && problems.push(`${tag(current)} console: ${message.text()}`));
+    page.on('pageerror', (error) => problems.push(`${tag(current)} exception: ${error.message}`));
+
+    for (const mode of [...MODES, 'mortgage-results']) {
+      current = mode;
+      if (mode === 'mortgage-results') {
+        // Walk the wizard to the optimizer's results, the heaviest page in the app.
+        await page.goto(`${base}/#/mortgage`);
+        await page.getByRole('button', { name: 'המשך' }).click();
+        await page.getByRole('button', { name: 'המשך' }).click();
+        await page.getByRole('button', { name: 'חשב תמהיל אופטימלי' }).click();
+        await page.getByRole('button', { name: 'תוצאות', pressed: true }).waitFor({ timeout: 15_000 });
+      } else {
+        await page.goto(`${base}/#/${mode}`);
+      }
+      await page.waitForTimeout(1800);
+      const dark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+      if (dark !== (scheme === 'dark')) {
+        problems.push(`${tag(mode)} theme class did not follow the system preference`);
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      if (overflow > 1) {
+        problems.push(`${tag(mode)} horizontal overflow of ${overflow}px`);
+      }
+      await page.evaluate(axeSource);
+      const result = await page.evaluate(async () =>
+        axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
+      );
+      for (const violation of result.violations) {
+        if (violation.impact === 'serious' || violation.impact === 'critical') {
+          const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
+          problems.push(`${tag(mode)} axe ${violation.id} (${violation.nodes.length}): ${where}`);
+        }
+      }
+      if (shots) {
+        await page.screenshot({ path: `${shots}/${device}-${scheme}-${mode}.png`, fullPage: true });
+      }
+    }
+    await page.close();
+  }
+}
+
+await browser.close();
+if (problems.length > 0) {
+  console.error(problems.join('\n'));
+  process.exit(1);
+}
+console.log('smoke: all modes clean on desktop and phone, light and dark');

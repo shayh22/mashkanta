@@ -9,7 +9,7 @@ import { useRefinanceAnalysis } from '../store/refinanceStore';
  * few hundred months and takes a few milliseconds, so there is no submit button to forget.
  */
 export function RefinancePage() {
-  const { proposal, comparison } = useRefinanceAnalysis();
+  const { proposal, comparison, ltv } = useRefinanceAnalysis();
 
   return (
     <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-5 lg:grid-cols-2">
@@ -20,7 +20,7 @@ export function RefinancePage() {
       </div>
       <div className="min-w-0 space-y-5">
         {comparison ? (
-          <RefinanceResults comparison={comparison} />
+          <RefinanceResults comparison={comparison} ltv={ltv} />
         ) : (
           <Card title="תוצאות">
             <p className="text-sm text-ink-soft">

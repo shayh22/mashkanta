@@ -88,7 +88,7 @@ export function ApprovalUploader({
           handleFiles(event.dataTransfer.files);
         }}
         className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
-          dragging ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-slate-50/50'
+          dragging ? 'border-brand-500 bg-brand-50' : 'border-line-strong bg-surface-muted/50'
         }`}
       >
         <p className="text-sm font-medium text-ink">גררו לכאן את קובץ ה-PDF של האישור העקרוני</p>
@@ -121,7 +121,7 @@ export function ApprovalUploader({
       {upload.isPending && <p className="mt-4 text-sm text-ink-soft">מעלה את הקובץ…</p>}
 
       {upload.isError && (
-        <p className="mt-4 text-sm text-rose-600">
+        <p className="mt-4 text-sm text-negative">
           {upload.error instanceof ApiError ? upload.error.message : 'העלאת הקובץ נכשלה.'}
         </p>
       )}
@@ -131,16 +131,16 @@ export function ApprovalUploader({
       )}
 
       {job.data?.status === 'FAILED' && (
-        <p className="mt-4 text-sm text-rose-600">{job.data.error ?? 'עיבוד המסמך נכשל.'}</p>
+        <p className="mt-4 text-sm text-negative">{job.data.error ?? 'עיבוד המסמך נכשל.'}</p>
       )}
 
       {result && (
         <div className="mt-5 space-y-4">
-          <div className="rounded-xl bg-emerald-50 p-3">
-            <p className="text-sm font-medium text-emerald-800">
+          <div className="rounded-xl bg-emerald-500/10 p-3">
+            <p className="text-sm font-medium text-positive">
               הוסרו {job.data?.redactedSpans ?? 0} פרטים מזהים לפני כל שמירה
             </p>
-            <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-emerald-700">
+            <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-positive">
               {Object.entries(result.redactionsByCategory).map(([category, count]) => (
                 <li key={category}>
                   {REDACTION_LABELS[category] ?? category}: {count}
@@ -150,17 +150,17 @@ export function ApprovalUploader({
           </div>
 
           {result.tracks.length > 0 && (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs text-ink-soft">
+                  <tr className="border-b border-line text-xs text-ink-soft">
                     <th className="py-2 text-start font-medium">מסלול</th>
                     <th className="py-2 text-start font-medium">סכום</th>
                     <th className="py-2 text-start font-medium">ריבית</th>
                     <th className="py-2 text-start font-medium">תקופה</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line/60">
                   {result.tracks.map((track, index) => (
                     <tr key={`${track.track}-${index}`}>
                       <td className="py-2 font-medium text-ink">{track.hebrewName}</td>
@@ -171,7 +171,7 @@ export function ApprovalUploader({
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-slate-200 font-semibold">
+                  <tr className="border-t border-line font-semibold">
                     <td className="py-2">סה"כ</td>
                     <td className="tabular py-2">{formatCurrency(result.totalAmount)}</td>
                     <td colSpan={2} />
@@ -182,7 +182,7 @@ export function ApprovalUploader({
           )}
 
           {result.warnings.length > 0 && (
-            <ul className="list-inside list-disc rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+            <ul className="list-inside list-disc rounded-xl bg-amber-500/10 p-3 text-xs text-caution">
               {result.warnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}

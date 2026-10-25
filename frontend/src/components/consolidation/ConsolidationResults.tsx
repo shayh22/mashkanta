@@ -3,6 +3,9 @@ import { CONSOLIDATION_LIMITS, repayWithExtra, type ConsolidationAnalysis } from
 import { formatCompact, formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../../lib/format';
 import { useConsolidation } from '../../store/consolidationStore';
 import { Card, LevelBadge, RangeField, Stat } from '../ui';
+import { WaterfallChart } from '../charts/WaterfallChart';
+import { RiskPanel } from '../charts/RiskGauge';
+import { ltvRisk, primeRisk, ptiRisk } from '../../engine/risk';
 
 const LEVEL_TEXT = { OK: 'תקין', WARNING: 'לתשומת לב', BLOCKING: 'חוסם' } as const;
 
@@ -10,16 +13,16 @@ const LEVEL_TEXT = { OK: 'תקין', WARNING: 'לתשומת לב', BLOCKING: 'ח
 export function RegulatoryPanel({ analysis }: { analysis: ConsolidationAnalysis }) {
   const r = analysis.regulation;
   const verdict = !r.feasible
-    ? { className: 'border-rose-500/30 bg-rose-500/10 text-rose-800', icon: '✕', title: 'לא עומד בהוראה 329 כפי שהוגדר' }
+    ? { className: 'border-rose-500/30 bg-rose-500/10 text-negative', icon: '✕', title: 'לא עומד בהוראה 329 כפי שהוגדר' }
     : !r.bankFeasible
-      ? { className: 'border-amber-500/30 bg-amber-500/10 text-amber-800', icon: '!', title: 'עומד ברגולציה, מעל מדיניות 40% המקובלת בבנקים' }
-      : { className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800', icon: '✓', title: 'בר-ביצוע לפי הוראת בנק ישראל מ-1.10.2026' };
+      ? { className: 'border-amber-500/30 bg-amber-500/10 text-caution', icon: '!', title: 'עומד ברגולציה, מעל מדיניות 40% המקובלת בבנקים' }
+      : { className: 'border-emerald-500/30 bg-emerald-500/10 text-positive', icon: '✓', title: 'בר-ביצוע לפי הוראת בנק ישראל מ-1.10.2026' };
 
   return (
     <div className="space-y-5">
       <section className={`animate-fade-up rounded-2xl border p-5 ${verdict.className}`} aria-live="polite">
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-lg font-bold" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface/70 text-lg font-bold" aria-hidden>
             {verdict.icon}
           </span>
           <div>
@@ -131,7 +134,15 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
             <Tooltip
               formatter={(value: number) => formatCurrency(value)}
               labelFormatter={(month: number) => `חודש ${month}`}
-              contentStyle={{ direction: 'rtl', borderRadius: 12, fontSize: 12 }}
+              contentStyle={{
+                direction: 'rtl',
+                borderRadius: 12,
+                fontSize: 12,
+                background: 'rgb(var(--surface))',
+                borderColor: 'rgb(var(--line))',
+                color: 'rgb(var(--ink))',
+              }}
+              cursor={{ stroke: 'currentColor', strokeOpacity: 0.3 }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line type="stepAfter" dataKey="before" name="בלי איחוד" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
@@ -194,4 +205,26 @@ export function ShorteningSimulator({ analysis }: { analysis: ConsolidationAnaly
       </p>
     </Card>
   );
+}
+
+/** Today's total payment, each debt that disappears, the new loan, and the total after. */
+export function ConsolidationWaterfall({ analysis }: { analysis: ConsolidationAnalysis }) {
+  return (
+    <WaterfallChart
+      title="מפל ההחזר החודשי"
+      subtitle="סך ההחזרים היום, ההלוואות שנסגרות, ההלוואה החדשה — וסך ההחזרים אחרי האיחוד."
+      start={analysis.paymentBefore}
+      steps={[
+        ...analysis.included.map((debt) => ({ label: debt.label, delta: -debt.monthlyPayment })),
+        { label: 'הלוואה חדשה', delta: analysis.allocation.payment },
+      ]}
+      endLabel="אחרי איחוד"
+    />
+  );
+}
+
+/** Stability after consolidation, against the Directive 329 thresholds. */
+export function ConsolidationRisk({ analysis }: { analysis: ConsolidationAnalysis }) {
+  const r = analysis.regulation;
+  return <RiskPanel indicators={[ltvRisk(r.ltvAfter), ptiRisk(r.pti), primeRisk(r.variableShareAfter)]} />;
 }

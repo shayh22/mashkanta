@@ -1,7 +1,7 @@
 import { DEBT_KIND_LABELS, type ConsolidationAnalysis, type DebtKind } from '../../engine/consolidation';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { useConsolidation } from '../../store/consolidationStore';
-import { Card, CurrencyField, NumberInput, RangeField } from '../ui';
+import { ScrollRegion, Card, CurrencyField, NumberInput, RangeField } from '../ui';
 
 const ACTION_BADGE = {
   CONSOLIDATE: { className: 'badge-ok', label: 'מומלץ לאחד' },
@@ -93,7 +93,7 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
         </div>
       }
     >
-      <div className="-mx-1 overflow-x-auto px-1">
+      <ScrollRegion label="טבלת התחייבויות">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-ink-soft">
@@ -185,7 +185,7 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
                   <td className="py-2 text-end">
                     <button
                       type="button"
-                      className="text-xs font-medium text-rose-600"
+                      className="text-xs font-medium text-negative"
                       onClick={() => removeDebt(debt.id)}
                       aria-label={`הסרת ${debt.label}`}
                     >
@@ -197,7 +197,7 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       <p className="mt-3 text-sm text-ink-muted">
         לאיחוד: <span className="tabular font-semibold">{analysis.included.length}</span> הלוואות בסך{' '}
         <span className="tabular font-semibold">

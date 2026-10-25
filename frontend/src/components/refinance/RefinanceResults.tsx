@@ -7,13 +7,19 @@ import {
 } from '../../engine/refinance';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../../lib/format';
 import { TRACK_LABEL } from '../../lib/trackOptions';
-import { Card, Stat } from '../ui';
+import { ScrollRegion, Card, Stat } from '../ui';
 import { BreakevenChart } from './BreakevenChart';
+import { WaterfallChart } from '../charts/WaterfallChart';
+import { RiskPanel } from '../charts/RiskGauge';
+import { cpiRisk, ltvRisk, primeRisk } from '../../engine/risk';
+import { TRACKS } from '../../engine/tracks';
+import type { TrackType } from '../../lib/types';
+import type { WaterfallStep } from '../../lib/waterfall';
 
 const VERDICT_STYLE: Record<RefinanceVerdict, { box: string; icon: string }> = {
-  IMMEDIATE: { box: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800', icon: '✓' },
-  LONG_TERM: { box: 'border-amber-500/30 bg-amber-500/10 text-amber-800', icon: '!' },
-  NOT_WORTHWHILE: { box: 'border-rose-500/30 bg-rose-500/10 text-rose-800', icon: '✕' },
+  IMMEDIATE: { box: 'border-emerald-500/30 bg-emerald-500/10 text-positive', icon: '✓' },
+  LONG_TERM: { box: 'border-amber-500/30 bg-amber-500/10 text-caution', icon: '!' },
+  NOT_WORTHWHILE: { box: 'border-rose-500/30 bg-rose-500/10 text-negative', icon: '✕' },
 };
 
 const ROUTE_NAME = { INTERNAL: 'מיחזור פנימי', EXTERNAL: 'בנק מתחרה' } as const;
@@ -23,7 +29,7 @@ function months(value: number): string {
 }
 
 /** The decision first, then the numbers behind it, then the fee detail. */
-export function RefinanceResults({ comparison }: { comparison: RefinanceComparison }) {
+export function RefinanceResults({ comparison, ltv }: { comparison: RefinanceComparison; ltv: number }) {
   const best = comparison.best === 'EXTERNAL' ? comparison.external : comparison.internal;
   const style = VERDICT_STYLE[best.verdict];
 
@@ -35,7 +41,7 @@ export function RefinanceResults({ comparison }: { comparison: RefinanceComparis
         aria-label="המלצת מיחזור"
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-lg font-bold" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface/70 text-lg font-bold" aria-hidden>
             {style.icon}
           </span>
           <div>
@@ -63,7 +69,7 @@ export function RefinanceResults({ comparison }: { comparison: RefinanceComparis
           />
         </dl>
 
-        <div className="-mx-1 mt-6 overflow-x-auto px-1">
+        <ScrollRegion label="השוואת הדרכים" className="mt-6">
           <table className="w-full min-w-[480px] text-sm">
             <caption className="sr-only">השוואת מיחזור פנימי מול מעבר לבנק מתחרה</caption>
             <thead>
@@ -90,10 +96,27 @@ export function RefinanceResults({ comparison }: { comparison: RefinanceComparis
               <Row label="פסיקה" pick={(a) => VERDICT_LABELS[a.verdict]} comparison={comparison} />
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       </Card>
 
+      <WaterfallChart
+        title="ההחזר החודשי — לפני ואחרי"
+        subtitle={`המעבר מההחזר היום להחזר אחרי ${ROUTE_NAME[comparison.best]}, מסלול אחר מסלול.`}
+        start={best.currentPayment}
+        steps={trackSteps(best)}
+        endLabel="אחרי מיחזור"
+      />
+
       <BreakevenChart comparison={comparison} />
+
+      <RiskPanel
+        title="מד סיכון — התמהיל החדש"
+        indicators={[
+          ltvRisk(ltv),
+          primeRisk(shareOf(best, (type) => TRACKS[type].variableRate)),
+          cpiRisk(shareOf(best, (type) => TRACKS[type].cpiLinked)),
+        ]}
+      />
 
       <FeeBreakdown analysis={best} />
     </div>
@@ -130,7 +153,7 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
       title="פירוט עמלות הפירעון המוקדם"
       subtitle="לפי צו הבנקאות (פירעון מוקדם של הלוואה לדיור). עמלת ההיוון מחושבת מול הריבית הממוצעת שבנק ישראל מפרסם היום."
     >
-      <div className="-mx-1 overflow-x-auto px-1">
+      <ScrollRegion label="טבלה">
         <table className="tabular w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-ink-soft">
@@ -157,7 +180,7 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
                 <td className="py-2">
                   {formatCurrency(track.capitalizationFee)}
                   {track.seniorityDiscount > 0 && track.grossCapitalizationFee > 0 && (
-                    <span className="block text-xs text-emerald-700">
+                    <span className="block text-xs text-positive">
                       הנחת ותק {formatPercent(track.seniorityDiscount, 0)} מתוך {formatCurrency(track.grossCapitalizationFee)}
                     </span>
                   )}
@@ -181,7 +204,7 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
             </tr>
           </tfoot>
         </table>
-      </div>
+      </ScrollRegion>
 
       {waits.length > 0 && (
         <ul className="mt-4 space-y-1 text-sm text-ink-muted">
@@ -199,4 +222,25 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
       )}
     </Card>
   );
+}
+
+/** Share of the replacement mix's principal in tracks matching the predicate. */
+function shareOf(analysis: RouteAnalysis, predicate: (type: TrackType) => boolean): number {
+  const total = analysis.proposed.totalPrincipal;
+  if (total <= 0) {
+    return 0;
+  }
+  return analysis.proposed.tracks.filter((track) => predicate(track.type)).reduce((sum, track) => sum + track.amount, 0) / total;
+}
+
+/** The change in first-month payment per track type, current against proposed. */
+function trackSteps(analysis: RouteAnalysis): WaterfallStep[] {
+  const byType = new Map<TrackType, number>();
+  for (const track of analysis.current.tracks) {
+    byType.set(track.type, (byType.get(track.type) ?? 0) - track.initialPayment);
+  }
+  for (const track of analysis.proposed.tracks) {
+    byType.set(track.type, (byType.get(track.type) ?? 0) + track.initialPayment);
+  }
+  return [...byType.entries()].map(([type, delta]) => ({ label: TRACK_LABEL[type], delta }));
 }

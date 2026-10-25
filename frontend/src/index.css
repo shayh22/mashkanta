@@ -3,10 +3,52 @@
 @tailwind utilities;
 
 @layer base {
-  /* Categorical chart series, validated for colour-vision deficiency against the light surface. */
+  /* Design tokens as RGB channels, so Tailwind opacity modifiers (bg-surface/80) keep working.
+     Dark is its own palette, not an inversion: surfaces step up in lightness as they rise, and the
+     chart series are re-validated against the dark surface. */
   :root {
+    color-scheme: light;
+    --canvas: 244 246 251;
+    --surface: 255 255 255;
+    --surface-muted: 248 250 252;
+    --surface-sunken: 238 242 247;
+    --line: 226 232 240;
+    --line-strong: 203 213 225;
+    --ink: 15 23 42;
+    --ink-muted: 51 65 85;
+    --ink-soft: 92 107 130;
+    --positive: 4 120 87;
+    --negative: 190 18 60;
+    --caution: 180 83 9;
+    --brand-50: 238 242 255;
+    --brand-100: 224 231 255;
+    --brand-200: 199 210 254;
+    --brand-700: 55 48 163;
+    /* Categorical chart series, validated for colour-vision deficiency against each surface. */
     --chart-1: #4f46e5;
     --chart-2: #d97706;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --canvas: 8 11 20;
+    --surface: 17 22 36;
+    --surface-muted: 22 28 45;
+    --surface-sunken: 28 36 56;
+    --line: 41 51 74;
+    --line-strong: 66 79 107;
+    --ink: 241 245 249;
+    --ink-muted: 203 213 225;
+    --ink-soft: 148 163 184;
+    --positive: 52 211 153;
+    --negative: 251 113 133;
+    --caution: 251 191 36;
+    --brand-50: 30 27 75;
+    --brand-100: 49 46 129;
+    --brand-200: 67 56 202;
+    --brand-700: 199 210 254;
+    --chart-1: #7c83f0;
+    --chart-2: #c97a0a;
   }
 
   html {
@@ -17,6 +59,11 @@
 
   body {
     @apply bg-canvas text-ink font-sans antialiased;
+    /* A soft brand glow behind the glass cards; fixed so it does not scroll away. */
+    background-image:
+      radial-gradient(60rem 30rem at 85% -10%, rgb(79 70 229 / 0.10), transparent 60%),
+      radial-gradient(40rem 24rem at 0% 0%, rgb(14 165 233 / 0.08), transparent 60%);
+    background-attachment: fixed;
   }
 
   /* Shekel amounts and rates line up column-wise only with tabular figures. */
@@ -37,12 +84,14 @@
 }
 
 @layer components {
+  /* Cards are frosted glass over the canvas glow: translucent enough to pick up its tint,
+     opaque enough that text contrast is measured against the surface colour. */
   .card {
-    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card;
+    @apply rounded-2xl border border-line/80 bg-surface/90 p-5 shadow-card backdrop-blur-xl;
   }
 
   .card-muted {
-    @apply rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5;
+    @apply rounded-2xl border border-line bg-surface-muted/60 p-5;
   }
 
   .label {
@@ -54,8 +103,8 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base
-           text-ink transition placeholder:text-slate-400
+    @apply w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-base
+           text-ink transition placeholder:text-ink-soft
            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
   }
 
@@ -65,39 +114,39 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700;
+    @apply btn bg-brand-600 text-white shadow-glow hover:bg-brand-500 active:bg-brand-600;
   }
 
   .btn-ghost {
-    @apply btn border border-slate-300 bg-white text-ink-muted hover:bg-slate-50;
+    @apply btn border border-line-strong bg-surface text-ink-muted hover:bg-surface-muted;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium
            backdrop-blur-md;
   }
 
   .badge-ok {
-    @apply badge bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/20;
+    @apply badge bg-emerald-500/10 text-positive ring-1 ring-inset ring-emerald-500/20;
   }
 
   .badge-warn {
-    @apply badge bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/20;
+    @apply badge bg-amber-500/10 text-caution ring-1 ring-inset ring-amber-500/20;
   }
 
   .badge-danger {
-    @apply badge bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/20;
+    @apply badge bg-rose-500/10 text-negative ring-1 ring-inset ring-rose-500/20;
   }
 
   .badge-neutral {
-    @apply badge bg-slate-500/10 text-slate-600 ring-1 ring-inset ring-slate-500/20;
+    @apply badge bg-slate-500/10 text-ink-soft ring-1 ring-inset ring-slate-500/20;
   }
 }
 
 /* The native range thumb is unstyled in most browsers; these rules make the sliders
    feel like part of the design system rather than an OS control. */
 input[type='range'] {
-  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200;
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-line;
 }
 
 input[type='range']::-webkit-slider-thumb {
@@ -109,12 +158,41 @@ input[type='range']::-moz-range-thumb {
 }
 
 @media print {
+  /* Paper is white whatever theme is on screen. */
+  html.dark {
+    color-scheme: light;
+    --canvas: 244 246 251;
+    --surface: 255 255 255;
+    --surface-muted: 248 250 252;
+    --surface-sunken: 238 242 247;
+    --line: 226 232 240;
+    --line-strong: 203 213 225;
+    --ink: 15 23 42;
+    --ink-muted: 51 65 85;
+    --ink-soft: 92 107 130;
+    --positive: 4 120 87;
+    --negative: 190 18 60;
+    --caution: 180 83 9;
+    --brand-50: 238 242 255;
+    --brand-100: 224 231 255;
+    --brand-200: 199 210 254;
+    --brand-700: 55 48 163;
+    --chart-1: #4f46e5;
+    --chart-2: #d97706;
+  }
+
+  body {
+    background: #fff;
+  }
+
   .no-print {
     display: none !important;
   }
 
   .card {
     box-shadow: none;
+    backdrop-filter: none;
+    background: #fff;
     break-inside: avoid;
   }
 }
