@@ -6,7 +6,12 @@ import {
   ShorteningSimulator,
 } from '../components/consolidation/ConsolidationResults';
 import { DebtsTable, HouseholdCard, TermsCard } from '../components/consolidation/ConsolidationInputs';
+import { useMemo } from 'react';
+import { ActionPlanReport } from '../components/ActionPlanReport';
+import { consolidationPlan } from '../engine/actionPlan';
+import { scenarioOf } from '../lib/api';
 import { useConsolidationAnalysis } from '../store/consolidationStore';
+import { useWizard } from '../store/wizardStore';
 
 /**
  * Debt consolidation against the home. Inputs on one side, the regulatory verdict and the
@@ -14,6 +19,8 @@ import { useConsolidationAnalysis } from '../store/consolidationStore';
  */
 export function ConsolidationPage() {
   const analysis = useConsolidationAnalysis();
+  const macro = useWizard((state) => state.macro);
+  const plan = useMemo(() => consolidationPlan(analysis, scenarioOf(macro).primeAnnual), [analysis, macro]);
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -42,6 +49,7 @@ export function ConsolidationPage() {
           <ShorteningSimulator analysis={analysis} />
         </div>
       </div>
+      <ActionPlanReport plan={plan} />
     </div>
   );
 }
