@@ -389,7 +389,7 @@ export function optimize(
 
   let bestSpecs: TrackSpec[];
   let bestScore = 0;
-  let alternatives: Candidate[] = [];
+  const alternatives: Candidate[] = [];
   let evaluated = 0;
 
   if (feasible.length === 0) {
