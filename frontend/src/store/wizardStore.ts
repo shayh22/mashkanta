@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { browserStorage, storageKey } from './persistence';
 import type { BorrowerProfileRequest, BuyerSegment, LiquidityEvent, MacroRequest } from '../lib/types';
 
 /** The regulatory LTV ceiling per segment, mirrored client-side so the sliders can bound themselves. */
@@ -74,78 +76,95 @@ interface WizardState {
 
 export const TOTAL_STEPS = 3;
 
-export const useWizard = create<WizardState>((set) => ({
-  step: 1,
-  profile: DEFAULT_PROFILE,
-  requestedLoanAmount: DEFAULT_PROFILE.loanAmount,
-  macro: {},
-  percentile: 0.5,
-  submitted: false,
-
-  setProfile: (patch) =>
-    set((state) => {
-      const profile = { ...state.profile, ...patch };
-      // Typing a loan amount is a new request; changing anything else only re-derives the clamp,
-      // so raising the property value restores an amount an earlier ceiling had cut.
-      const requestedLoanAmount =
-        patch.loanAmount === undefined ? state.requestedLoanAmount : patch.loanAmount;
-      profile.loanAmount = clampToCeiling(requestedLoanAmount, profile.propertyValue, profile.segment);
-      return { profile, requestedLoanAmount };
-    }),
-
-  setSegment: (segment) =>
-    set((state) => ({
-      profile: {
-        ...state.profile,
-        segment,
-        loanAmount: clampToCeiling(state.requestedLoanAmount, state.profile.propertyValue, segment),
-      },
-    })),
-
-  setMacro: (patch) => set((state) => ({ macro: { ...state.macro, ...patch } })),
-
-  setPercentile: (percentile) => set({ percentile }),
-
-  setPreferences: (prime, stable, dynamic) =>
-    set((state) => ({
-      profile: {
-        ...state.profile,
-        primePreference: prime,
-        stablePreference: stable,
-        dynamicPreference: dynamic,
-      },
-    })),
-
-  addLiquidityEvent: (event) =>
-    set((state) => ({
-      profile: {
-        ...state.profile,
-        liquidityEvents: [...state.profile.liquidityEvents, event].sort((a, b) => a.month - b.month),
-      },
-    })),
-
-  removeLiquidityEvent: (index) =>
-    set((state) => ({
-      profile: {
-        ...state.profile,
-        liquidityEvents: state.profile.liquidityEvents.filter((_, i) => i !== index),
-      },
-    })),
-
-  goTo: (step) => set({ step: Math.min(TOTAL_STEPS, Math.max(1, step)) }),
-  next: () => set((state) => ({ step: Math.min(TOTAL_STEPS, state.step + 1) })),
-  back: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
-  submit: () => set({ submitted: true }),
-  reset: () =>
-    set({
+export const useWizard = create<WizardState>()(
+  persist(
+    (set) => ({
       step: 1,
       profile: DEFAULT_PROFILE,
       requestedLoanAmount: DEFAULT_PROFILE.loanAmount,
       macro: {},
       percentile: 0.5,
       submitted: false,
+
+      setProfile: (patch) =>
+        set((state) => {
+          const profile = { ...state.profile, ...patch };
+          // Typing a loan amount is a new request; changing anything else only re-derives the clamp,
+          // so raising the property value restores an amount an earlier ceiling had cut.
+          const requestedLoanAmount =
+            patch.loanAmount === undefined ? state.requestedLoanAmount : patch.loanAmount;
+          profile.loanAmount = clampToCeiling(requestedLoanAmount, profile.propertyValue, profile.segment);
+          return { profile, requestedLoanAmount };
+        }),
+
+      setSegment: (segment) =>
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            segment,
+            loanAmount: clampToCeiling(state.requestedLoanAmount, state.profile.propertyValue, segment),
+          },
+        })),
+
+      setMacro: (patch) => set((state) => ({ macro: { ...state.macro, ...patch } })),
+
+      setPercentile: (percentile) => set({ percentile }),
+
+      setPreferences: (prime, stable, dynamic) =>
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            primePreference: prime,
+            stablePreference: stable,
+            dynamicPreference: dynamic,
+          },
+        })),
+
+      addLiquidityEvent: (event) =>
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            liquidityEvents: [...state.profile.liquidityEvents, event].sort((a, b) => a.month - b.month),
+          },
+        })),
+
+      removeLiquidityEvent: (index) =>
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            liquidityEvents: state.profile.liquidityEvents.filter((_, i) => i !== index),
+          },
+        })),
+
+      goTo: (step) => set({ step: Math.min(TOTAL_STEPS, Math.max(1, step)) }),
+      next: () => set((state) => ({ step: Math.min(TOTAL_STEPS, state.step + 1) })),
+      back: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
+      submit: () => set({ submitted: true }),
+      reset: () =>
+        set({
+          step: 1,
+          profile: DEFAULT_PROFILE,
+          requestedLoanAmount: DEFAULT_PROFILE.loanAmount,
+          macro: {},
+          percentile: 0.5,
+          submitted: false,
+        }),
     }),
-}));
+    {
+      name: storageKey('wizard'),
+      version: 1,
+      storage: browserStorage,
+      // The answers survive a reload; the step and submission state start fresh, since the
+      // results they point at are recomputed rather than stored.
+      partialize: (state) => ({
+        profile: state.profile,
+        requestedLoanAmount: state.requestedLoanAmount,
+        macro: state.macro,
+        percentile: state.percentile,
+      }),
+    },
+  ),
+);
 
 /** Metrics the wizard shows live, without a round trip to the backend. */
 export function useDerivedMetrics() {
@@ -165,13 +184,7 @@ export function useDerivedMetrics() {
     ltvExceeded: ltv > maxLtv + 1e-9,
     disposableIncome: Math.max(0, profile.monthlyNetIncome - profile.existingMonthlyObligations),
     /** The payment ceiling implied by the 40% debt-to-income rule. */
-    maxAffordablePayment: Math.max(
-      0,
-      profile.monthlyNetIncome * 0.4 - profile.existingMonthlyObligations,
-    ),
-    comfortablePayment: Math.max(
-      0,
-      profile.monthlyNetIncome * 0.3 - profile.existingMonthlyObligations,
-    ),
+    maxAffordablePayment: Math.max(0, profile.monthlyNetIncome * 0.4 - profile.existingMonthlyObligations),
+    comfortablePayment: Math.max(0, profile.monthlyNetIncome * 0.3 - profile.existingMonthlyObligations),
   };
 }
