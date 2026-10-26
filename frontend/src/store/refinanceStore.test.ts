@@ -70,4 +70,27 @@ describe('refinance store', () => {
     useRefinance.getState().updateTrack(track.id, { balance: track.balance + 1_000 });
     expect(useRefinance.getState().tracks[0]!.statedFee).toBeUndefined();
   });
+
+  it('starts an import from a clean proposal, whatever mode the borrower was in', () => {
+    const state = useRefinance.getState();
+    state.setProposalMode('MANUAL', [
+      { id: 'old', type: 'PRIME', amount: 1_000_000, annualRate: 0.05, termMonths: 300 },
+    ]);
+    state.toggleKept(state.tracks[0]!.id);
+    state.importTracks([
+      {
+        id: 'new',
+        type: 'PRIME',
+        balance: 200_000,
+        annualRate: 0.05,
+        remainingMonths: 200,
+        monthsElapsed: 20,
+      },
+    ]);
+    const after = useRefinance.getState();
+    expect(after.proposalMode).toBe('AUTO');
+    expect(after.manualProposal).toEqual([]);
+    expect(after.keptIds).toEqual([]);
+    expect(after.tracks.map((track) => track.id)).toEqual(['new']);
+  });
 });

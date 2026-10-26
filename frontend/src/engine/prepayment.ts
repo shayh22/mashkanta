@@ -50,6 +50,8 @@ export interface ExistingTrack {
    * averages and origination references that the estimate has to approximate.
    */
   readonly statedFee?: number;
+  /** Day of month the stated fee was computed for; it includes the average-CPI fee if 1–15. */
+  readonly statedFeeDay?: number;
 }
 
 export interface PrepaymentOptions {
@@ -279,20 +281,27 @@ export function quoteTrack(
 /**
  * A quote built on the bank's stated fee. The statement prices a repayment on its own date without
  * advance notice, so the notice component (at most 0.1% of the balance) is taken back out when
- * notice will be given; the average-CPI fee is added when the chosen day falls on the 1st–15th,
- * since a statement dated after the 15th does not include it. Everything else is the bank's figure.
+ * notice will be given, and the average-CPI fee follows the chosen day rather than the statement's.
+ * Everything else is the bank's figure.
  */
-function statedQuote(track: ExistingTrack, marketAverageRate: number, options: PrepaymentOptions): TrackPrepaymentQuote {
+function statedQuote(
+  track: ExistingTrack,
+  marketAverageRate: number,
+  options: PrepaymentOptions,
+): TrackPrepaymentQuote {
   const meta = TRACKS[track.type];
   const stated = Math.max(0, track.statedFee ?? 0);
   const noticePart = Math.min(stated, track.balance * PREPAYMENT.NO_NOTICE_RATE);
-  const capitalizationFee = stated - noticePart;
-  const noticeFee = options.noticeGiven ? 0 : noticePart;
   const monthlyCpi = Math.pow(1 + options.cpiAnnual, 1 / 12) - 1;
-  const cpiFee =
-    track.type !== 'ELIGIBILITY' && meta.cpiLinked && options.dayOfMonth <= PREPAYMENT.CPI_FEE_LAST_DAY
-      ? Math.max(0, 0.5 * monthlyCpi * track.balance)
-      : 0;
+  const cpiEstimate =
+    track.type !== 'ELIGIBILITY' && meta.cpiLinked ? Math.max(0, 0.5 * monthlyCpi * track.balance) : 0;
+  // A statement dated on the 1st–15th already contains the average-CPI fee; take it out so the
+  // remainder is the capitalization fee alone, then add it back only if the chosen day needs it.
+  const statementIncludesCpi = (track.statedFeeDay ?? 31) <= PREPAYMENT.CPI_FEE_LAST_DAY;
+  const withoutNotice = stated - noticePart;
+  const capitalizationFee = statementIncludesCpi ? Math.max(0, withoutNotice - cpiEstimate) : withoutNotice;
+  const noticeFee = options.noticeGiven ? 0 : noticePart;
+  const cpiFee = options.dayOfMonth <= PREPAYMENT.CPI_FEE_LAST_DAY ? cpiEstimate : 0;
   return {
     id: track.id,
     type: track.type,

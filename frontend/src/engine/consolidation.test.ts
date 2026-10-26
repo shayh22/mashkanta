@@ -29,9 +29,31 @@ const debt = (patch: Partial<ConsumerDebt>): ConsumerDebt => ({
 const base: ConsolidationInput = {
   netIncome: 24_000,
   debts: [
-    debt({ id: 'car', kind: 'CAR', balance: 90_000, annualRate: 0.085, monthlyPayment: 2_200, remainingMonths: 48 }),
-    debt({ id: 'card', kind: 'CREDIT_CARD', balance: 45_000, annualRate: 0.14, monthlyPayment: 1_600, remainingMonths: 36 }),
-    debt({ id: 'short', kind: 'OTHER', balance: 12_000, annualRate: 0.07, monthlyPayment: 1_100, remainingMonths: 11, include: false }),
+    debt({
+      id: 'car',
+      kind: 'CAR',
+      balance: 90_000,
+      annualRate: 0.085,
+      monthlyPayment: 2_200,
+      remainingMonths: 48,
+    }),
+    debt({
+      id: 'card',
+      kind: 'CREDIT_CARD',
+      balance: 45_000,
+      annualRate: 0.14,
+      monthlyPayment: 1_600,
+      remainingMonths: 36,
+    }),
+    debt({
+      id: 'short',
+      kind: 'OTHER',
+      balance: 12_000,
+      annualRate: 0.07,
+      monthlyPayment: 1_100,
+      remainingMonths: 11,
+      include: false,
+    }),
   ],
   property: {
     value: 2_000_000,
@@ -142,7 +164,12 @@ describe('two-thirds variable on all credit secured by the property', () => {
     const result = analyseConsolidation({
       ...base,
       debts: [debt({ id: 'big', balance: 300_000, monthlyPayment: 6_000, remainingMonths: 60 })],
-      property: { ...base.property, value: 3_000_000, mortgageBalance: 900_000, mortgageVariableBalance: 720_000 },
+      property: {
+        ...base.property,
+        value: 3_000_000,
+        mortgageBalance: 900_000,
+        mortgageVariableBalance: 720_000,
+      },
       terms: { ...base.terms, preferredVariableShare: 1 },
     });
     expect(result.allocation.variableAmount).toBeCloseTo(80_000, 6);
@@ -230,11 +257,27 @@ describe('smart term shortening', () => {
 describe('debt recommendations', () => {
   it('keeps short debts out and consolidates expensive long ones', () => {
     expect(recommendDebt(debt({ remainingMonths: 12, annualRate: 0.08 }), 0.065).action).toBe('KEEP');
-    expect(recommendDebt(debt({ kind: 'CREDIT_CARD', remainingMonths: 12, annualRate: 0.16 }), 0.065).action).toBe(
-      'OPTIONAL',
-    );
+    expect(
+      recommendDebt(debt({ kind: 'CREDIT_CARD', remainingMonths: 12, annualRate: 0.16 }), 0.065).action,
+    ).toBe('OPTIONAL');
     expect(recommendDebt(debt({ remainingMonths: 40, annualRate: 0.1 }), 0.065).action).toBe('CONSOLIDATE');
     expect(recommendDebt(debt({ remainingMonths: 40, annualRate: 0.06 }), 0.065).action).toBe('KEEP');
     expect(CONSOLIDATION_LIMITS.SHORT_TERM_MONTHS).toBe(18);
+  });
+});
+
+describe('a debt marked for consolidation with nothing left to repay', () => {
+  it('counts in the payment-to-income test exactly as it counts in the cash flow', () => {
+    const empty = debt({
+      id: 'empty',
+      balance: 0,
+      monthlyPayment: 1_500,
+      remainingMonths: 60,
+      include: true,
+    });
+    const result = analyseConsolidation({ ...base, debts: [...base.debts, empty] });
+    expect(result.kept.some((d) => d.id === 'empty')).toBe(true);
+    expect(result.regulation.otherObligations).toBe(1_500);
+    expect(result.paymentAfter).toBeCloseTo(4_800 + 1_100 + 1_500 + result.allocation.payment, 6);
   });
 });

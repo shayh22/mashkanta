@@ -79,9 +79,12 @@ export function redact(text: string | null | undefined): RedactionResult {
 
   // The addressee block has no labels to anchor on, so it goes whole: every line between
   // "לכבוד" and the salutation, which in a bank letter is the borrower's name and address.
-  working = working.replace(ADDRESSEE, (_match, label: string, _rest: string, block: string) => {
+  working = working.replace(ADDRESSEE, (_match, label: string, rest: string, block: string) => {
     bump('NAME');
-    return `${label} ${MASK}${block.replace(/[^\n]+/g, MASK)}`;
+    // Letters often print the date on the addressee's first line; it is not identifying and the
+    // parsers need it, so it moves to a line of its own ahead of the masked block.
+    const date = /תאריך:?\s*\d{2}\/\d{2}\/\d{4}/.exec(rest)?.[0];
+    return `${date ? `${date}\n` : ''}${label} ${MASK}${block.replace(/[^\n]+/g, MASK)}`;
   });
 
   working = working.replace(EMAIL, () => {

@@ -67,6 +67,8 @@ interface RefinanceState {
 
   setPropertyValue: (value: number) => void;
   setTracks: (tracks: ExistingTrack[]) => void;
+  /** Replaces the whole mortgage, as an import does: selections and quoted proposals no longer apply. */
+  importTracks: (tracks: ExistingTrack[]) => void;
   addTrack: () => void;
   updateTrack: (id: string, patch: Partial<ExistingTrack>) => void;
   removeTrack: (id: string) => void;
@@ -105,6 +107,7 @@ export const useRefinance = create<RefinanceState>()(
 
       setPropertyValue: (propertyValue) => set({ propertyValue }),
       setTracks: (tracks) => set({ tracks }),
+      importTracks: (tracks) => set({ tracks, keptIds: [], manualProposal: [], proposalMode: 'AUTO' }),
       addTrack: () =>
         set((state) => ({
           tracks: [

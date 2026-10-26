@@ -47,6 +47,8 @@ export interface StatementComponent {
   readonly lastIndex: number;
   /** Margin over prime for prime-based sub-loans, as a signed fraction. */
   readonly primeMargin?: number;
+  /** Re-prices with prime every month. */
+  readonly primeBased: boolean;
 }
 
 export interface ParsedStatement {
@@ -89,7 +91,12 @@ const LABELS = {
 } as const;
 
 /** Every label line, including the wrapped second lines of two-line labels. */
-const LABEL_FRAGMENTS = [...Object.values(LABELS), 'אחרון / תאריך סילוק', 'הפחתה )ריבית סיכון(', 'הפחתה (ריבית סיכון)'];
+const LABEL_FRAGMENTS = [
+  ...Object.values(LABELS),
+  'אחרון / תאריך סילוק',
+  'הפחתה )ריבית סיכון(',
+  'הפחתה (ריבית סיכון)',
+];
 
 const isLabel = (line: string) => LABEL_FRAGMENTS.some((label) => line.includes(label));
 
@@ -116,7 +123,13 @@ export function isMortgageStatement(text: string): boolean {
  * The values row for a label: the first following line that has what `pick` is looking for,
  * stopping at the next label so a row that is empty for every column yields nothing.
  */
-function valuesAfter<T>(lines: readonly string[], from: number, to: number, label: string, pick: (line: string) => T[]): T[] {
+function valuesAfter<T>(
+  lines: readonly string[],
+  from: number,
+  to: number,
+  label: string,
+  pick: (line: string) => T[],
+): T[] {
   const at = lines.findIndex((line, index) => index >= from && index < to && line.includes(label));
   if (at < 0) {
     return [];
@@ -174,14 +187,17 @@ function parseBlocks(lines: readonly string[], warnings: string[]): StatementCom
       return;
     }
 
-    const row = <T>(label: string, pick: (line: string) => T[]) => valuesAfter(lines, start, end, label, pick);
+    const row = <T>(label: string, pick: (line: string) => T[]) =>
+      valuesAfter(lines, start, end, label, pick);
     const amounts = row(LABELS.originalAmount, numbersIn);
     const originations = row(LABELS.originationDate, datesIn);
     const firstPayments = row(LABELS.firstPayment, datesIn);
     const lastPayments = row(LABELS.lastPayment, datesIn);
     const loanTypes = row(LABELS.loanType, (line) => line.split(/\s+/).filter(Boolean));
     const rateTypes = row(LABELS.rateType, (line) =>
-      [...line.matchAll(/קבועה|משתנה/g)].map((match): 'FIXED' | 'VARIABLE' => (match[0] === 'קבועה' ? 'FIXED' : 'VARIABLE')),
+      [...line.matchAll(/קבועה|משתנה/g)].map((match): 'FIXED' | 'VARIABLE' =>
+        match[0] === 'קבועה' ? 'FIXED' : 'VARIABLE',
+      ),
     );
     const nominal = row(LABELS.nominalRate, numbersIn);
     const atOrigination = row(LABELS.originationRate, numbersIn);
@@ -203,18 +219,29 @@ function parseBlocks(lines: readonly string[], warnings: string[]): StatementCom
       return;
     }
 
-    // Rows that only exist for variable sub-loans are filled in column order.
+    // Rows that only exist for variable sub-loans are filled in column order — but only when the
+    // count matches. A misaligned row is dropped rather than assigned to the wrong sub-loans.
     const variableColumns = rateTypes.flatMap((type, index) => (type === 'VARIABLE' ? [index] : []));
-    if (resets.length > 0 && resets.length !== variableColumns.length) {
-      warnings.push(`תדירות שינוי הריבית בהלוואה ${loanNumbers[0]} לא הותאמה למרכיבים המשתנים.`);
+    const resetsAligned = resets.length === variableColumns.length;
+    const nextResetsAligned = nextResets.length === variableColumns.length;
+    if (variableColumns.length > 0 && !resetsAligned) {
+      warnings.push(
+        `תדירות שינוי הריבית בהלוואה ${loanNumbers[0]} לא הותאמה למרכיבים המשתנים — בדקו את סוג המסלול.`,
+      );
     }
+    const unlinkedVariable = variableColumns.filter((index) => indexation[index] !== 'מדד המחירים לצרכן');
+    // Without an aligned reset row, a sub-loan counts as prime only if every unlinked variable
+    // sub-loan in the block carries a P-margin; otherwise none is guessed to be.
+    const allPrimeByMargin = primeMargins.length > 0 && primeMargins.length === unlinkedVariable.length;
     let primeCursor = 0;
 
     for (let column = 0; column < columns; column++) {
       const variableIndex = variableColumns.indexOf(column);
-      const resetMonths = variableIndex >= 0 ? resets[variableIndex] : undefined;
+      const resetMonths = variableIndex >= 0 && resetsAligned ? resets[variableIndex] : undefined;
       const cpiLinked = indexation[column] === 'מדד המחירים לצרכן';
-      const isPrime = rateTypes[column] === 'VARIABLE' && !cpiLinked && (resetMonths ?? 1) <= 1;
+      const unlinkedVariableColumn = rateTypes[column] === 'VARIABLE' && !cpiLinked;
+      const primeBased =
+        unlinkedVariableColumn && (resetMonths !== undefined ? resetMonths <= 1 : allPrimeByMargin);
       components.push({
         loanNumber: loanNumbers[column]!,
         component: componentNumbers[column]!,
@@ -227,11 +254,12 @@ function parseBlocks(lines: readonly string[], warnings: string[]): StatementCom
         nominalRate: nominal[column]! / 100,
         originationRate: (atOrigination[column] ?? nominal[column]!) / 100,
         resetMonths,
-        nextResetDate: variableIndex >= 0 ? nextResets[variableIndex] : undefined,
+        nextResetDate: variableIndex >= 0 && nextResetsAligned ? nextResets[variableIndex] : undefined,
         cpiLinked,
         baseIndex: baseIndices[column] ?? 0,
         lastIndex: lastIndices[column] ?? 0,
-        primeMargin: isPrime ? primeMargins[primeCursor++] : undefined,
+        primeMargin: primeBased ? primeMargins[primeCursor++] : undefined,
+        primeBased,
       });
     }
   });
@@ -247,8 +275,11 @@ export function parseMortgageStatement(redactedText: string): ParsedStatement | 
   const warnings: string[] = [];
 
   const asOfMatch =
-    /נכון ליום\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(redactedText) ?? /תאריך:\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(redactedText);
-  const asOf = asOfMatch ? `${asOfMatch[3]}-${asOfMatch[2]}-${asOfMatch[1]}` : new Date().toISOString().slice(0, 10);
+    /נכון ליום\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(redactedText) ??
+    /תאריך:\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(redactedText);
+  const asOf = asOfMatch
+    ? `${asOfMatch[3]}-${asOfMatch[2]}-${asOfMatch[1]}`
+    : new Date().toISOString().slice(0, 10);
   if (!asOfMatch) {
     warnings.push('תאריך הדוח לא זוהה — החישוב מניח את תאריך היום.');
   }
@@ -291,7 +322,10 @@ export function monthsBetween(fromIso: string, toIso: string): number {
 export function paymentsRemaining(asOfIso: string, lastIso: string): number {
   const asOf = parseIso(asOfIso);
   const last = parseIso(lastIso);
-  return Math.max(0, (last.year - asOf.year) * 12 + (last.month - asOf.month) + (asOf.day < last.day ? 1 : 0));
+  return Math.max(
+    0,
+    (last.year - asOf.year) * 12 + (last.month - asOf.month) + (asOf.day < last.day ? 1 : 0),
+  );
 }
 
 /** Fraction of a level annuity's principal still outstanding after `paid` of `total` payments. */
@@ -317,7 +351,50 @@ function trackType(component: StatementComponent): TrackType {
   if (component.cpiLinked) {
     return 'VARIABLE_LINKED';
   }
-  return (component.resetMonths ?? 1) <= 1 ? 'PRIME' : 'VARIABLE_UNLINKED';
+  return component.primeBased ? 'PRIME' : 'VARIABLE_UNLINKED';
+}
+
+/** Whether a sub-loan can carry a capitalization fee at all on the statement date. */
+function canCarryCapitalizationFee(part: StatementComponent, asOf: string): boolean {
+  if (part.directed || part.primeBased) {
+    return false;
+  }
+  if (part.rateType === 'FIXED') {
+    return true;
+  }
+  // Variable sub-loans resetting yearly or more often carry none, nor do ones repaid on a reset date.
+  const atReset = part.nextResetDate !== undefined && paymentsRemaining(asOf, part.nextResetDate) === 0;
+  return (part.resetMonths ?? 0) > 12 && !atReset;
+}
+
+/**
+ * Splits a loan's stated fee across its sub-loans the way the fee arises: every non-directed
+ * sub-loan owes the 0.1% notice component on its own balance, and whatever is left is capitalization
+ * fee, which only fixed and long-reset variable sub-loans can owe. Splitting by balance alone would
+ * hand a prime sub-loan part of a fixed sibling's capitalization fee.
+ */
+export function splitStatedFee(
+  fee: number,
+  parts: readonly StatementComponent[],
+  balances: readonly number[],
+  asOf: string,
+): number[] {
+  const share = (weights: number[], amount: number) => {
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    return weights.map((weight) => (total > 0 ? (amount * weight) / total : 0));
+  };
+  const notice = parts.map((part, index) => (part.directed ? 0 : balances[index]! * 0.001));
+  const noticeTotal = notice.reduce((sum, value) => sum + value, 0);
+  const capable = parts.map((part, index) => (canCarryCapitalizationFee(part, asOf) ? balances[index]! : 0));
+  const remainder = fee - noticeTotal;
+
+  if (remainder >= 0 && capable.some((weight) => weight > 0)) {
+    const capitalization = share(capable, remainder);
+    return notice.map((value, index) => value + capitalization[index]!);
+  }
+  // Less than the notice component in total (a favourable rate gap offset it), or no sub-loan that
+  // can owe capitalization: spread what there is over the notice weights, else by balance.
+  return noticeTotal > 0 ? share(notice, fee) : share([...balances], fee);
 }
 
 export interface StatementTrack extends ExistingTrack {
@@ -330,8 +407,8 @@ export interface StatementTrack extends ExistingTrack {
  * The statement gives balances per loan, not per sub-loan, so each loan's balance (principal plus
  * indexation) is split across its sub-loans in proportion to an estimate of each one's outstanding
  * balance — original amount, indexed, amortised on its own schedule. The bank's stated fee for the
- * loan is split the same way and carried on each track, so the analysis uses the bank's figure
- * rather than an estimate.
+ * loan is carried on its tracks too (see {@link splitStatedFee}), so the analysis uses the bank's
+ * figure rather than an estimate.
  */
 export function statementToTracks(statement: ParsedStatement): StatementTrack[] {
   const tracks: StatementTrack[] = [];
@@ -348,23 +425,30 @@ export function statementToTracks(statement: ParsedStatement): StatementTrack[] 
     });
     const estimateSum = estimates.reduce((sum, value) => sum + value, 0);
     const loanBalance = loan.principal + loan.indexation;
+    const balances = estimates.map((estimate) =>
+      estimateSum > 0 ? (loanBalance * estimate) / estimateSum : loanBalance / parts.length,
+    );
+    const fees = splitStatedFee(loan.prepaymentFee, parts, balances, statement.asOf);
+    const loanDigits = loan.loanNumber.replace(/\D/g, '');
 
     parts.forEach((part, index) => {
-      const share = estimateSum > 0 ? estimates[index]! / estimateSum : 1 / parts.length;
-      const type = trackType(part);
       tracks.push({
-        id: `${loan.loanNumber.slice(-3)}-${part.component}`,
+        // The whole loan number, not just its suffix: two loans can end in the same three digits.
+        id: `${loanDigits}-${part.component}`,
         loanNumber: loan.loanNumber,
         label: `הלוואה ${loan.loanNumber.slice(-3)} · מרכיב ${part.component}`,
-        type,
-        balance: loanBalance * share,
+        type: trackType(part),
+        balance: balances[index]!,
         annualRate: part.nominalRate,
         remainingMonths: paymentsRemaining(statement.asOf, part.lastPaymentDate),
         monthsElapsed: Math.max(0, monthsBetween(part.originationDate, statement.asOf)),
         originationAverageRate: part.originationRate,
         monthsToReset:
-          part.nextResetDate !== undefined ? paymentsRemaining(statement.asOf, part.nextResetDate) : undefined,
-        statedFee: loan.prepaymentFee * share,
+          part.nextResetDate !== undefined
+            ? paymentsRemaining(statement.asOf, part.nextResetDate)
+            : undefined,
+        statedFee: fees[index]!,
+        statedFeeDay: Number(statement.asOf.slice(8, 10)),
       });
     });
   }

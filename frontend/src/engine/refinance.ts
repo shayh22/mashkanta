@@ -198,21 +198,28 @@ export function likeForLikeProposal(
     );
 }
 
-/** A hand-entered proposal plus the kept tracks carried over beside it. */
+/** A hand-entered proposal plus the kept and eligibility tracks carried over beside it. */
 export function withKeptTracks(
   proposal: readonly ProposedTrack[],
   existing: readonly ExistingTrack[],
   kept: ReadonlySet<string>,
 ): ProposedTrack[] {
+  // Eligibility loans are carried over whatever the hand-entered proposal says, exactly as in the
+  // automatic one: a quoted mix that leaves them out would otherwise count them as repaid.
   const carried = existing
-    .filter((track) => kept.has(track.id) && track.balance > 0 && track.remainingMonths > 0)
+    .filter(
+      (track) =>
+        (kept.has(track.id) || track.type === 'ELIGIBILITY') &&
+        track.balance > 0 &&
+        track.remainingMonths > 0,
+    )
     .map(carryOver);
   const carriedIds = new Set(carried.map((track) => track.id));
   return [...proposal.filter((track) => !carriedIds.has(track.id)), ...carried];
 }
 
-function verdictOf(npv: number, breakeven: number, horizon: number): RefinanceVerdict {
-  if (npv <= 0 || breakeven === 0 || breakeven > horizon) {
+function verdictOf(npv: number, breakeven: number): RefinanceVerdict {
+  if (npv <= 0 || breakeven === 0) {
     return 'NOT_WORTHWHILE';
   }
   return breakeven <= IMMEDIATE_BREAKEVEN_MONTHS ? 'IMMEDIATE' : 'LONG_TERM';
@@ -273,7 +280,7 @@ export function analyseRoute(
     lifetimeSaving: current.totalPaid - replacement.totalPaid - upfrontCost,
     netPresentValue: npv,
     breakevenMonth: breakeven,
-    verdict: verdictOf(npv, breakeven, horizon),
+    verdict: verdictOf(npv, breakeven),
     path,
   };
 }
