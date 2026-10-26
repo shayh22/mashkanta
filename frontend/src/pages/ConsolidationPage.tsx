@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
 import { CombinedLinkCard } from '../components/consolidation/CombinedMoveCard';
 import { DebtsTable, HouseholdCard, TermsCard } from '../components/consolidation/ConsolidationInputs';
+import { DebtImporter } from '../components/consolidation/DebtImporter';
 import {
   BeforeAfterPanel,
   ConsolidationRisk,
@@ -64,7 +65,12 @@ export function ConsolidationPage() {
             </div>
           </div>
         )}
-        {shows('debts') && <DebtsTable analysis={analysis} />}
+        {shows('debts') && (
+          <>
+            <DebtImporter />
+            <DebtsTable analysis={analysis} />
+          </>
+        )}
         {shows('regulation') && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
             <div className="min-w-0">

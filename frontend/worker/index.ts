@@ -1,17 +1,19 @@
 import { isUsable } from '../src/engine/boiMarket';
+import { handleExtract, type ExtractEnv } from './extract';
 import { readMarket } from './market';
 
 /**
- * The only server code in the deployment: `/api/market`, which reads the Bank of Israel figures on
- * the app's behalf. Every other path is served from static assets without reaching this script
- * (`run_worker_first` in wrangler.toml lists only `/api/*`).
+ * The only server code in the deployment, two routes; every other path is served from static
+ * assets without reaching this script (`run_worker_first` in wrangler.toml lists only `/api/*`):
+ * - `/api/market` reads the Bank of Israel figures on the app's behalf;
+ * - `/api/extract` reads an unrecognised document through OpenRouter (see `extract.ts`).
  *
- * Results are cached at the edge for six hours, so the statistics service sees a handful of
+ * Market results are cached at the edge for six hours, so the statistics service sees a handful of
  * requests a day however many people open the app. A forced refresh (`?fresh=1`) skips the cache
  * unless the cached copy is under a minute old.
  */
 
-interface Env {
+interface Env extends ExtractEnv {
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
 }
 
@@ -40,6 +42,10 @@ const json = (body: unknown, status: number, cacheControl: string) =>
 export default {
   async fetch(request: Request, env: Env, context: Context): Promise<Response> {
     const url = new URL(request.url);
+    const cache = (caches as unknown as { default: Cache }).default;
+    if (url.pathname === '/api/extract') {
+      return handleExtract(request, env, cache, fetch);
+    }
     if (url.pathname !== '/api/market') {
       return env.ASSETS.fetch(request);
     }
@@ -47,7 +53,6 @@ export default {
       return json({ error: 'method not allowed' }, 405, 'no-store');
     }
 
-    const cache = (caches as unknown as { default: Cache }).default;
     const key = new Request(`${url.origin}/api/market?v=${SCHEMA_VERSION}`);
     const cached = await cache.match(key);
     const cachedAt = Number(cached?.headers.get('x-fetched-at') ?? 0);

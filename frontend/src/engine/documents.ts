@@ -146,3 +146,85 @@ export async function extractMortgageDocument(file: File, primeRate: number): Pr
   const approval = parseApproval(sanitizedText, primeRate);
   return { kind: 'approval', tracks: approval.tracks, redaction, pageCount, warnings: [...approval.warnings, ...warnings] };
 }
+
+// ---------------------------------------------------------------------------
+// Preparing an unrecognised document for the language model (see aiExtraction.ts)
+// ---------------------------------------------------------------------------
+
+/** What would be sent, shown to the borrower before they agree to send it. */
+export interface AiPayload {
+  /** Redacted text, when the document has a text layer. */
+  readonly text?: string;
+  /** Page images (data URLs) for a scan or a photo — these cannot be redacted. */
+  readonly images?: readonly string[];
+  readonly redaction?: Omit<RedactionResult, 'sanitizedText'>;
+  readonly pageCount: number;
+  /** True when the text was cut to the model's limit. */
+  readonly truncated: boolean;
+}
+
+const IMAGE_TYPES = /^image\/(png|jpeg|webp)$/;
+
+export function isImageFile(file: File): boolean {
+  return IMAGE_TYPES.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
+}
+
+/** Longest image side sent to the model; enough to read a statement, small enough to send. */
+const MAX_IMAGE_SIDE = 2000;
+
+function canvasToDataUrl(canvas: HTMLCanvasElement): string {
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+async function imageFileToDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return canvasToDataUrl(canvas);
+}
+
+async function renderPdfPages(data: ArrayBuffer, maxPages: number): Promise<{ images: string[]; pageCount: number }> {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  const images: string[] = [];
+  for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, maxPages); pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: Math.min(2, MAX_IMAGE_SIDE / Math.max(base.width, base.height)) });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+    images.push(canvasToDataUrl(canvas));
+  }
+  return { images, pageCount: pdf.numPages };
+}
+
+/**
+ * Turns a document into what the model would receive: redacted text when there is a text layer,
+ * otherwise images of the first pages. Runs entirely in the browser; nothing is sent from here.
+ */
+export async function prepareForAi(file: File, maxText: number, maxPages: number): Promise<AiPayload> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('הקובץ גדול מ-10MB.');
+  }
+  if (isImageFile(file)) {
+    return { images: [await imageFileToDataUrl(file)], pageCount: 1, truncated: false };
+  }
+  const { text, pageCount } = await readDocumentText(file);
+  if (text.trim().length >= TEXT_LAYER_THRESHOLD) {
+    const { sanitizedText, ...redaction } = redact(text);
+    return {
+      text: sanitizedText.slice(0, maxText),
+      redaction,
+      pageCount,
+      truncated: sanitizedText.length > maxText,
+    };
+  }
+  const rendered = await renderPdfPages(await file.arrayBuffer(), maxPages);
+  return { images: rendered.images, pageCount: rendered.pageCount, truncated: rendered.pageCount > maxPages };
+}
