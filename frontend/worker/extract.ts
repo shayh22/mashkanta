@@ -15,6 +15,13 @@ export interface ExtractEnv {
   readonly OPENROUTER_MODEL?: string;
 }
 
+/**
+ * Chosen by benchmark (26.10.2026, five synthetic Hebrew documents: consumer loans as text and as a
+ * screenshot, a mortgage statement as text and as a scan, an offer letter — 71 fields): the only
+ * model of the ten cheapest with images and structured outputs to read every field right, twice in
+ * a row. Cheaper models misread scans (gemma-3-4b 79%, gpt-4.1-nano 89%, gemini-2.5-flash-lite 90%,
+ * gemma-3-12b 92%, nex-n2.5-mini 94–97%). About $0.0006 a document.
+ */
 export const DEFAULT_MODEL = 'anthropic/claude-haiku-5.5';
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 /** Requests per visitor (IP) per hour. A document is one request; this is a guard against abuse. */
