@@ -42,7 +42,8 @@ const MODES: { id: Mode; icon: string; title: string; subtitle: string }[] = [
 ];
 
 function modeFromHash(): Mode {
-  const hash = window.location.hash.replace(/^#\/?/, '');
+  // `#/<mode>` or `#/<mode>/<section>`; the section is read by the page's own tabs.
+  const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'mortgage';
 }
 
@@ -180,8 +181,23 @@ export default function App() {
 }
 
 function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
+  const ref = useRef<HTMLElement>(null);
+  // Section tabs stick directly under the header, whose height changes when the title wraps on a
+  // narrow phone; publish the real height for them as --header-h.
+  useEffect(() => {
+    const header = ref.current;
+    if (!header || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(() =>
+      document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`),
+    );
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <header className="no-print sticky top-0 z-40 border-b border-line/70 bg-surface/75 backdrop-blur-xl">
+    <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line/70 bg-surface/75 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-bold text-white shadow-glow">
@@ -194,7 +210,7 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
             </p>
           </div>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <MarketStatus />
           <button
             type="button"
