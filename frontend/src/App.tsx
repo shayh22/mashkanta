@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, fetchBaseline, fetchReference, optimize } from './lib/api';
 import type { BorrowerProfileRequest, MacroRequest } from './lib/types';
 import { useTheme } from './lib/theme';
@@ -10,6 +10,8 @@ import { MortgageWizard } from './components/MortgageWizard';
 import { OfferReview } from './pages/OfferReview';
 import { ResultsDashboard } from './pages/ResultsDashboard';
 import { ErrorCard, LoadingCard } from './components/ui';
+import { MarketStatus } from './components/MarketStatus';
+import { useMarket } from './store/marketStore';
 
 // The refinance and consolidation modes carry the charting library; loading them on demand keeps
 // it off the first visit, which lands on the mortgage wizard.
@@ -62,6 +64,20 @@ export default function App() {
       window.history.replaceState(null, '', `#/${next}`);
     }
   };
+
+  // Live market figures are read on every load; the last good set is cached, so the app starts on
+  // it and only the numbers change when the fresh one arrives.
+  const queryClient = useQueryClient();
+  const marketVersion = useMarket((state) => state.version);
+  useEffect(() => {
+    void useMarket.getState().refresh();
+  }, []);
+  useEffect(() => {
+    if (marketVersion > 0) {
+      void queryClient.invalidateQueries({ queryKey: ['reference'] });
+      void queryClient.invalidateQueries({ queryKey: ['baseline'] });
+    }
+  }, [marketVersion, queryClient]);
 
   // Reference data and the market baseline are public, cheap and change at most daily.
   const reference = useQuery({ queryKey: ['reference'], queryFn: fetchReference, staleTime: 60 * 60 * 1000 });
@@ -167,26 +183,29 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
   return (
     <header className="no-print sticky top-0 z-40 border-b border-line/70 bg-surface/75 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-bold text-white shadow-glow">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-bold text-white shadow-glow">
             ₪
           </span>
           <div>
             <h1 className="text-sm font-bold text-ink">השוואת משכנתאות חכמה</h1>
-            <p className="text-xs text-ink-soft">
+            <p className="hidden text-xs text-ink-soft sm:block">
               מיחזור, איחוד הלוואות ותמהיל — על בסיס נתונים ציבוריים בלבד
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface text-base transition hover:bg-surface-muted"
-          onClick={onToggleTheme}
-          aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
-          title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
-        >
-          <span aria-hidden>{theme === 'dark' ? '☀️' : '🌙'}</span>
-        </button>
+        <div className="flex min-w-0 items-center gap-2">
+          <MarketStatus />
+          <button
+            type="button"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-surface text-base transition hover:bg-surface-muted"
+            onClick={onToggleTheme}
+            aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
+            title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+          >
+            <span aria-hidden>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          </button>
+        </div>
       </div>
     </header>
   );

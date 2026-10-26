@@ -1,22 +1,37 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { isUsable } from './src/engine/boiMarket';
+import { readMarket } from './worker/market';
+
+/**
+ * `/api/market` for the dev and preview servers, doing what the Worker does in production. Without
+ * it the app would fall back to its seeded figures whenever it runs locally.
+ */
+function marketApi(): Plugin {
+  const handler: Connect.NextHandleFunction = (request, response, next) => {
+    if (!request.url?.startsWith('/api/market')) {
+      next();
+      return;
+    }
+    readMarket(fetch)
+      .then((market) => {
+        response.statusCode = isUsable(market) ? 200 : 502;
+        response.setHeader('content-type', 'application/json; charset=utf-8');
+        response.end(JSON.stringify(market));
+      })
+      .catch(next);
+  };
+  return {
+    name: 'market-api',
+    configureServer: (server) => void server.middlewares.use(handler),
+    configurePreviewServer: (server) => void server.middlewares.use(handler),
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
-  // The dev and preview servers both talk to the Spring Boot backend on 8080. In production the
-  // two are served from the same origin behind the CDN, so no proxy is involved there.
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-    },
-  },
-  preview: {
-    port: 4173,
-    proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-    },
-  },
+  plugins: [react(), marketApi()],
+  server: { port: 5173 },
+  preview: { port: 4173 },
   build: {
     outDir: 'dist',
     sourcemap: true,

@@ -5,7 +5,9 @@
 //   node e2e/smoke.mjs https://mashkanta.shayh22.workers.dev    # the deployed site, with its real headers
 //
 // Fails on any console error, uncaught exception, horizontal page overflow, axe-core violation
-// of serious/critical impact, or the opening screen downloading the charting library. Uses the Playwright that ships with the environment.
+// of serious/critical impact, the opening screen downloading the charting library, or live market
+// data not arriving. Locally the preview server reads the Bank of Israel itself; behind a proxy,
+// start it with NODE_USE_ENV_PROXY=1. Uses the Playwright that ships with the environment.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -37,6 +39,21 @@ const problems = [];
   if (charts.length > 0) {
     problems.push(`first visit downloaded the charting library: ${charts.join(', ')}`);
   }
+  await page.close();
+}
+
+// Live market figures: the endpoint answers (the Worker in production, the Vite middleware
+// locally), and the header shows the prime rate read from it rather than the seeded fallback.
+{
+  const page = await browser.newPage();
+  const response = await page.request.get(`${base}/api/market`);
+  const market = response.ok() ? await response.json() : undefined;
+  if (!market?.prime?.value || !market?.housing) {
+    problems.push(`/api/market: HTTP ${response.status()} ${JSON.stringify(market?.missing ?? market)}`);
+  }
+  await page.goto(`${base}/#/mortgage`);
+  const status = page.getByRole('status').filter({ hasText: 'נתוני בנק ישראל' });
+  await status.waitFor({ timeout: 20_000 }).catch(() => problems.push('header never showed live market data'));
   await page.close();
 }
 
