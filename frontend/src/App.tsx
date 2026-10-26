@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError, fetchBaseline, fetchReference, optimize } from './lib/api';
 import type { BorrowerProfileRequest, MacroRequest } from './lib/types';
@@ -9,9 +9,16 @@ import { useConsolidation } from './store/consolidationStore';
 import { MortgageWizard } from './components/MortgageWizard';
 import { OfferReview } from './pages/OfferReview';
 import { ResultsDashboard } from './pages/ResultsDashboard';
-import { RefinancePage } from './pages/RefinancePage';
-import { ConsolidationPage } from './pages/ConsolidationPage';
 import { ErrorCard, LoadingCard } from './components/ui';
+
+// The refinance and consolidation modes carry the charting library; loading them on demand keeps
+// it off the first visit, which lands on the mortgage wizard.
+const RefinancePage = lazy(() =>
+  import('./pages/RefinancePage').then((module) => ({ default: module.RefinancePage })),
+);
+const ConsolidationPage = lazy(() =>
+  import('./pages/ConsolidationPage').then((module) => ({ default: module.ConsolidationPage })),
+);
 
 /** The three jobs the platform does. Each is addressable by URL hash so it can be linked to. */
 type Mode = 'mortgage' | 'refinance' | 'consolidation';
@@ -19,7 +26,12 @@ type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; icon: string; title: string; subtitle: string }[] = [
   { id: 'mortgage', icon: '🏠', title: 'משכנתא חדשה', subtitle: 'תמהיל אופטימלי והשוואת סלים אחידים' },
-  { id: 'refinance', icon: '🔄', title: 'בדיקת כדאיות מיחזור', subtitle: 'עמלות פירעון, נקודת איזון וחיסכון' },
+  {
+    id: 'refinance',
+    icon: '🔄',
+    title: 'בדיקת כדאיות מיחזור',
+    subtitle: 'עמלות פירעון, נקודת איזון וחיסכון',
+  },
   { id: 'consolidation', icon: '🧩', title: 'איחוד הלוואות', subtitle: 'הבראה תזרימית כנגד הנכס' },
 ];
 
@@ -67,7 +79,10 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2"
+      >
         דילוג לתוכן
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
@@ -104,24 +119,36 @@ export default function App() {
               )}
 
               {view === 'results' && optimization.data && (
-                <ResultsDashboard result={optimization.data} baseline={baseline.data} onEdit={() => setView('wizard')} />
+                <ResultsDashboard
+                  result={optimization.data}
+                  baseline={baseline.data}
+                  onEdit={() => setView('wizard')}
+                />
               )}
 
               {view === 'upload' && (
                 <div className="space-y-5">
                   <OfferReview />
                   <p className="mx-auto max-w-4xl text-center text-xs text-ink-soft">
-                    מספרי תעודת זהות, שמות, כתובות ומספרי חשבון מוסרים מתוך המסמך בזיכרון. הקובץ מעובד
-                    בדפדפן בלבד ואינו נשלח לשום שרת.
+                    מספרי תעודת זהות, שמות, כתובות ומספרי חשבון מוסרים מתוך המסמך בזיכרון. הקובץ מעובד בדפדפן
+                    בלבד ואינו נשלח לשום שרת.
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {mode === 'refinance' && <RefinancePage />}
-
-          {mode === 'consolidation' && <ConsolidationPage />}
+          {mode !== 'mortgage' && (
+            <Suspense
+              fallback={
+                <div className="mx-auto w-full max-w-3xl">
+                  <LoadingCard message="טוען…" />
+                </div>
+              }
+            >
+              {mode === 'refinance' ? <RefinancePage /> : <ConsolidationPage />}
+            </Suspense>
+          )}
         </div>
       </main>
 
@@ -140,7 +167,9 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
           </span>
           <div>
             <h1 className="text-sm font-bold text-ink">השוואת משכנתאות חכמה</h1>
-            <p className="text-xs text-ink-soft">מיחזור, איחוד הלוואות ותמהיל — על בסיס נתונים ציבוריים בלבד</p>
+            <p className="text-xs text-ink-soft">
+              מיחזור, איחוד הלוואות ותמהיל — על בסיס נתונים ציבוריים בלבד
+            </p>
           </div>
         </div>
         <button
@@ -182,7 +211,11 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
 
   return (
     <nav className="no-print px-4 pt-5" aria-label="מצבי עבודה">
-      <div role="tablist" aria-label="מצב עבודה" className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:gap-3">
+      <div
+        role="tablist"
+        aria-label="מצב עבודה"
+        className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:gap-3"
+      >
         {MODES.map((item, index) => {
           const selected = item.id === mode;
           return (
@@ -214,7 +247,9 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
                 {item.icon}
               </span>
               <span>
-                <span className={`block text-xs font-semibold sm:text-sm ${selected ? 'text-brand-700' : 'text-ink'}`}>
+                <span
+                  className={`block text-xs font-semibold sm:text-sm ${selected ? 'text-brand-700' : 'text-ink'}`}
+                >
                   {item.title}
                 </span>
                 <span className="hidden text-xs text-ink-soft sm:block">{item.subtitle}</span>
@@ -243,7 +278,11 @@ function MortgageSubNav({
   ];
   return (
     <div className="no-print mx-auto flex w-full max-w-6xl justify-center">
-      <div className="inline-flex rounded-xl border border-line/80 bg-surface-sunken/80 p-0.5" role="group" aria-label="שלבי משכנתא חדשה">
+      <div
+        className="inline-flex rounded-xl border border-line/80 bg-surface-sunken/80 p-0.5"
+        role="group"
+        aria-label="שלבי משכנתא חדשה"
+      >
         {items.map((item) => (
           <button
             key={item.id}
@@ -268,8 +307,8 @@ function Footer({ onReset }: { onReset: () => void }) {
     <footer className="no-print border-t border-line/70 bg-surface/60 px-4 py-6 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-ink-soft">
-          נתוני הריביות מבוססים על פרסומי בנק ישראל, הלשכה המרכזית לסטטיסטיקה ותרומות אנונימיות של
-          לווים. הכללים הרגולטוריים לפי הוראה 329 בנוסחה מ-1.10.2026. אין באמור ייעוץ פיננסי.
+          נתוני הריביות מבוססים על פרסומי בנק ישראל, הלשכה המרכזית לסטטיסטיקה ותרומות אנונימיות של לווים.
+          הכללים הרגולטוריים לפי הוראה 329 בנוסחה מ-1.10.2026. אין באמור ייעוץ פיננסי.
         </p>
         <button type="button" className="text-xs font-medium text-brand-700" onClick={onReset}>
           איפוס הנתונים

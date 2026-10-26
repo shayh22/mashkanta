@@ -26,8 +26,10 @@ export default defineConfig({
           if (!id.includes('node_modules')) {
             return undefined;
           }
-          // Only the framework belongs in the eagerly loaded vendor chunk.
-          if (/node_modules\/(react|react-dom|scheduler|@tanstack)\//.test(id)) {
+          // Only the framework and the state stores belong in the eagerly loaded vendor chunk. The
+          // stores must be listed: everything unlisted falls through to 'charts', and a store
+          // landing there makes the entry chunk depend on - and preload - the whole charting library.
+          if (/node_modules\/(react|react-dom|scheduler|@tanstack|zustand|use-sync-external-store)\//.test(id)) {
             return 'vendor';
           }
           // pdf.js is only reached when someone drops an approval-in-principle on the upload
