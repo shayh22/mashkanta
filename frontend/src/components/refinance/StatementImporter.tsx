@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { extractMortgageDocument, type MortgageDocument } from '../../engine/documents';
+import { toMortgageTracks } from '../../engine/aiExtraction';
+import { extractMortgageDocument, isImageFile, type MortgageDocument } from '../../engine/documents';
+import { AiDocumentReader } from '../AiDocumentReader';
 import { scenarioOf } from '../../lib/api';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import { newTrackId, useRefinance } from '../../store/refinanceStore';
@@ -31,10 +33,15 @@ export function StatementImporter() {
   const macro = useWizard((state) => state.macro);
   const setMacro = useWizard((state) => state.setMacro);
 
+  // A document no local parser recognised, offered for reading with AI; and what that reading gave.
+  const [aiFile, setAiFile] = useState<File>();
+  const [aiImport, setAiImport] = useState<{ count: number; warnings: string[] }>();
+
   const importer = useMutation({
     mutationFn: (file: File) => extractMortgageDocument(file, scenarioOf(macro).primeAnnual),
-    onSuccess: (document: MortgageDocument) => {
+    onSuccess: (document: MortgageDocument, file: File) => {
       if (document.tracks.length === 0) {
+        setAiFile(file);
         return;
       }
       if (document.kind === 'statement') {
@@ -54,7 +61,29 @@ export function StatementImporter() {
     },
   });
 
-  const pick = (file: File | undefined) => file && importer.mutate(file);
+  const pick = (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+    setAiFile(undefined);
+    setAiImport(undefined);
+    importer.reset();
+    // A photo or screenshot has no text for the local parsers; it can only be read with AI.
+    if (isImageFile(file)) {
+      setAiFile(file);
+    } else {
+      importer.mutate(file);
+    }
+  };
+
+  const importFromAi = (data: unknown) => {
+    const { items, warnings } = toMortgageTracks(data, newTrackId);
+    if (items.length > 0) {
+      importTracks(items);
+    }
+    setAiImport({ count: items.length, warnings });
+    setAiFile(undefined);
+  };
   const result = importer.data;
   const prime = scenarioOf(macro).primeAnnual;
 
@@ -78,14 +107,14 @@ export function StatementImporter() {
           pick(event.dataTransfer.files[0]);
         }}
       >
-        <p className="text-sm text-ink-muted">גררו לכאן קובץ PDF, או</p>
+        <p className="text-sm text-ink-muted">גררו לכאן קובץ PDF או צילום מסך, או</p>
         <button type="button" className="btn-ghost" onClick={() => inputRef.current?.click()} disabled={importer.isPending}>
           {importer.isPending ? 'קורא את המסמך…' : 'בחירת קובץ'}
         </button>
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf,.pdf,.txt"
+          accept="application/pdf,.pdf,.txt,image/png,image/jpeg,image/webp"
           className="sr-only"
           aria-label="קובץ דוח המשכנתא"
           onChange={(event) => {
@@ -93,8 +122,43 @@ export function StatementImporter() {
             event.target.value = '';
           }}
         />
-        <p className="hint">הקובץ מעובד בדפדפן בלבד ואינו נשלח לשום שרת. שם, כתובת ומספר זהות מושחרים לפני הניתוח.</p>
+        <p className="hint">
+          דוח בפורמט מוכר מעובד בדפדפן בלבד ואינו נשלח לשום שרת. שם, כתובת ומספר זהות מושחרים לפני הניתוח. פורמט
+          אחר אפשר לקרוא עם AI — רק באישורכם.
+        </p>
       </div>
+
+      {aiFile && (
+        <AiDocumentReader
+          kind="mortgage"
+          file={aiFile}
+          reason={
+            isImageFile(aiFile)
+              ? 'זו תמונה — המחשבון קורא בעצמו רק דוחות PDF בפורמט מוכר.'
+              : 'הפורמט של המסמך לא מוכר למחשבון (כרגע הוא קורא בעצמו את דוח "פרטי משכנתאות" של בנק הפועלים ואישורים עקרוניים).'
+          }
+          onData={importFromAi}
+        />
+      )}
+
+      {aiImport && (
+        <div className="mt-4 space-y-2 text-sm" aria-live="polite">
+          {aiImport.count > 0 ? (
+            <p className="font-semibold text-positive">
+              ✓ יובאו {aiImport.count} מסלולים שזוהו עם AI. בדקו כל שורה בטבלה מול המסמך — זו קריאה אוטומטית.
+            </p>
+          ) : (
+            <p className="text-negative">לא זוהו במסמך מסלולי משכנתא. אפשר להזין אותם ידנית.</p>
+          )}
+          {aiImport.warnings.length > 0 && (
+            <ul className="list-inside list-disc text-caution">
+              {aiImport.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {importer.isError && (
         <p className="mt-3 text-sm text-negative" role="alert">
@@ -102,7 +166,7 @@ export function StatementImporter() {
         </p>
       )}
 
-      {result && (
+      {result && result.tracks.length > 0 && (
         <div className="mt-4 space-y-3 text-sm" aria-live="polite">
           {result.kind === 'statement' ? (
             <>
