@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { browserStorage, storageKey } from './persistence';
-import type { BorrowerProfileRequest, BuyerSegment, LiquidityEvent, MacroRequest } from '../lib/types';
+import type { BorrowerProfileRequest, BuyerSegment, LiquidityEvent, MacroRequest, TrackType } from '../lib/types';
+import { DEFAULT_MANUAL_SHARES, type ManualShares } from '../engine/manualMix';
+
+/** Who chooses the mix: the optimisation engine, or the borrower track by track. */
+export type MixMode = 'AUTO' | 'MANUAL';
 
 /** The regulatory LTV ceiling per segment, mirrored client-side so the sliders can bound themselves. */
 export const SEGMENT_MAX_LTV: Record<BuyerSegment, number> = {
@@ -59,12 +63,18 @@ interface WizardState {
   /** Where in the market rate distribution to price: 0.5 is the published average. */
   percentile: number;
   submitted: boolean;
+  mixMode: MixMode;
+  /** The hand-built mix, as shares of the loan beyond any eligibility loan. */
+  manualShares: ManualShares;
 
   setProfile: (patch: Partial<BorrowerProfileRequest>) => void;
   setSegment: (segment: BuyerSegment) => void;
   setMacro: (patch: MacroRequest) => void;
   setPercentile: (percentile: number) => void;
   setPreferences: (prime: number, stable: number, dynamic: number) => void;
+  setMixMode: (mode: MixMode) => void;
+  setManualShare: (track: TrackType, share: number) => void;
+  setManualShares: (shares: ManualShares) => void;
   addLiquidityEvent: (event: LiquidityEvent) => void;
   removeLiquidityEvent: (index: number) => void;
   goTo: (step: number) => void;
@@ -85,6 +95,8 @@ export const useWizard = create<WizardState>()(
       macro: {},
       percentile: 0.5,
       submitted: false,
+      mixMode: 'AUTO',
+      manualShares: DEFAULT_MANUAL_SHARES,
 
       setProfile: (patch) =>
         set((state) => {
@@ -120,6 +132,11 @@ export const useWizard = create<WizardState>()(
           },
         })),
 
+      setMixMode: (mixMode) => set({ mixMode }),
+      setManualShare: (track, share) =>
+        set((state) => ({ manualShares: { ...state.manualShares, [track]: Math.min(1, Math.max(0, share)) } })),
+      setManualShares: (manualShares) => set({ manualShares }),
+
       addLiquidityEvent: (event) =>
         set((state) => ({
           profile: {
@@ -148,6 +165,8 @@ export const useWizard = create<WizardState>()(
           macro: {},
           percentile: 0.5,
           submitted: false,
+          mixMode: 'AUTO',
+          manualShares: DEFAULT_MANUAL_SHARES,
         }),
     }),
     {
@@ -161,6 +180,8 @@ export const useWizard = create<WizardState>()(
         requestedLoanAmount: state.requestedLoanAmount,
         macro: state.macro,
         percentile: state.percentile,
+        mixMode: state.mixMode,
+        manualShares: state.manualShares,
       }),
     },
   ),

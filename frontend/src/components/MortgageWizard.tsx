@@ -10,8 +10,10 @@ import type { BuyerSegment, MacroAnchors } from '../lib/types';
 import { formatCurrency, formatPercent, formatTerm } from '../lib/format';
 import { Card, CurrencyField, Field, ProgressSteps, RangeField, SegmentedControl } from './ui';
 import { DEFAULT_PRIME } from '../engine/scenario';
+import { checkManualMix } from '../engine/manualMix';
+import { ManualMixEditor } from './ManualMixEditor';
 
-const STEP_LABELS = ['נכס והלוואה', 'פרופיל לווה', 'סיכון והעדפות'];
+const STEP_LABELS = ['נכס והלוואה', 'פרופיל לווה', 'סיכון ותמהיל'];
 
 const RISK_DESCRIPTIONS = [
   'שמרן מאוד — ודאות מלאה בהחזר החודשי',
@@ -36,7 +38,11 @@ const RISK_DESCRIPTIONS = [
 export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; onSubmit: () => void }) {
   const { step, profile, macro, setProfile, setSegment, setMacro, setPreferences, next, back, goTo } =
     useWizard();
+  const { mixMode, manualShares, setMixMode, setManualShare, setManualShares } = useWizard();
   const metrics = useDerivedMetrics();
+  const lockedShare = profile.loanAmount > 0 ? Math.min(profile.eligibilityAmount, profile.loanAmount) / profile.loanAmount : 0;
+  // Shares that do not add up cannot be priced; a mix that breaks the shape rules still can, for comparison.
+  const manualIncomplete = mixMode === 'MANUAL' && Boolean(checkManualMix(manualShares, lockedShare).totalError);
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -179,13 +185,39 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
                   step={100}
                   onChange={(value) => setProfile({ volatilityCapacity: value })}
                 />
+              </div>
+            </Card>
 
-                <PreferenceSliders
-                  prime={profile.primePreference}
-                  stable={profile.stablePreference}
-                  dynamic={profile.dynamicPreference}
-                  onChange={setPreferences}
+            <Card
+              title="בחירת התמהיל"
+              subtitle="המנוע יכול לבחור עבורכם את החלוקה הזולה ביותר שעומדת באילוצים, או שתרכיבו אותה בעצמכם ותראו אותה מול הסלים ומול בחירת המנוע."
+            >
+              <div className="space-y-5">
+                <SegmentedControl
+                  label="מי בוחר את התמהיל"
+                  value={mixMode}
+                  onChange={setMixMode}
+                  options={[
+                    { value: 'AUTO', title: 'אוטומטי', subtitle: 'המנוע בוחר את התמהיל האופטימלי' },
+                    { value: 'MANUAL', title: 'ידני', subtitle: 'אני מחלק/ת בין המסלולים' },
+                  ]}
                 />
+                {mixMode === 'AUTO' ? (
+                  <PreferenceSliders
+                    prime={profile.primePreference}
+                    stable={profile.stablePreference}
+                    dynamic={profile.dynamicPreference}
+                    onChange={setPreferences}
+                  />
+                ) : (
+                  <ManualMixEditor
+                    shares={manualShares}
+                    loanAmount={profile.loanAmount}
+                    eligibilityAmount={profile.eligibilityAmount}
+                    onChange={setManualShare}
+                    onReplace={setManualShares}
+                  />
+                )}
               </div>
             </Card>
 
@@ -203,8 +235,13 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
             המשך
           </button>
         ) : (
-          <button type="button" className="btn-primary" onClick={onSubmit} disabled={metrics.ltvExceeded}>
-            חשב תמהיל אופטימלי
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={onSubmit}
+            disabled={metrics.ltvExceeded || manualIncomplete}
+          >
+            {mixMode === 'MANUAL' ? 'חשב את התמהיל שלי' : 'חשב תמהיל אופטימלי'}
           </button>
         )}
       </div>

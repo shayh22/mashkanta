@@ -13,7 +13,8 @@ const TRACK_COLORS: Record<TrackType, string> = {
 };
 
 /**
- * The recommended mix beside the three standardised baskets.
+ * The chosen mix — the engine's, or one the borrower built — beside the three standardised
+ * baskets, and beside the engine's choice when the borrower built their own.
  *
  * All four are priced at the same market rates and the same term, so the only thing that differs
  * between the columns is the composition — which is exactly the comparison the Bank of Israel's
@@ -23,17 +24,20 @@ export function MixComparison({
   recommended,
   baskets,
   savings,
+  engineOptimum,
 }: {
   recommended: MixProposal;
   baskets: MixProposal[];
   savings: SavingsComparison[];
+  engineOptimum?: MixProposal;
 }) {
   const savingsById = new Map(savings.map((entry) => [entry.againstId, entry]));
-  const all = [recommended, ...baskets];
+  const all = [recommended, ...(engineOptimum ? [engineOptimum] : []), ...baskets];
+  const manual = Boolean(engineOptimum);
 
   return (
     <Card
-      title="התמהיל המומלץ מול הסלים האחידים"
+      title={manual ? 'התמהיל שלכם מול המנוע והסלים האחידים' : 'התמהיל המומלץ מול הסלים האחידים'}
       subtitle="כל התמהילים מתומחרים באותן ריביות שוק ובאותה תקופה, כך שההשוואה בודדת את השפעת ההרכב בלבד."
     >
       <div className="grid gap-4 lg:grid-cols-2">
@@ -42,6 +46,7 @@ export function MixComparison({
             key={proposal.id}
             proposal={proposal}
             saving={savingsById.get(proposal.id)}
+            manual={manual}
           />
         ))}
       </div>
@@ -49,8 +54,18 @@ export function MixComparison({
   );
 }
 
-function MixCard({ proposal, saving }: { proposal: MixProposal; saving?: SavingsComparison }) {
+function MixCard({
+  proposal,
+  saving,
+  manual,
+}: {
+  proposal: MixProposal;
+  saving?: SavingsComparison;
+  /** The chosen mix is the borrower's own rather than the engine's. */
+  manual: boolean;
+}) {
   const { summary, compliance } = proposal;
+  const chosen = manual ? 'התמהיל שלכם' : 'התמהיל המומלץ';
 
   return (
     <article
@@ -64,7 +79,9 @@ function MixCard({ proposal, saving }: { proposal: MixProposal; saving?: Savings
           <p className="mt-0.5 text-xs text-ink-soft">{proposal.description}</p>
         </div>
         {proposal.recommended ? (
-          <span className="badge-ok shrink-0">מומלץ</span>
+          <span className="badge-ok shrink-0">{manual ? 'שלכם' : 'מומלץ'}</span>
+        ) : proposal.id === 'OPTIMAL' ? (
+          <span className="badge-neutral shrink-0">בחירת המנוע</span>
         ) : (
           <LevelBadge level={compliance.level}>
             {compliance.level === 'OK' ? 'תקין' : compliance.level === 'WARNING' ? 'לתשומת לב' : 'חריגה'}
@@ -93,9 +110,13 @@ function MixCard({ proposal, saving }: { proposal: MixProposal; saving?: Savings
             saving.totalPaidSaving > 0 ? 'bg-emerald-500/10 text-positive' : 'bg-surface-muted text-ink-soft'
           }`}
         >
-          {saving.totalPaidSaving > 0
-            ? `התמהיל המומלץ חוסך ${formatCurrency(saving.totalPaidSaving)} מול סל זה`
-            : `סל זה זול ב-${formatCurrency(Math.abs(saving.totalPaidSaving))} מהתמהיל המומלץ, אך תנודתי יותר`}
+          {Math.abs(saving.totalPaidSaving) < 1
+            ? `זהה בעלות ל${chosen.slice(1)}`
+            : saving.totalPaidSaving > 0
+            ? `${chosen} חוסך ${formatCurrency(saving.totalPaidSaving)} מול ${proposal.id === 'OPTIMAL' ? 'בחירת המנוע' : 'סל זה'}`
+            : manual
+              ? `${proposal.id === 'OPTIMAL' ? 'בחירת המנוע זולה' : 'סל זה זול'} ב-${formatCurrency(Math.abs(saving.totalPaidSaving))} מהתמהיל שלכם`
+              : `סל זה זול ב-${formatCurrency(Math.abs(saving.totalPaidSaving))} מהתמהיל המומלץ, אך תנודתי יותר`}
           {' · '}
           החזר ראשוני {formatSignedCurrency(-saving.initialPaymentDelta)}
         </p>
@@ -156,7 +177,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 /** The detailed per-track table for the recommended mix. */
 export function AllocationTable({ proposal }: { proposal: MixProposal }) {
   return (
-    <Card title="פירוט המסלולים" subtitle="הרכב התמהיל המומלץ, מסלול אחר מסלול">
+    <Card
+      title="פירוט המסלולים"
+      subtitle={`הרכב ${proposal.id === 'MANUAL' ? 'התמהיל שלכם' : 'התמהיל המומלץ'}, מסלול אחר מסלול`}
+    >
       <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">
           <thead>

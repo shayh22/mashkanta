@@ -8,6 +8,7 @@ import { withShock, type MacroScenario } from './scenario';
 import { annualRateAt, initialRate, TRACKS, trackFromRate, withTerm, type TrackSpec } from './tracks';
 import { maxAffordablePayment, type BorrowerProfile, type RiskProfile } from './profile';
 import type { ComplianceReport } from '../lib/types';
+import { normaliseShares, type ManualShares } from './manualMix';
 
 /** Tracks the optimizer may allocate to. Eligibility is locked, not optimized. */
 const CANDIDATES: readonly TrackType[] = [
@@ -76,7 +77,11 @@ export interface TermOption {
 }
 
 export interface OptimizationResult {
+  /** AUTO: the engine chose the mix. MANUAL: the borrower did, and `recommended` is their mix. */
+  readonly mode: 'AUTO' | 'MANUAL';
   readonly recommended: MixProposal;
+  /** In MANUAL mode, what the engine would have chosen for the same borrower — the yardstick. */
+  readonly engineOptimum?: MixProposal;
   readonly baskets: readonly MixProposal[];
   readonly alternatives: readonly MixProposal[];
   readonly savings: readonly SavingsComparison[];
@@ -143,6 +148,7 @@ export function optimize(
   risk: RiskProfile,
   scenario: MacroScenario,
   percentile = 0.5,
+  manualShares?: ManualShares,
 ): OptimizationResult {
   const started = performance.now();
 
@@ -423,19 +429,7 @@ export function optimize(
     }
   }
 
-  const recommended = buildProposal(
-    'OPTIMAL',
-    'סל אופטימלי מומלץ',
-    'תמהיל שנבנה במיוחד עבור פרופיל הסיכון, ההכנסה ואופק הנזילות שהוזנו.',
-    bestSpecs,
-    borrower,
-    risk,
-    scenario,
-    true,
-    bestScore,
-  );
-
-  // --- The three standardised baskets the banks must present alongside their own offer ---
+  /** A mix given as shares of the optimizable principal, with the eligibility loan beside it. */
   const basketSpecs = (shares: Partial<Record<TrackType, number>>): TrackSpec[] => {
     const specs: TrackSpec[] = [];
     if (locked) {
@@ -450,6 +444,35 @@ export function optimize(
     return specs;
   };
 
+  const manual = manualShares ? normaliseShares(manualShares) : undefined;
+  const optimum = buildProposal(
+    'OPTIMAL',
+    manual ? 'התמהיל האופטימלי של המנוע' : 'סל אופטימלי מומלץ',
+    'תמהיל שנבנה במיוחד עבור פרופיל הסיכון, ההכנסה ואופק הנזילות שהוזנו.',
+    bestSpecs,
+    borrower,
+    risk,
+    scenario,
+    !manual,
+    bestScore,
+  );
+  // A hand-built mix is priced exactly like the engine's, at the same rates, so the two compare.
+  const chosenSpecs = manual ? basketSpecs(manual) : bestSpecs;
+  const recommended = manual
+    ? buildProposal(
+        'MANUAL',
+        'התמהיל שלכם',
+        'התמהיל שבניתם, מתומחר באותן ריביות שוק ובאותם מבחני קיצון כמו הסלים שלצדו.',
+        chosenSpecs,
+        borrower,
+        risk,
+        scenario,
+        true,
+        0,
+      )
+    : optimum;
+
+  // --- The three standardised baskets the banks must present alongside their own offer ---
   const third = 1 / 3;
   const baskets: MixProposal[] = [
     buildProposal(
@@ -487,7 +510,8 @@ export function optimize(
     ),
   ];
 
-  const savings: SavingsComparison[] = baskets.map((basket) => ({
+  // A hand-built mix is also measured against the engine's own choice.
+  const savings: SavingsComparison[] = [...baskets, ...(manual ? [optimum] : [])].map((basket) => ({
     againstId: basket.id,
     againstName: basket.name,
     totalPaidSaving: basket.result.totalPaid - recommended.result.totalPaid,
@@ -512,7 +536,7 @@ export function optimize(
   // --- The same mix re-priced over the terms a borrower realistically chooses between ---
   const termSensitivity: TermOption[] = [15, 20, 25, 30].map((years) => {
     const months = years * 12;
-    const result = priceMix(bestSpecs.map((spec) => withTerm(spec, months)), scenario);
+    const result = priceMix(chosenSpecs.map((spec) => withTerm(spec, months)), scenario);
     return {
       termMonths: months,
       initialPayment: result.initialPayment,
@@ -525,7 +549,9 @@ export function optimize(
   });
 
   return {
+    mode: manual ? 'MANUAL' : 'AUTO',
     recommended,
+    ...(manual ? { engineOptimum: optimum } : {}),
     baskets,
     alternatives: alternativeProposals,
     savings,

@@ -17,10 +17,12 @@ import {
   type RouteKind,
   type SwitchingCosts,
 } from '../engine/refinance';
+import { optimalRefinance, type OptimalRefinance } from '../engine/refinanceOptimal';
 import { useWizard } from './wizardStore';
 import { browserStorage, storageKey, uniqueId } from './persistence';
 
-export type ProposalMode = 'AUTO' | 'MANUAL';
+/** AUTO: the same tracks at market prices. OPTIMAL: a new mix chosen by the engine. MANUAL: a quote typed in. */
+export type ProposalMode = 'AUTO' | 'OPTIMAL' | 'MANUAL';
 
 /** Row ids key React lists and pair an existing track with its proposed replacement. */
 export const newTrackId = () => uniqueId('t');
@@ -231,13 +233,35 @@ export interface RefinanceView {
   comparison?: RefinanceComparison;
   /** Each track refinanced on its own at the current bank. */
   perTrack: TrackVerdict[];
+  /** In OPTIMAL mode, the engine's run behind the proposal. */
+  optimal?: OptimalRefinance;
 }
 
 /** The whole analysis, recomputed only when an input changes. It takes a few milliseconds. */
 export function useRefinanceAnalysis(): RefinanceView {
   const state = useRefinance();
   const macro = useWizard((wizard) => wizard.macro);
+  // The household as entered for a new mortgage: income and appetite for risk shape the optimal mix.
+  const household = useWizard((wizard) => wizard.profile);
   const marketVersion = useMarketVersion();
+
+  // The search takes a tenth of a second, so it runs only in OPTIMAL mode and only on its own inputs.
+  const optimal = useMemo(
+    () =>
+      state.proposalMode === 'OPTIMAL'
+        ? (optimalRefinance(
+            state.tracks,
+            new Set(state.keptIds),
+            state.propertyValue,
+            household,
+            state.percentile,
+            scenarioOf(macro),
+          ) ?? undefined)
+        : undefined,
+    // marketVersion: the engine prices against the live market table.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.proposalMode, state.tracks, state.keptIds, state.propertyValue, household, state.percentile, macro, marketVersion],
+  );
 
   return useMemo(() => {
     const balance = outstandingBalance(state.tracks);
@@ -247,9 +271,11 @@ export function useRefinanceAnalysis(): RefinanceView {
     const proposal =
       state.proposalMode === 'AUTO'
         ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept, scenario.primeAnnual)
-        : withKeptTracks(state.manualProposal, state.tracks, kept);
+        : state.proposalMode === 'OPTIMAL'
+          ? withKeptTracks(optimal?.proposal ?? [], state.tracks, kept)
+          : withKeptTracks(state.manualProposal, state.tracks, kept);
     if (!tracksValid(state.tracks) || proposal.length === 0) {
-      return { ltv, balance, proposal, perTrack: [] };
+      return { ltv, balance, proposal, perTrack: [], optimal };
     }
     const options = {
       scenario,
@@ -261,7 +287,7 @@ export function useRefinanceAnalysis(): RefinanceView {
     };
     const comparison = compareRoutes(state.tracks, proposal, state.routes, options);
     const perTrack = trackByTrack(state.tracks, state.percentile, options);
-    return { ltv, balance, proposal, comparison, perTrack };
+    return { ltv, balance, proposal, comparison, perTrack, optimal };
     // marketVersion is not read in the body: the engine prices against the live market table, and
     // this is how a change to that table reaches the memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,5 +304,6 @@ export function useRefinanceAnalysis(): RefinanceView {
     state.dayOfMonth,
     macro,
     marketVersion,
+    optimal,
   ]);
 }

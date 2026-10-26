@@ -257,7 +257,11 @@ export interface BankQuote {
 }
 
 export interface OptimizationResponse {
+  /** AUTO: the engine chose the mix. MANUAL: the borrower built it, and `recommended` is theirs. */
+  mode: 'AUTO' | 'MANUAL';
   recommended: MixProposal;
+  /** In MANUAL mode, the engine's own choice for the same borrower. */
+  engineOptimum?: MixProposal;
   baskets: MixProposal[];
   alternatives: MixProposal[];
   savings: SavingsComparison[];
