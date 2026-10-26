@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DebtImporter } from '../consolidation/DebtImporter';
@@ -85,10 +85,39 @@ describe('importing loans from a document', () => {
     expect(screen.getByText(/נוספו 1 הלוואות מהמסמך/)).toBeTruthy();
   });
 
-  it('is hidden when AI reading is not switched on', async () => {
+  it('reads an amortization schedule in the browser, without AI', async () => {
+    const calls = serveAi({ loans: [] });
+    const user = userEvent.setup();
+    renderImporter();
+    const rows = ['לוח סילוקין', 'שיעור ריבית שנתית 6%'];
+    let balance = 30_000;
+    for (let month = 1; month <= 12; month++) {
+      const interest = Math.round(balance * 0.005 * 100) / 100;
+      const principal = 2_400;
+      balance = Math.round((balance - principal) * 100) / 100;
+      rows.push(`10/${String(month).padStart(2, '0')}/2020 ${principal.toFixed(2)} ${interest.toFixed(2)} ${(principal + interest).toFixed(2)} ${balance.toFixed(2)}`);
+    }
+    for (let month = 1; month <= 12; month++) {
+      const interest = Math.round(balance * 0.005 * 100) / 100;
+      const principal = Math.min(balance, 500);
+      balance = Math.round((balance - principal) * 100) / 100;
+      rows.push(`10/${String(month).padStart(2, '0')}/2099 ${principal.toFixed(2)} ${interest.toFixed(2)} ${(principal + interest).toFixed(2)} ${balance.toFixed(2)}`);
+    }
+
+    await user.upload(await screen.findByLabelText('מסמך פירוט הלוואות'), new File([rows.join('\n')], 'schedule.txt', { type: 'text/plain' }));
+
+    expect(await screen.findByText(/לוח סילוקין: שולמו 12 מתוך 24 תשלומים/)).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: 'הוספה לרשימה' }));
+    expect(useConsolidation.getState().debts.at(-1)).toMatchObject({ balance: 1_200, annualRate: 0.06, remainingMonths: 12 });
+  });
+
+  it('without AI, says a document it does not know must be entered by hand', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ enabled: false }))));
-    const { container } = renderImporter();
-    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
-    expect(container.textContent).toBe('');
+    const user = userEvent.setup();
+    renderImporter();
+    await user.upload(await screen.findByLabelText('מסמך פירוט הלוואות'), new File(['שלום'], 'note.txt', { type: 'text/plain' }));
+    expect(await screen.findByText(/זה לא לוח סילוקין שהמחשבון מכיר/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'קריאה עם AI' })).toBeNull();
   });
 });
