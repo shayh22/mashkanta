@@ -87,11 +87,14 @@ export async function handleExtract(request: Request, env: ExtractEnv, cache: Ca
   if (typeof parsed === 'string') {
     return json({ error: parsed }, 400);
   }
-  if (await overLimit(request, cache)) {
+  if (!(body as { model?: string }).model && (await overLimit(request, cache))) {
     return json({ error: 'rate limited' }, 429);
   }
 
-  const model = env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  // TEMPORARY (preview only, reverted before merge): pick a model from a fixed list to benchmark.
+  const BENCH = ['google/gemma-3-4b-it', 'google/gemma-3-12b-it', 'mistralai/mistral-small-3.2-24b-instruct', 'qwen/qwen3.5-flash-02-23', 'openai/gpt-5-nano', 'google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano', 'inclusionai/ling-3.0-flash-vl', 'nex-agi/nex-n2.5-mini', 'anthropic/claude-haiku-5.5'];
+  const bench = (body as { model?: string }).model;
+  const model = bench && BENCH.includes(bench) ? bench : env.OPENROUTER_MODEL || DEFAULT_MODEL;
   let upstream: Response;
   try {
     upstream = await fetcher(ENDPOINT, {
