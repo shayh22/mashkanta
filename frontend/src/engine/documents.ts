@@ -1,5 +1,6 @@
 import { parseApproval, type ParsedApproval } from './approval';
 import { redact, type RedactionResult } from './redaction';
+import { parseAmortizationSchedule, type ParsedSchedule } from './schedule';
 import { parseMortgageStatement, statementToTracks, type ParsedStatement, type StatementTrack } from './statement';
 
 /**
@@ -42,21 +43,79 @@ async function extractPdfText(data: ArrayBuffer): Promise<{ text: string; pageCo
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
-    // Group by vertical position so a table row stays on one line for the parser.
-    const rows = new Map<number, string[]>();
-    for (const item of content.items) {
-      if (!('str' in item)) {
-        continue;
-      }
-      const y = Math.round((item.transform[5] as number) / 3);
-      const row = rows.get(y) ?? [];
-      row.push(item.str);
-      rows.set(y, row);
-    }
-    const ordered = [...rows.entries()].sort((a, b) => b[0] - a[0]);
-    parts.push(ordered.map(([, cells]) => cells.join(' ')).join('\n'));
+    const items: PdfTextItem[] = content.items.flatMap((item) => ('str' in item ? [item] : []));
+    parts.push(isGlyphByGlyph(items) ? rebuildVisualText(items) : joinTextItems(items));
   }
   return { text: parts.join('\n'), pageCount: document.numPages };
+}
+
+/** The part of a pdf.js text item the extraction uses. */
+interface PdfTextItem {
+  readonly str: string;
+  readonly transform: number[];
+  readonly width: number;
+}
+
+/** Rows of a page, top to bottom, keyed by vertical position so a table row stays on one line. */
+function rowsOf(items: readonly PdfTextItem[]): PdfTextItem[][] {
+  const rows = new Map<number, PdfTextItem[]>();
+  for (const item of items) {
+    const y = Math.round((item.transform[5] as number) / 3);
+    const row = rows.get(y) ?? [];
+    row.push(item);
+    rows.set(y, row);
+  }
+  return [...rows.entries()].sort((a, b) => b[0] - a[0]).map(([, row]) => row);
+}
+
+/** Most PDFs carry words and phrases as items, in reading order. */
+function joinTextItems(items: readonly PdfTextItem[]): string {
+  return rowsOf(items)
+    .map((row) => row.map((item) => item.str).join(' '))
+    .join('\n');
+}
+
+/**
+ * Some document generators (Quadient Inspire, used by banks for printed schedules) write every
+ * character as its own item, in visual order, so joining items gives "6 5 . 4 3 2 , 1" for
+ * 1,234.56 and Hebrew backwards. Recognised by most items being a single character.
+ */
+function isGlyphByGlyph(items: readonly PdfTextItem[]): boolean {
+  const visible = items.filter((item) => item.str.trim().length > 0);
+  const single = visible.filter((item) => [...item.str.trim()].length === 1).length;
+  return visible.length >= 20 && single / visible.length > 0.6;
+}
+
+const HEBREW = /[\u0590-\u05FF]/;
+
+/**
+ * Rebuilds such a page by position: characters left to right, a space wherever the gap between
+ * them is wider than letter spacing — which gives numbers and dates in reading order — then each
+ * line turned from visual to logical order for right-to-left text: words last to first, and each
+ * Hebrew word's letters reversed.
+ */
+export function rebuildVisualText(items: readonly PdfTextItem[]): string {
+  return rowsOf(items.filter((item) => item.str.trim().length > 0))
+    .map((row) => {
+      const sorted = [...row].sort((a, b) => (a.transform[4] as number) - (b.transform[4] as number));
+      let line = '';
+      let end = -Infinity;
+      for (const item of sorted) {
+        const x = item.transform[4] as number;
+        if (line && x - end > 1.5) {
+          line += ' ';
+        }
+        line += item.str;
+        end = x + item.width;
+      }
+      return line
+        .split(/\s+/)
+        .filter(Boolean)
+        .reverse()
+        .map((word) => (HEBREW.test(word) ? [...word].reverse().join('') : word))
+        .join(' ');
+    })
+    .join('\n');
 }
 
 function isPdf(bytes: Uint8Array, file: File): boolean {
@@ -145,6 +204,19 @@ export async function extractMortgageDocument(file: File, primeRate: number): Pr
 
   const approval = parseApproval(sanitizedText, primeRate);
   return { kind: 'approval', tracks: approval.tracks, redaction, pageCount, warnings: [...approval.warnings, ...warnings] };
+}
+
+/**
+ * Reads a loan's amortization schedule (לוח סילוקין) in the browser. `schedule` is null when the
+ * document is not one, which is the cue to offer reading it with AI instead.
+ */
+export async function extractLoanSchedule(
+  file: File,
+  today: string,
+): Promise<{ schedule: ParsedSchedule | null; redaction: Omit<RedactionResult, 'sanitizedText'>; warnings: string[] }> {
+  const { text, warnings } = await readDocumentText(file);
+  const { sanitizedText, ...redaction } = redact(text);
+  return { schedule: parseAmortizationSchedule(sanitizedText, today), redaction, warnings };
 }
 
 // ---------------------------------------------------------------------------
