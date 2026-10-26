@@ -1,4 +1,4 @@
-// End-to-end smoke check: every mode, desktop and phone, light and dark.
+// End-to-end smoke check: every mode and every section tab in it, desktop and phone, light and dark.
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
@@ -89,26 +89,41 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
       if (dark !== (scheme === 'dark')) {
         problems.push(`${tag(mode)} theme class did not follow the system preference`);
       }
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      if (overflow > 1) {
-        problems.push(`${tag(mode)} horizontal overflow of ${overflow}px`);
-      }
-      await page.evaluate(axeSource);
-      auditing = true;
-      const result = await page.evaluate(async () =>
-        axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
-      );
-      // Let any console message the audit triggered arrive before attribution resumes.
-      await page.waitForTimeout(200);
-      auditing = false;
-      for (const violation of result.violations) {
-        if (violation.impact === 'serious' || violation.impact === 'critical') {
-          const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
-          problems.push(`${tag(mode)} axe ${violation.id} (${violation.nodes.length}): ${where}`);
+
+      // Every section tab of the mode, not just the one it opens on.
+      const sections = page.locator('[role="tablist"]:not([aria-label="מצב עבודה"]) [role="tab"]');
+      const count = await sections.count();
+      for (let index = 0; index < Math.max(1, count); index++) {
+        let section = mode;
+        if (count > 0) {
+          const tab = sections.nth(index);
+          section = `${mode}/${(await tab.getAttribute('id'))?.split('-tab-')[1]}`;
+          current = section;
+          await tab.click();
+          await page.waitForTimeout(index === 0 ? 300 : 900);
         }
-      }
-      if (shots) {
-        await page.screenshot({ path: `${shots}/${device}-${scheme}-${mode}.png`, fullPage: true });
+
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        if (overflow > 1) {
+          problems.push(`${tag(section)} horizontal overflow of ${overflow}px`);
+        }
+        await page.evaluate(axeSource);
+        auditing = true;
+        const result = await page.evaluate(async () =>
+          axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
+        );
+        // Let any console message the audit triggered arrive before attribution resumes.
+        await page.waitForTimeout(200);
+        auditing = false;
+        for (const violation of result.violations) {
+          if (violation.impact === 'serious' || violation.impact === 'critical') {
+            const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
+            problems.push(`${tag(section)} axe ${violation.id} (${violation.nodes.length}): ${where}`);
+          }
+        }
+        if (shots) {
+          await page.screenshot({ path: `${shots}/${device}-${scheme}-${section.replace('/', '-')}.png`, fullPage: true });
+        }
       }
     }
     await page.close();
@@ -120,4 +135,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('smoke: all modes clean on desktop and phone, light and dark');
+console.log('smoke: all modes and their section tabs clean on desktop and phone, light and dark');

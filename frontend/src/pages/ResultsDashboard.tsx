@@ -7,6 +7,8 @@ import { CompliancePanel } from '../components/CompliancePanel';
 import { ReportExportModal } from '../components/ReportExportModal';
 import { MarketBaselinePanel } from '../components/MarketBaselinePanel';
 import { Card, LoadingCard, Stat } from '../components/ui';
+import { PageTabs, TabPanel } from '../components/PageTabs';
+import { usePageTab, type PageTab } from '../lib/pageTabs';
 
 // The charting library is a third of the whole bundle and is only ever reached here, so it is
 // split out and fetched while the borrower is reading the headline numbers above it.
@@ -23,7 +25,16 @@ const RELAXED_LABELS: Record<string, string> = {
   NO_FEASIBLE_MIX: 'לא נמצא תמהיל חוקי כלל בסכום ובתקופה שהוזנו',
 };
 
-/** The results page: recommendation first, then the evidence behind it. */
+type Section = 'mix' | 'payments' | 'rules' | 'market';
+
+const TABS: PageTab<Section>[] = [
+  { id: 'mix', label: 'התמהיל וההשוואה', icon: '🧩' },
+  { id: 'payments', label: 'החזרים ותרחישים', icon: '📉' },
+  { id: 'rules', label: 'רגולציה ותקופה', icon: '⚖️' },
+  { id: 'market', label: 'בנקים ושוק', icon: '🏦' },
+];
+
+/** The results page: the recommendation stays on top; the evidence behind it is split into tabs. */
 export function ResultsDashboard({
   result,
   baseline,
@@ -34,6 +45,7 @@ export function ResultsDashboard({
   onEdit: () => void;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
+  const [section, setSection] = usePageTab('mortgage', TABS);
   const { recommended, riskProfile } = result;
   const bestSaving = result.savings.reduce(
     (best, saving) => (saving.totalPaidSaving > best ? saving.totalPaidSaving : best),
@@ -100,63 +112,72 @@ export function ResultsDashboard({
         </p>
       </Card>
 
-      <AllocationTable proposal={recommended} />
+      <PageTabs label="פירוט התוצאות" idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection} />
+      <TabPanel idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection}>
+        {section === 'mix' && (
+          <>
+            <AllocationTable proposal={recommended} />
+            <MixComparison recommended={recommended} baskets={result.baskets} savings={result.savings} />
+          </>
+        )}
 
-      <MixComparison
-        recommended={recommended}
-        baskets={result.baskets}
-        savings={result.savings}
-      />
+        {section === 'payments' && (
+          <Suspense fallback={<LoadingCard message="טוען את הגרפים…" />}>
+            <AmortizationChart yearly={recommended.summary.yearly} />
+            <ScenarioSimulator stress={recommended.stress} capacity={riskProfile.volatilityCapacity} />
+          </Suspense>
+        )}
 
-      <Suspense fallback={<LoadingCard message="טוען את הגרפים…" />}>
-        <AmortizationChart yearly={recommended.summary.yearly} />
-        <ScenarioSimulator stress={recommended.stress} capacity={riskProfile.volatilityCapacity} />
-      </Suspense>
+        {section === 'rules' && (
+          <>
+            <CompliancePanel compliance={recommended.compliance} />
+            <TermSensitivity options={result.termSensitivity} chosen={recommended.summary.termMonths} />
+          </>
+        )}
 
-      <CompliancePanel compliance={recommended.compliance} />
-
-      <TermSensitivity options={result.termSensitivity} chosen={recommended.summary.termMonths} />
-
-      <BankComparison quotes={result.bankQuotes} />
-
-      {result.alternatives.length > 0 && (
-        <Card
-          title="חלופות ששקלנו"
-          subtitle="תמהילים שונים מהותית מהמומלץ, אם תעדיפו איזון אחר בין עלות לתנודתיות."
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            {result.alternatives.map((alternative) => (
-              <article key={alternative.id} className="rounded-2xl border border-line p-4">
-                <h3 className="text-sm font-semibold text-ink">{alternative.name}</h3>
-                <ul className="mt-2 space-y-1 text-xs text-ink-muted">
-                  {alternative.summary.allocations.map((allocation) => (
-                    <li key={allocation.track}>
-                      {allocation.hebrewName}: {formatPercent(allocation.share, 0)} בריבית{' '}
-                      {formatPercent(allocation.annualRate)}
-                    </li>
+        {section === 'market' && (
+          <>
+            <BankComparison quotes={result.bankQuotes} />
+            {result.alternatives.length > 0 && (
+              <Card
+                title="חלופות ששקלנו"
+                subtitle="תמהילים שונים מהותית מהמומלץ, אם תעדיפו איזון אחר בין עלות לתנודתיות."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {result.alternatives.map((alternative) => (
+                    <article key={alternative.id} className="rounded-2xl border border-line p-4">
+                      <h3 className="text-sm font-semibold text-ink">{alternative.name}</h3>
+                      <ul className="mt-2 space-y-1 text-xs text-ink-muted">
+                        {alternative.summary.allocations.map((allocation) => (
+                          <li key={allocation.track}>
+                            {allocation.hebrewName}: {formatPercent(allocation.share, 0)} בריבית{' '}
+                            {formatPercent(allocation.annualRate)}
+                          </li>
+                        ))}
+                      </ul>
+                      <dl className="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <dt className="text-xs text-ink-soft">החזר ראשוני</dt>
+                          <dd className="tabular text-sm font-semibold text-ink">
+                            {formatCurrency(alternative.summary.initialPayment)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-ink-soft">עלות כוללת</dt>
+                          <dd className="tabular text-sm font-semibold text-ink">
+                            {formatCurrency(alternative.summary.totalPaid)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
                   ))}
-                </ul>
-                <dl className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <dt className="text-xs text-ink-soft">החזר ראשוני</dt>
-                    <dd className="tabular text-sm font-semibold text-ink">
-                      {formatCurrency(alternative.summary.initialPayment)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-ink-soft">עלות כוללת</dt>
-                    <dd className="tabular text-sm font-semibold text-ink">
-                      {formatCurrency(alternative.summary.totalPaid)}
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {baseline && <MarketBaselinePanel baseline={baseline} highlightLtv={recommended.compliance.ltv} />}
+                </div>
+              </Card>
+            )}
+            {baseline && <MarketBaselinePanel baseline={baseline} highlightLtv={recommended.compliance.ltv} />}
+          </>
+        )}
+      </TabPanel>
 
       <p className="pb-8 text-center text-xs text-ink-soft">
         המידע באתר הוא כלי השוואה עצמאי המבוסס על נתונים ציבוריים בלבד ואינו מהווה ייעוץ פיננסי,

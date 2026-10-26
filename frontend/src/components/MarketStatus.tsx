@@ -32,8 +32,8 @@ export function MarketStatus() {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <p className="min-w-0 text-end text-xs leading-tight" role="status" aria-live="polite">
+    <div className="flex shrink-0 items-center gap-2">
+      <p className="text-end text-xs leading-tight sm:max-w-[26rem]" role="status" aria-live="polite">
         <span className={`block whitespace-nowrap font-medium ${status === 'error' && !market ? 'text-caution' : 'text-ink'}`}>
           {summary}
         </span>
