@@ -103,7 +103,7 @@ Rules:
 - Explain, do not decide: no "you must" and no recommendation of a bank. When chosenBy is BORROWER, say honestly where the borrower's mix is weaker than ENGINE_OPTIMUM, if it is.
 - Track names: PRIME = פריים, FIXED_UNLINKED = קבועה לא צמודה, FIXED_LINKED = קבועה צמודה, VARIABLE_UNLINKED = משתנה לא צמודה, VARIABLE_LINKED = משתנה צמודה, ELIGIBILITY = הלוואת זכאות. Shares are fractions of the loan; rates are annual fractions (0.05 = 5%).
 - If ruleBreaches is not empty, the first risk must say that a bank cannot approve the mix as it is.
-- Each item is one sentence of at most 30 words. Return only the JSON the schema asks for.`;
+- Be brief: each item is one sentence of at most 25 words, 2–3 reasons, 1–2 risks, 1–2 questions. Return only the JSON the schema asks for.`;
 
 const MAX_ITEM = 300;
 

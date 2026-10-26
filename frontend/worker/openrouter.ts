@@ -105,11 +105,12 @@ export async function completeJson(
   if (!upstream.ok) {
     return json({ error: `upstream ${upstream.status}` }, 502);
   }
-  const answer = (await upstream.json()) as { choices?: { message?: { content?: unknown } }[] };
+  const answer = (await upstream.json()) as { choices?: { message?: { content?: unknown }; finish_reason?: string }[] };
   const content = answer.choices?.[0]?.message?.content;
   try {
     return { model, data: typeof content === 'string' ? JSON.parse(content) : content };
   } catch {
-    return json({ error: 'unreadable answer' }, 502);
+    // The finish reason tells a cut-off answer ("length") from a malformed one, without echoing content.
+    return json({ error: 'unreadable answer', finish: answer.choices?.[0]?.finish_reason ?? null }, 502);
   }
 }

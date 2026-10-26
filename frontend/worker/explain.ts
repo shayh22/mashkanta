@@ -34,7 +34,8 @@ export async function handleExplain(request: Request, env: OpenRouterEnv, cache:
       { role: 'system', content: EXPLAIN_INSTRUCTIONS },
       { role: 'user', content: JSON.stringify(parsed) },
     ],
-    maxTokens: 1500,
+    // Hebrew costs several tokens a word; a cut-off answer is unreadable JSON.
+    maxTokens: 4000,
     temperature: 0.2,
   });
   if (result instanceof Response) {
