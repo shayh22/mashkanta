@@ -25,6 +25,18 @@ export interface Observation {
   readonly asOf: string;
 }
 
+export interface MarketMonth {
+  /** `YYYY-MM`. */
+  readonly month: string;
+  readonly prime?: number;
+  readonly fixedUnlinked?: number;
+  readonly fixedLinked?: number;
+  readonly variableLinked?: number;
+}
+
+/** How many months of history the trend shows. */
+export const HISTORY_MONTHS = 12;
+
 export interface LiveMarket {
   /** When the figures were read from the Bank of Israel, ISO timestamp. */
   readonly fetchedAt: string;
@@ -53,6 +65,11 @@ export interface LiveMarket {
     /** Average all-in variable rate less prime at the end of the same month. */
     readonly variableMarginOverPrime?: number;
   };
+  /**
+   * Up to twelve months of published housing averages with the prime rate at the end of each month,
+   * oldest first — the trend a borrower deciding when to act wants to see.
+   */
+  readonly history?: readonly MarketMonth[];
   /** Average rate on new unsecured consumer loans (other than overdrafts) to households, unlinked. */
   readonly consumerUnsecured?: Observation;
   /** Figures that could not be read and fall back to the seeded values. */
@@ -66,9 +83,9 @@ export function boiSources(now: Date): Record<keyof BoiFiles, string> {
     return date.toISOString().slice(0, 10);
   };
   return {
-    br: `${BASE}/BR/1.0?startperiod=${monthsAgo(6)}&format=csv`,
+    br: `${BASE}/BR/1.0?startperiod=${monthsAgo(HISTORY_MONTHS + 1)}&format=csv`,
     zcm: `${BASE}/ZCM/1.0?startperiod=${monthsAgo(4).slice(0, 7)}&format=csv`,
-    mortgages: `${BASE}/BIR_MRTG_99/1.0?startperiod=${monthsAgo(6).slice(0, 7)}&format=csv`,
+    mortgages: `${BASE}/BIR_MRTG_99/1.0?startperiod=${monthsAgo(HISTORY_MONTHS + 1).slice(0, 7)}&format=csv`,
     loans: `${BASE}/BIR/1.0?startperiod=${monthsAgo(6).slice(0, 7)}&format=csv`,
   };
 }
@@ -170,7 +187,7 @@ const inRange = (value: number | undefined, min: number, max: number) =>
 
 /** Converts a published percentage to a fraction, rejecting values outside a plausible range. */
 const rate = (percent: number | undefined, min = 0, max = 0.2) =>
-  inRange(percent === undefined ? undefined : percent / 100, min, max);
+  inRange(percent === undefined ? undefined : round(percent / 100), min, max);
 
 const endOfMonth = (period: string) => `${period}-31`;
 
@@ -219,6 +236,8 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
     const base = { BS_ITEM: item, INDEXATION_TYPE: indexation, IR_FV_TYPE: kind, DATA_TYPE: dataType, LTV: 'L0' };
     return latest(mortgages, { ...base, PTI: 'P01' }) ?? latest(mortgages, { ...base, PTI: 'P07' });
   };
+
+  const history = housingHistory(mortgages, br);
 
   // The month every housing figure is read for: the latest one the fixed unlinked average covers.
   // Mixing months would compare a September fixed rate with an August variable one.
@@ -299,9 +318,43 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
     linkedYield5y,
     housing,
     allPurpose,
+    history: history.length > 0 ? history : undefined,
     consumerUnsecured,
     missing,
   };
+}
+
+/**
+ * The housing averages month by month. Each month is read on its own, so a series that misses a
+ * month leaves a gap there rather than borrowing a neighbour's value.
+ */
+function housingHistory(mortgages: readonly CsvRow[], br: readonly CsvRow[]): MarketMonth[] {
+  const isFixedUnlinked = (row: CsvRow) =>
+    row.BS_ITEM === 'A2C' && row.INDEXATION_TYPE === 'NI' && row.IR_FV_TYPE === 'F' && row.DATA_TYPE === 'R';
+  const months = [...new Set(mortgages.filter((row) => isFixedUnlinked(row) && row.OBS_VALUE).map((row) => row.TIME_PERIOD ?? ''))]
+    .filter((month) => /^\d{4}-\d{2}$/.test(month))
+    .sort()
+    .slice(-HISTORY_MONTHS);
+
+  return months.map((month) => {
+    const rows = mortgages.filter((row) => row.TIME_PERIOD === month);
+    const value = (indexation: string, kind: string, dataType: string) => {
+      const base = { BS_ITEM: 'A2C', INDEXATION_TYPE: indexation, IR_FV_TYPE: kind, DATA_TYPE: dataType, LTV: 'L0' };
+      return (latest(rows, { ...base, PTI: 'P01' }) ?? latest(rows, { ...base, PTI: 'P07' }))?.value;
+    };
+    const benchmark = value('CPI', 'V', 'RB');
+    const margin = value('CPI', 'V', 'RM');
+    const boi = onOrBefore(br, { SERIES_CODE: 'MNT_RIB_BOI_D' }, endOfMonth(month));
+    const boiValue = rate(boi?.value, 0, 0.15);
+    return {
+      month,
+      prime: boiValue === undefined ? undefined : round(boiValue + PRIME_SPREAD),
+      fixedUnlinked: rate(value('NI', 'F', 'R'), 0.005),
+      fixedLinked: rate(value('CPI', 'F', 'R'), 0, 0.15),
+      variableLinked:
+        benchmark !== undefined && margin !== undefined ? rate(benchmark + margin, 0, 0.15) : undefined,
+    };
+  });
 }
 
 /** Rounds away floating-point noise from percent-to-fraction conversion. */
