@@ -44,6 +44,12 @@ export function StatementImporter() {
         setAiFile(file);
         return;
       }
+      if (document.kind === 'approval') {
+        // Read as an approval-in-principle: only amounts, rates and full terms, with seniority and
+        // the bank's fees missing. Fine for an approval, rough for a balances statement in an
+        // unfamiliar format — offer to read the same file accurately with AI.
+        setAiFile(file);
+      }
       if (document.kind === 'statement') {
         importTracks(document.tracks.map(({ loanNumber: _loanNumber, ...track }) => track));
       } else {
@@ -83,6 +89,10 @@ export function StatementImporter() {
     }
     setAiImport({ count: items.length, warnings });
     setAiFile(undefined);
+    // The AI reading replaces any rough local one; its summary would now describe the wrong data.
+    if (items.length > 0) {
+      importer.reset();
+    }
   };
   const result = importer.data;
   const prime = scenarioOf(macro).primeAnnual;
@@ -135,7 +145,9 @@ export function StatementImporter() {
           reason={
             isImageFile(aiFile)
               ? 'זו תמונה — המחשבון קורא בעצמו רק דוחות PDF בפורמט מוכר.'
-              : 'הפורמט של המסמך לא מוכר למחשבון (כרגע הוא קורא בעצמו את דוח "פרטי משכנתאות" של בנק הפועלים ואישורים עקרוניים).'
+              : result && result.kind === 'approval' && result.tracks.length > 0
+                ? 'המסמך נקרא כאישור עקרוני — יובאו רק סכומים, ריביות ותקופה מלאה, והוותק והעמלות הוערכו. אם זה דוח יתרות של המשכנתא הקיימת, קריאה עם AI תשלים את התשלומים שנותרו, הוותק ועמלות הבנק.'
+                : 'הפורמט של המסמך לא מוכר למחשבון (כרגע הוא קורא בעצמו את דוח "פרטי משכנתאות" של בנק הפועלים ואישורים עקרוניים).'
           }
           onData={importFromAi}
         />
