@@ -238,10 +238,14 @@ export function analyseRoute(
   // Tracks carried over unchanged are not repaid, so they carry no fee.
   const carried = new Set(proposed.filter((track) => track.carriedOver).map((track) => track.id));
   const repaid = existing.filter((track) => !carried.has(track.id));
+  // Refinancing at the same bank: the amount it lends again carries no no-notice fee.
+  const repaidBalance = repaid.reduce((sum, track) => sum + track.balance, 0);
+  const relent = proposed.filter((track) => !track.carriedOver).reduce((sum, track) => sum + track.amount, 0);
+  const relentShare = route.kind === 'INTERNAL' && repaidBalance > 0 ? Math.min(1, relent / repaidBalance) : 0;
   const prepayment = quotePrepayment(
     repaid,
     (track) => marketAverageFor(track, options.ltv, options.scenario.primeAnnual),
-    options,
+    { ...options, relentShare },
   );
 
   const switchingCost = totalCosts(route.costs);

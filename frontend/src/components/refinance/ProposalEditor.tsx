@@ -175,7 +175,7 @@ export function RefinanceSettings() {
       <div className="grid gap-5 sm:grid-cols-2">
         <Toggle
           label="נמסרה הודעה מוקדמת (10–45 יום)"
-          hint="חוסכת עמלת אי-הודעה של 0.1% מהסכום הנפרע"
+          hint="חוסכת עמלת אי-הודעה של 0.1% מהסכום הנפרע. במיחזור באותו בנק העמלה ממילא לא נגבית על הסכום שהבנק מלווה מחדש."
           checked={state.noticeGiven}
           onChange={state.setNoticeGiven}
         />
