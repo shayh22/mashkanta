@@ -326,10 +326,29 @@ it with a language model through OpenRouter:
 cd frontend
 npx wrangler secret put OPENROUTER_API_KEY        # or: dashboard → Workers → mashkanta → Settings → Variables and Secrets
 # optional — any OpenRouter model that reads images and supports structured outputs:
-npx wrangler secret put OPENROUTER_MODEL          # default: anthropic/claude-haiku-5.5
+npx wrangler secret put OPENROUTER_MODEL          # default: anthropic/claude-haiku-5.5 (see below)
 ```
 
-Set a credit limit on the key in OpenRouter as well. For local development, export
+Set a credit limit on the key in OpenRouter as well.
+
+**Model choice.** The ten cheapest OpenRouter models that read images and support structured outputs
+were run over five synthetic Hebrew documents (consumer loans as text and as a screenshot, a mortgage
+statement as text and as a scan, an offer letter; 71 fields), against the deployed endpoint:
+
+| Model | Fields right | Note |
+|---|---|---|
+| anthropic/claude-haiku-5.5 | **100%**, twice | ~$0.0006 a document — the default |
+| nex-agi/nex-n2.5-mini | 94–97% | misreads the mortgage scan |
+| google/gemma-3-12b-it | 92% | |
+| google/gemini-2.5-flash-lite | 90% | intermittent upstream errors |
+| openai/gpt-4.1-nano | 89% | |
+| mistralai/mistral-small-3.2-24b | 85% | |
+| google/gemma-3-4b-it | 79% | |
+| openai/gpt-5-nano | 74% | fails on the scan, ~40s a document |
+| qwen/qwen3.5-flash | 32% | |
+| inclusionai/ling-3.0-flash-vl | — | no provider meets the no-retention setting |
+
+A misread balance or rate costs a borrower far more than the fraction of a cent the cheaper models save. For local development, export
 `OPENROUTER_API_KEY` before `npm run dev`.
 
 ## Privacy engineering
