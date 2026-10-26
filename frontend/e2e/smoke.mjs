@@ -3,8 +3,8 @@
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
 //
-// Fails on any console error, uncaught exception, horizontal page overflow, or axe-core
-// violation of serious/critical impact. Uses the Playwright that ships with the environment.
+// Fails on any console error, uncaught exception, horizontal page overflow, axe-core violation
+// of serious/critical impact, or the opening screen downloading the charting library. Uses the Playwright that ships with the environment.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -23,6 +23,21 @@ const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, 
 
 const browser = await playwright.chromium.launch();
 const problems = [];
+
+// The first visit lands on the mortgage wizard, which has no charts. Recharts is over 100KB
+// gzipped; it must arrive only with a page that draws one.
+{
+  const page = await browser.newPage();
+  const scripts = [];
+  page.on('request', (request) => request.resourceType() === 'script' && scripts.push(request.url()));
+  await page.goto(`${base}/#/mortgage`);
+  await page.waitForLoadState('networkidle');
+  const charts = scripts.filter((url) => /\/charts-[\w-]+\.js$/.test(url));
+  if (charts.length > 0) {
+    problems.push(`first visit downloaded the charting library: ${charts.join(', ')}`);
+  }
+  await page.close();
+}
 
 for (const [device, viewport] of Object.entries(VIEWPORTS)) {
   for (const scheme of ['light', 'dark']) {
