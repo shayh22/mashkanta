@@ -1,4 +1,5 @@
 import type { ComplianceFinding, ComplianceLevel } from '../lib/types';
+import { liveMarket } from './liveMarket';
 import { monthlyRate, payment as annuityPayment, presentValue } from './math';
 
 /**
@@ -12,6 +13,21 @@ import { monthlyRate, payment as annuityPayment, presentValue } from './math';
  * mortgage can find consolidation blocked, and why the tool shows the room left before the borrower
  * ever talks to a bank.
  */
+
+/**
+ * Bank of Israel average rate on new unsecured consumer loans to households (statistics service,
+ * dataflow BIR, item A2B1), August 2026. Replaced by the live figure when one has been read.
+ */
+export const CONSUMER_LOAN_AVERAGE_SEED = 0.079;
+
+/** The market average a consumer loan is measured against, and the month it describes. */
+export function consumerLoanAverage(): { rate: number; asOf?: string } {
+  const live = liveMarket()?.consumerUnsecured;
+  return live ? { rate: live.value, asOf: live.asOf } : { rate: CONSUMER_LOAN_AVERAGE_SEED };
+}
+
+/** How far above the market average a loan must sit before it is called out. */
+const ABOVE_MARKET_MARGIN = 0.01;
 
 export const CONSOLIDATION_LIMITS = {
   /** Loans with this many months left or fewer are left out of the payment-to-income test. */
@@ -95,6 +111,12 @@ export interface DebtRecommendation {
   readonly action: DebtAction;
   readonly reason: string;
   readonly shortTerm: boolean;
+  /**
+   * Points above the average rate on unsecured consumer loans, when at least a point above it.
+   * Worth raising with the lender whether or not the debt is consolidated. Overdrafts are a
+   * different product and are not compared.
+   */
+  readonly aboveMarket?: number;
 }
 
 export interface Allocation {
@@ -199,6 +221,12 @@ export function isShortTerm(debt: Pick<ConsumerDebt, 'remainingMonths'>): boolea
 
 /** The advice for one debt, given the blended rate the consolidation loan would carry. */
 export function recommendDebt(debt: ConsumerDebt, consolidationRate: number): DebtRecommendation {
+  const gap = debt.annualRate - consumerLoanAverage().rate;
+  const aboveMarket = debt.kind !== 'OVERDRAFT' && gap >= ABOVE_MARKET_MARGIN - 1e-9 ? gap : undefined;
+  return { ...adviceFor(debt, consolidationRate), ...(aboveMarket !== undefined ? { aboveMarket } : {}) };
+}
+
+function adviceFor(debt: ConsumerDebt, consolidationRate: number): DebtRecommendation {
   const spread = debt.annualRate - consolidationRate;
   const revolving = debt.kind === 'CREDIT_CARD' || debt.kind === 'OVERDRAFT' || debt.kind === 'NON_BANK';
   if (isShortTerm(debt)) {

@@ -15,8 +15,9 @@ export interface BankRateSheet {
 }
 
 /**
- * Indicative positions derived from publicly posted tariffs and campaign announcements, not
- * confidential quotes. Market shares are the published figures for new mortgage origination.
+ * Estimated pricing positions around the published average. The Bank of Israel's open data has no
+ * per-bank rates, so these offsets are judgement, not data, and the UI says so; the average they sit
+ * around is live. Market shares are approximate shares of new mortgage origination.
  */
 export const BANK_SHEETS: readonly BankRateSheet[] = [
   {

@@ -1,4 +1,10 @@
-import { DEBT_KIND_LABELS, type ConsolidationAnalysis, type DebtKind } from '../../engine/consolidation';
+import {
+  consumerLoanAverage,
+  DEBT_KIND_LABELS,
+  type ConsolidationAnalysis,
+  type DebtKind,
+} from '../../engine/consolidation';
+import { monthLabel } from '../../engine/liveMarket';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { useConsolidation } from '../../store/consolidationStore';
 import { ScrollRegion, Card, CurrencyField, NumberInput, RangeField } from '../ui';
@@ -77,6 +83,7 @@ export function HouseholdCard() {
 export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
   const { debts, addDebt, updateDebt, removeDebt, applyRecommendations } = useConsolidation();
   const advice = new Map(analysis.recommendations.map((item) => [item.id, item]));
+  const market = consumerLoanAverage();
 
   return (
     <Card
@@ -179,6 +186,13 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
                       <>
                         <span className={ACTION_BADGE[item.action].className}>{ACTION_BADGE[item.action].label}</span>
                         <p className="mt-1 text-xs leading-snug text-ink-soft">{item.reason}</p>
+                        {item.aboveMarket !== undefined && (
+                          <p className="mt-1 text-xs leading-snug text-caution">
+                            גבוהה ב-{(item.aboveMarket * 100).toFixed(1)} נק' מממוצע ההלוואות הצרכניות (
+                            {formatPercent(market.rate)}
+                            {market.asOf ? `, ${monthLabel(market.asOf)}` : ''}).
+                          </p>
+                        )}
                       </>
                     )}
                   </td>

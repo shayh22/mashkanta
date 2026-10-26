@@ -5,6 +5,7 @@
  * - `BR` — the Bank of Israel interest rate; prime is that rate plus 1.5 points.
  * - `ZCM` — inflation expectations and the zero-coupon government curve (monthly averages).
  * - `BIR_MRTG_99` — average rates on new housing loans, and on all-purpose loans secured on a home.
+ * - `BIR` — average rates on other new loans, among them unsecured consumer loans to households.
  *
  * This module only parses: it has no network or browser dependency, so the Cloudflare Worker that
  * fetches the files, the dev server and the tests all share it. Every figure is validated against a
@@ -52,12 +53,14 @@ export interface LiveMarket {
     /** Average all-in variable rate less prime at the end of the same month. */
     readonly variableMarginOverPrime?: number;
   };
+  /** Average rate on new unsecured consumer loans (other than overdrafts) to households, unlinked. */
+  readonly consumerUnsecured?: Observation;
   /** Figures that could not be read and fall back to the seeded values. */
   readonly missing: readonly string[];
 }
 
 /** The three files to fetch, starting far enough back to reach the latest monthly publication. */
-export function boiSources(now: Date): { br: string; zcm: string; mortgages: string } {
+export function boiSources(now: Date): Record<keyof BoiFiles, string> {
   const monthsAgo = (months: number) => {
     const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 1));
     return date.toISOString().slice(0, 10);
@@ -66,6 +69,7 @@ export function boiSources(now: Date): { br: string; zcm: string; mortgages: str
     br: `${BASE}/BR/1.0?startperiod=${monthsAgo(6)}&format=csv`,
     zcm: `${BASE}/ZCM/1.0?startperiod=${monthsAgo(4).slice(0, 7)}&format=csv`,
     mortgages: `${BASE}/BIR_MRTG_99/1.0?startperiod=${monthsAgo(6).slice(0, 7)}&format=csv`,
+    loans: `${BASE}/BIR/1.0?startperiod=${monthsAgo(6).slice(0, 7)}&format=csv`,
   };
 }
 
@@ -174,12 +178,14 @@ export interface BoiFiles {
   readonly br: string;
   readonly zcm: string;
   readonly mortgages: string;
+  readonly loans: string;
 }
 
 export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMarket {
   const br = parseCsv(files.br ?? '');
   const zcm = parseCsv(files.zcm ?? '');
   const mortgages = parseCsv(files.mortgages ?? '');
+  const loans = parseCsv(files.loans ?? '');
   const missing: string[] = [];
 
   const BOI_RATE = { SERIES_CODE: 'MNT_RIB_BOI_D' };
@@ -270,6 +276,20 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
     missing.push('allPurpose');
   }
 
+  // Households outside private banking — the population a consolidation borrower belongs to.
+  const consumerObservation = latest(loans, {
+    BS_ITEM: 'A2B1',
+    COUNTERPART_SECTOR: 'S_X306_L',
+    INDEXATION_TYPE: 'NI',
+    DATA_TYPE: 'R',
+  });
+  const consumerValue = rate(consumerObservation?.value, 0.01, 0.3);
+  const consumerUnsecured =
+    consumerObservation && consumerValue !== undefined ? { value: consumerValue, asOf: consumerObservation.asOf } : undefined;
+  if (!consumerUnsecured) {
+    missing.push('consumerUnsecured');
+  }
+
   return {
     fetchedAt: fetchedAt.toISOString(),
     boiRate,
@@ -279,6 +299,7 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
     linkedYield5y,
     housing,
     allPurpose,
+    consumerUnsecured,
     missing,
   };
 }

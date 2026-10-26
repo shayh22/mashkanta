@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import br from './__fixtures__/boi/br.csv?raw';
+import loans from './__fixtures__/boi/loans.csv?raw';
 import mortgages from './__fixtures__/boi/mortgages.csv?raw';
 import zcm from './__fixtures__/boi/zcm.csv?raw';
 import { boiSources, isUsable, latest, marketFromBoi, parseCsv } from './boiMarket';
 
 // Trimmed copies of the real Bank of Israel files, as published in October 2026.
-const FILES = { br, zcm, mortgages };
+const FILES = { br, zcm, mortgages, loans };
 const NOW = new Date('2026-10-26T08:00:00Z');
 
 describe('Bank of Israel market data', () => {
@@ -29,6 +30,7 @@ describe('Bank of Israel market data', () => {
     expect(market.allPurpose?.asOf).toBe('2026-08');
     expect(market.allPurpose?.fixedUnlinked).toBeCloseTo(0.0661, 10);
     expect(market.allPurpose?.variableMarginOverPrime).toBeCloseTo(0.0149, 10);
+    expect(market.consumerUnsecured).toEqual({ value: 0.079, asOf: '2026-08' });
     expect(isUsable(market)).toBe(true);
   });
 
@@ -77,5 +79,6 @@ describe('Bank of Israel market data', () => {
     expect(sources.br).toContain('/BR/1.0?startperiod=2026-04-01&format=csv');
     expect(sources.zcm).toContain('/ZCM/1.0?startperiod=2026-06&format=csv');
     expect(sources.mortgages).toContain('/BIR_MRTG_99/1.0?startperiod=2026-04&format=csv');
+    expect(sources.loans).toContain('/BIR/1.0?startperiod=2026-04&format=csv');
   });
 });
