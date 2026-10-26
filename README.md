@@ -32,8 +32,10 @@ Full functional requirements are in [SPECIFICATION.md](SPECIFICATION.md).
 | Stress tests against four rate shocks, four inflation paths and two combined scenarios | `engine/stress.ts` |
 | Ranks every lender on the same mix | `engine/banks.ts` |
 | Prices the early repayment fee per the Banking Order: capitalization, seniority discount, notice, CPI, operational | `engine/prepayment.ts` |
-| Decides whether refinancing pays — same bank vs. competitor, breakeven month, NPV, verdict | `engine/refinance.ts` |
+| Decides whether refinancing pays — same bank vs. competitor, breakeven month, NPV, verdict, per-track partial refinance | `engine/refinance.ts` |
+| Imports the bank's mortgage details statement (פרטי משכנתאות): every sub-loan, balances and the bank's own prepayment fee | `engine/statement.ts` |
 | Tests debt consolidation against the home under the 1 October 2026 PTI formula, cumulative LTV 50/70/₪200K, cumulative ⅔ variable and the ₪120K exemption | `engine/consolidation.ts` |
+| Refinances and consolidates in one move, re-testing the consolidation against the refinanced mortgage | `engine/combined.ts` |
 | Traffic-light risk dials and a prioritised action plan with print/PDF and share | `engine/risk.ts`, `engine/actionPlan.ts` |
 
 The Java service in `backend/` exposes the same capabilities over HTTP (`/api/v1/mortgage/simulate`,

@@ -67,6 +67,8 @@ interface RefinanceState {
 
   setPropertyValue: (value: number) => void;
   setTracks: (tracks: ExistingTrack[]) => void;
+  /** Replaces the whole mortgage, as an import does: selections and quoted proposals no longer apply. */
+  importTracks: (tracks: ExistingTrack[]) => void;
   addTrack: () => void;
   updateTrack: (id: string, patch: Partial<ExistingTrack>) => void;
   removeTrack: (id: string) => void;
@@ -105,6 +107,7 @@ export const useRefinance = create<RefinanceState>()(
 
       setPropertyValue: (propertyValue) => set({ propertyValue }),
       setTracks: (tracks) => set({ tracks }),
+      importTracks: (tracks) => set({ tracks, keptIds: [], manualProposal: [], proposalMode: 'AUTO' }),
       addTrack: () =>
         set((state) => ({
           tracks: [
@@ -121,7 +124,18 @@ export const useRefinance = create<RefinanceState>()(
         })),
       updateTrack: (id, patch) =>
         set((state) => ({
-          tracks: state.tracks.map((track) => (track.id === id ? { ...track, ...patch } : track)),
+          tracks: state.tracks.map((track) => {
+            if (track.id !== id) {
+              return track;
+            }
+            const updated = { ...track, ...patch };
+            // The bank's stated fee was for the track as it appeared on the statement; once the
+            // borrower changes what is being repaid, the fee falls back to the estimate.
+            const repriced = (['type', 'balance', 'annualRate', 'remainingMonths'] as const).some(
+              (key) => key in patch && patch[key] !== track[key],
+            );
+            return repriced ? { ...updated, statedFee: undefined } : updated;
+          }),
         })),
       removeTrack: (id) =>
         set((state) => ({
@@ -227,14 +241,14 @@ export function useRefinanceAnalysis(): RefinanceView {
     const balance = outstandingBalance(state.tracks);
     const ltv = state.propertyValue > 0 ? balance / state.propertyValue : 0;
     const kept = new Set(state.keptIds);
+    const scenario = scenarioOf(macro);
     const proposal =
       state.proposalMode === 'AUTO'
-        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept)
+        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept, scenario.primeAnnual)
         : withKeptTracks(state.manualProposal, state.tracks, kept);
     if (!tracksValid(state.tracks) || proposal.length === 0) {
       return { ltv, balance, proposal, perTrack: [] };
     }
-    const scenario = scenarioOf(macro);
     const options = {
       scenario,
       discountRate: state.discountRate,

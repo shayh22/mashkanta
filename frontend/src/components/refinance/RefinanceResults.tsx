@@ -171,6 +171,7 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
               <tr key={track.id}>
                 <th className="py-2 text-start font-medium text-ink" scope="row">
                   {TRACK_LABEL[track.type]}
+                  {track.source === 'BANK' && <span className="badge-neutral ms-1.5">דוח הבנק</span>}
                   {track.exemption && <span className="block text-xs font-normal text-ink-soft">{track.exemption}</span>}
                 </th>
                 <td className="py-2">{formatCurrency(track.balance)}</td>

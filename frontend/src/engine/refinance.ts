@@ -152,8 +152,8 @@ export function proposedSpecs(
 }
 
 /** Today's published average for a track over its remaining term — the fee's discount rate. */
-export function marketAverageFor(track: ExistingTrack, ltv: number): number {
-  return rateFor(track.type, ltv, track.remainingMonths).medianRate;
+export function marketAverageFor(track: ExistingTrack, ltv: number, prime?: number): number {
+  return rateFor(track.type, ltv, track.remainingMonths, prime).medianRate;
 }
 
 /** An existing track kept exactly as it is in the replacement mortgage. */
@@ -181,6 +181,7 @@ export function likeForLikeProposal(
   ltv: number,
   percentile: number,
   kept: ReadonlySet<string> = new Set(),
+  prime?: number,
 ): ProposedTrack[] {
   return tracks
     .filter((track) => track.balance > 0 && track.remainingMonths > 0)
@@ -192,26 +193,33 @@ export function likeForLikeProposal(
             type: track.type,
             amount: track.balance,
             termMonths: track.remainingMonths,
-            annualRate: atPercentile(rateFor(track.type, ltv, track.remainingMonths), percentile),
+            annualRate: atPercentile(rateFor(track.type, ltv, track.remainingMonths, prime), percentile),
           },
     );
 }
 
-/** A hand-entered proposal plus the kept tracks carried over beside it. */
+/** A hand-entered proposal plus the kept and eligibility tracks carried over beside it. */
 export function withKeptTracks(
   proposal: readonly ProposedTrack[],
   existing: readonly ExistingTrack[],
   kept: ReadonlySet<string>,
 ): ProposedTrack[] {
+  // Eligibility loans are carried over whatever the hand-entered proposal says, exactly as in the
+  // automatic one: a quoted mix that leaves them out would otherwise count them as repaid.
   const carried = existing
-    .filter((track) => kept.has(track.id) && track.balance > 0 && track.remainingMonths > 0)
+    .filter(
+      (track) =>
+        (kept.has(track.id) || track.type === 'ELIGIBILITY') &&
+        track.balance > 0 &&
+        track.remainingMonths > 0,
+    )
     .map(carryOver);
   const carriedIds = new Set(carried.map((track) => track.id));
   return [...proposal.filter((track) => !carriedIds.has(track.id)), ...carried];
 }
 
-function verdictOf(npv: number, breakeven: number, horizon: number): RefinanceVerdict {
-  if (npv <= 0 || breakeven === 0 || breakeven > horizon) {
+function verdictOf(npv: number, breakeven: number): RefinanceVerdict {
+  if (npv <= 0 || breakeven === 0) {
     return 'NOT_WORTHWHILE';
   }
   return breakeven <= IMMEDIATE_BREAKEVEN_MONTHS ? 'IMMEDIATE' : 'LONG_TERM';
@@ -230,7 +238,11 @@ export function analyseRoute(
   // Tracks carried over unchanged are not repaid, so they carry no fee.
   const carried = new Set(proposed.filter((track) => track.carriedOver).map((track) => track.id));
   const repaid = existing.filter((track) => !carried.has(track.id));
-  const prepayment = quotePrepayment(repaid, (track) => marketAverageFor(track, options.ltv), options);
+  const prepayment = quotePrepayment(
+    repaid,
+    (track) => marketAverageFor(track, options.ltv, options.scenario.primeAnnual),
+    options,
+  );
 
   const switchingCost = totalCosts(route.costs);
   const upfrontCost = prepayment.total + switchingCost;
@@ -268,7 +280,7 @@ export function analyseRoute(
     lifetimeSaving: current.totalPaid - replacement.totalPaid - upfrontCost,
     netPresentValue: npv,
     breakevenMonth: breakeven,
-    verdict: verdictOf(npv, breakeven, horizon),
+    verdict: verdictOf(npv, breakeven),
     path,
   };
 }
@@ -331,7 +343,7 @@ export function trackByTrack(
     .map((track) => {
       const analysis = analyseRoute(
         [track],
-        likeForLikeProposal([track], options.ltv, percentile),
+        likeForLikeProposal([track], options.ltv, percentile, new Set(), options.scenario.primeAnnual),
         DEFAULT_ROUTES.INTERNAL,
         options,
       );

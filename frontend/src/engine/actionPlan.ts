@@ -77,7 +77,7 @@ export function negotiationTargets(
       continue;
     }
     seen.add(track.type);
-    const market = rateFor(track.type, ltv, track.termMonths);
+    const market = rateFor(track.type, ltv, track.termMonths, prime);
     targets.push({
       label: TRACK_NAMES[track.type],
       targetRate: market.bestRate,

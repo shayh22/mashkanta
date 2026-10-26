@@ -148,7 +148,13 @@ export function optimize(
 
   const rates = new Map<TrackType, number>();
   for (const track of Object.keys(TRACKS) as TrackType[]) {
-    rates.set(track, atPercentile(rateFor(track, borrower.loanAmount / borrower.propertyValue, borrower.termMonths), percentile));
+    rates.set(
+      track,
+      atPercentile(
+        rateFor(track, borrower.loanAmount / borrower.propertyValue, borrower.termMonths, scenario.primeAnnual),
+        percentile,
+      ),
+    );
   }
 
   const lockedAmount = Math.min(borrower.eligibilityAmount, borrower.loanAmount);

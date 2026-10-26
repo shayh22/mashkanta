@@ -42,6 +42,16 @@ export interface ExistingTrack {
   readonly monthsToReset?: number;
   /** Bank money lent alongside a directed (eligibility) loan gets the steeper discount schedule. */
   readonly additionalToDirected?: boolean;
+  /** Where the track came from, e.g. the loan and sub-loan number on an imported statement. */
+  readonly label?: string;
+  /**
+   * The early repayment fee the bank itself stated for this track, as of the statement date and
+   * without advance notice. When present it replaces the estimate: the bank knows the published
+   * averages and origination references that the estimate has to approximate.
+   */
+  readonly statedFee?: number;
+  /** Day of month the stated fee was computed for; it includes the average-CPI fee if 1–15. */
+  readonly statedFeeDay?: number;
 }
 
 export interface PrepaymentOptions {
@@ -72,6 +82,8 @@ export interface TrackPrepaymentQuote {
   readonly total: number;
   /** Why the capitalization fee is zero, when it is. */
   readonly exemption?: string;
+  /** BANK when the figure comes from the bank's own statement, ESTIMATE when computed here. */
+  readonly source: 'BANK' | 'ESTIMATE';
   /** Months until the seniority discount steps up, if it will. */
   readonly monthsToNextDiscount?: number;
   readonly nextDiscount?: number;
@@ -199,6 +211,9 @@ export function quoteTrack(
   marketAverageRate: number,
   options: PrepaymentOptions,
 ): TrackPrepaymentQuote {
+  if (track.statedFee !== undefined) {
+    return statedQuote(track, marketAverageRate, options);
+  }
   const meta = TRACKS[track.type];
   const exemption = capitalizationExemption(track);
   const origination = track.originationAverageRate ?? track.annualRate;
@@ -256,9 +271,52 @@ export function quoteTrack(
     cpiFee,
     borrowerGainOffset: noticeOffset + cpiOffset,
     total: capitalizationFee + noticeFee + cpiFee,
+    source: 'ESTIMATE',
     exemption,
     monthsToNextDiscount: gross > 0 ? step?.months : undefined,
     nextDiscount: gross > 0 ? step?.discount : undefined,
+  };
+}
+
+/**
+ * A quote built on the bank's stated fee. The statement prices a repayment on its own date without
+ * advance notice, so the notice component (at most 0.1% of the balance) is taken back out when
+ * notice will be given, and the average-CPI fee follows the chosen day rather than the statement's.
+ * Everything else is the bank's figure.
+ */
+function statedQuote(
+  track: ExistingTrack,
+  marketAverageRate: number,
+  options: PrepaymentOptions,
+): TrackPrepaymentQuote {
+  const meta = TRACKS[track.type];
+  const stated = Math.max(0, track.statedFee ?? 0);
+  const noticePart = Math.min(stated, track.balance * PREPAYMENT.NO_NOTICE_RATE);
+  const monthlyCpi = Math.pow(1 + options.cpiAnnual, 1 / 12) - 1;
+  const cpiEstimate =
+    track.type !== 'ELIGIBILITY' && meta.cpiLinked ? Math.max(0, 0.5 * monthlyCpi * track.balance) : 0;
+  // A statement dated on the 1st–15th already contains the average-CPI fee; take it out so the
+  // remainder is the capitalization fee alone, then add it back only if the chosen day needs it.
+  const statementIncludesCpi = (track.statedFeeDay ?? 31) <= PREPAYMENT.CPI_FEE_LAST_DAY;
+  const withoutNotice = stated - noticePart;
+  const capitalizationFee = statementIncludesCpi ? Math.max(0, withoutNotice - cpiEstimate) : withoutNotice;
+  const noticeFee = options.noticeGiven ? 0 : noticePart;
+  const cpiFee = options.dayOfMonth <= PREPAYMENT.CPI_FEE_LAST_DAY ? cpiEstimate : 0;
+  return {
+    id: track.id,
+    type: track.type,
+    balance: track.balance,
+    marketAverageRate,
+    referenceRate: Math.min(track.annualRate, track.originationAverageRate ?? track.annualRate),
+    grossCapitalizationFee: capitalizationFee,
+    seniorityDiscount: 0,
+    capitalizationFee,
+    noticeFee,
+    cpiFee,
+    borrowerGainOffset: 0,
+    total: capitalizationFee + noticeFee + cpiFee,
+    source: 'BANK',
+    exemption: stated === 0 ? 'לפי דוח הבנק — אין עמלה במועד הדוח' : undefined,
   };
 }
 
