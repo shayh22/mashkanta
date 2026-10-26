@@ -230,3 +230,25 @@ describe('manual proposals and eligibility loans', () => {
     expect(analysis.monthlySaving).toBeCloseTo(primeOnly.monthlySaving, 6);
   });
 });
+
+describe('no-notice fee when the same bank refinances', () => {
+  const noNotice: RefinanceOptions = { ...options, noticeGiven: false };
+  const primeOnly: ExistingTrack[] = [
+    { id: 'p', type: 'PRIME', balance: 400_000, annualRate: 0.065, remainingMonths: 240, monthsElapsed: 60 },
+  ];
+  const relend = (amount: number): ProposedTrack[] => [
+    { id: 'p', type: 'PRIME', amount, annualRate: 0.05, termMonths: 240 },
+  ];
+
+  it('is waived on the amount the current bank lends again, per the Banking Order', () => {
+    const internal = analyseRoute(primeOnly, relend(400_000), DEFAULT_ROUTES.INTERNAL, noNotice);
+    expect(internal.prepayment.noticeFee).toBe(0);
+    const external = analyseRoute(primeOnly, relend(400_000), DEFAULT_ROUTES.EXTERNAL, noNotice);
+    expect(external.prepayment.noticeFee).toBeCloseTo(400, 6);
+  });
+
+  it("still applies to the part repaid from the borrower's own cash", () => {
+    const partly = analyseRoute(primeOnly, relend(300_000), DEFAULT_ROUTES.INTERNAL, noNotice);
+    expect(partly.prepayment.noticeFee).toBeCloseTo(100, 6);
+  });
+});

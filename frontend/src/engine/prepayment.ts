@@ -61,6 +61,21 @@ export interface PrepaymentOptions {
   readonly dayOfMonth: number;
   /** Trailing annual inflation, for the average-CPI fee. */
   readonly cpiAnnual: number;
+  /**
+   * Share of the repaid amount that the same bank lends again to fund the repayment, 0–1. The
+   * Banking Order waives the no-notice fee on that amount: "אם נתן התאגיד הבנקאי הלוואה לצורך
+   * הפירעון המוקדם, לא תיגבה העמלה ... ביחס לסכום ההלוואה החדש שנתן".
+   */
+  readonly relentShare?: number;
+}
+
+/** The no-notice fee on a balance, after notice and the same-bank refinance waiver. */
+function noticeFeeOn(balance: number, options: PrepaymentOptions): number {
+  if (options.noticeGiven) {
+    return 0;
+  }
+  const relent = Math.min(1, Math.max(0, options.relentShare ?? 0));
+  return balance * PREPAYMENT.NO_NOTICE_RATE * (1 - relent);
 }
 
 export interface TrackPrepaymentQuote {
@@ -242,7 +257,7 @@ export function quoteTrack(
   const discount = seniorityDiscount(track.monthsElapsed, track.additionalToDirected);
   const capitalizationFee = Math.max(0, gross) * (1 - discount);
 
-  let noticeFee = fullyExempt || options.noticeGiven ? 0 : track.balance * PREPAYMENT.NO_NOTICE_RATE;
+  let noticeFee = fullyExempt ? 0 : noticeFeeOn(track.balance, options);
   let cpiFee = 0;
   if (!fullyExempt && meta.cpiLinked && options.dayOfMonth <= PREPAYMENT.CPI_FEE_LAST_DAY) {
     const monthlyCpi = Math.pow(1 + options.cpiAnnual, 1 / 12) - 1;
@@ -300,7 +315,8 @@ function statedQuote(
   const statementIncludesCpi = (track.statedFeeDay ?? 31) <= PREPAYMENT.CPI_FEE_LAST_DAY;
   const withoutNotice = stated - noticePart;
   const capitalizationFee = statementIncludesCpi ? Math.max(0, withoutNotice - cpiEstimate) : withoutNotice;
-  const noticeFee = options.noticeGiven ? 0 : noticePart;
+  // The stated notice part is 0.1% of the balance at most; waive the same share the estimate would.
+  const noticeFee = Math.min(noticePart, noticeFeeOn(track.balance, options));
   const cpiFee = options.dayOfMonth <= PREPAYMENT.CPI_FEE_LAST_DAY ? cpiEstimate : 0;
   return {
     id: track.id,

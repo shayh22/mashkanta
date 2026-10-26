@@ -2,6 +2,7 @@
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
+//   node e2e/smoke.mjs https://mashkanta.shayh22.workers.dev    # the deployed site, with its real headers
 //
 // Fails on any console error, uncaught exception, horizontal page overflow, axe-core violation
 // of serious/critical impact, or the opening screen downloading the charting library. Uses the Playwright that ships with the environment.
@@ -44,7 +45,14 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
     const page = await browser.newPage({ viewport, colorScheme: scheme });
     const tag = (mode) => `${device}/${scheme}/${mode}`;
     let current = 'load';
-    page.on('console', (message) => message.type() === 'error' && problems.push(`${tag(current)} console: ${message.text()}`));
+    // axe-core re-fetches cross-origin stylesheets for its contrast checks, which the deployed
+    // Content-Security-Policy (connect-src 'self') rightly blocks. Errors raised while axe runs are
+    // the audit's own, not the app's; a real visitor never makes that request.
+    let auditing = false;
+    page.on(
+      'console',
+      (message) => message.type() === 'error' && !auditing && problems.push(`${tag(current)} console: ${message.text()}`),
+    );
     page.on('pageerror', (error) => problems.push(`${tag(current)} exception: ${error.message}`));
 
     for (const mode of [...MODES, 'mortgage-results']) {
@@ -69,9 +77,13 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         problems.push(`${tag(mode)} horizontal overflow of ${overflow}px`);
       }
       await page.evaluate(axeSource);
+      auditing = true;
       const result = await page.evaluate(async () =>
         axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
       );
+      // Let any console message the audit triggered arrive before attribution resumes.
+      await page.waitForTimeout(200);
+      auditing = false;
       for (const violation of result.violations) {
         if (violation.impact === 'serious' || violation.impact === 'critical') {
           const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
