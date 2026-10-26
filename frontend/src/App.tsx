@@ -11,6 +11,8 @@ import { OfferReview } from './pages/OfferReview';
 import { ResultsDashboard } from './pages/ResultsDashboard';
 import { ErrorCard, LoadingCard } from './components/ui';
 import { MarketStatus } from './components/MarketStatus';
+import { SinceLastVisit } from './components/SinceLastVisit';
+import { useVisits } from './store/visitStore';
 import { useMarket } from './store/marketStore';
 
 // The refinance and consolidation modes carry the charting library; loading them on demand keeps
@@ -52,6 +54,10 @@ export default function App() {
   const [view, setView] = useState<MortgageView>('wizard');
   const { profile, macro, percentile, reset } = useWizard();
   const [theme, toggleTheme] = useTheme();
+
+  useEffect(() => {
+    useVisits.getState().markVisited(mode);
+  }, [mode]);
 
   useEffect(() => {
     const onHash = () => setMode(modeFromHash());
@@ -122,6 +128,7 @@ export default function App() {
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
       <ModeNav mode={mode} onSelect={navigate} />
+      <SinceLastVisit />
 
       <main id="main" className="flex-1 px-4 pb-10 pt-6" tabIndex={-1}>
         <div role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`}>
