@@ -50,6 +50,24 @@ describe('reading a model\'s answer', () => {
     expect(warnings.join(' ')).toContain('מסלול 3');
   });
 
+  it('works out seniority from the printed dates rather than asking the model to', () => {
+    const { items, warnings } = toMortgageTracks(
+      {
+        asOf: '2026-10-20',
+        tracks: [
+          { type: 'PRIME', label: null, balance: 512_300, annualRatePercent: 4.25, remainingMonths: 228, monthsElapsed: null, startDate: '2021-01', statedFee: 0 },
+          { type: 'FIXED_LINKED', label: null, balance: 100_000, annualRatePercent: 3, remainingMonths: 100, monthsElapsed: 12, startDate: '2021-01-15', statedFee: null },
+          { type: 'FIXED_UNLINKED', label: null, balance: 100_000, annualRatePercent: 4, remainingMonths: 100, monthsElapsed: null, startDate: 'ינואר 2021', statedFee: null },
+        ],
+      },
+      newId,
+    );
+    expect(items.map((track) => track.monthsElapsed)).toEqual([69, 12, 0]);
+    // Only the unreadable date leaves seniority unknown.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('מסלול 3');
+  });
+
   it('turns an offer into approval tracks and keeps the lender', () => {
     const result = toOfferTracks({
       bank: 'בנק לאומי',
