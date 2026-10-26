@@ -58,7 +58,7 @@ export function scoreOffer(
     if (spec.amount <= 0) {
       continue;
     }
-    const market = rateFor(spec.type, ltv, spec.termMonths);
+    const market = rateFor(spec.type, ltv, spec.termMonths, scenario.primeAnnual);
     const offeredRate = initialRate(spec, scenario);
     const bestRate = atPercentile(market, BEST_IN_MARKET_PERCENTILE);
     const percentile = percentileOf(market, offeredRate);

@@ -103,7 +103,7 @@ export function compareBanks(
       if (amount <= 0.5) {
         continue;
       }
-      const quoted = rateFor(track, ltv, termMonths).medianRate + (sheet.offsets[track] ?? 0);
+      const quoted = rateFor(track, ltv, termMonths, scenario.primeAnnual).medianRate + (sheet.offsets[track] ?? 0);
       rates[track] = quoted;
       specs.push(trackFromRate(track, amount, termMonths, quoted, scenario));
     }

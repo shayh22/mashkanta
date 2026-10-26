@@ -152,8 +152,8 @@ export function proposedSpecs(
 }
 
 /** Today's published average for a track over its remaining term — the fee's discount rate. */
-export function marketAverageFor(track: ExistingTrack, ltv: number): number {
-  return rateFor(track.type, ltv, track.remainingMonths).medianRate;
+export function marketAverageFor(track: ExistingTrack, ltv: number, prime?: number): number {
+  return rateFor(track.type, ltv, track.remainingMonths, prime).medianRate;
 }
 
 /** An existing track kept exactly as it is in the replacement mortgage. */
@@ -181,6 +181,7 @@ export function likeForLikeProposal(
   ltv: number,
   percentile: number,
   kept: ReadonlySet<string> = new Set(),
+  prime?: number,
 ): ProposedTrack[] {
   return tracks
     .filter((track) => track.balance > 0 && track.remainingMonths > 0)
@@ -192,7 +193,7 @@ export function likeForLikeProposal(
             type: track.type,
             amount: track.balance,
             termMonths: track.remainingMonths,
-            annualRate: atPercentile(rateFor(track.type, ltv, track.remainingMonths), percentile),
+            annualRate: atPercentile(rateFor(track.type, ltv, track.remainingMonths, prime), percentile),
           },
     );
 }
@@ -230,7 +231,11 @@ export function analyseRoute(
   // Tracks carried over unchanged are not repaid, so they carry no fee.
   const carried = new Set(proposed.filter((track) => track.carriedOver).map((track) => track.id));
   const repaid = existing.filter((track) => !carried.has(track.id));
-  const prepayment = quotePrepayment(repaid, (track) => marketAverageFor(track, options.ltv), options);
+  const prepayment = quotePrepayment(
+    repaid,
+    (track) => marketAverageFor(track, options.ltv, options.scenario.primeAnnual),
+    options,
+  );
 
   const switchingCost = totalCosts(route.costs);
   const upfrontCost = prepayment.total + switchingCost;
@@ -331,7 +336,7 @@ export function trackByTrack(
     .map((track) => {
       const analysis = analyseRoute(
         [track],
-        likeForLikeProposal([track], options.ltv, percentile),
+        likeForLikeProposal([track], options.ltv, percentile, new Set(), options.scenario.primeAnnual),
         DEFAULT_ROUTES.INTERNAL,
         options,
       );

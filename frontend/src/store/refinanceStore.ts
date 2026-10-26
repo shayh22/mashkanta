@@ -238,14 +238,14 @@ export function useRefinanceAnalysis(): RefinanceView {
     const balance = outstandingBalance(state.tracks);
     const ltv = state.propertyValue > 0 ? balance / state.propertyValue : 0;
     const kept = new Set(state.keptIds);
+    const scenario = scenarioOf(macro);
     const proposal =
       state.proposalMode === 'AUTO'
-        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept)
+        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept, scenario.primeAnnual)
         : withKeptTracks(state.manualProposal, state.tracks, kept);
     if (!tracksValid(state.tracks) || proposal.length === 0) {
       return { ltv, balance, proposal, perTrack: [] };
     }
-    const scenario = scenarioOf(macro);
     const options = {
       scenario,
       discountRate: state.discountRate,
