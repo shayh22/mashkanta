@@ -92,6 +92,20 @@ export default function App() {
 
   const runOptimization = () => optimization.mutate({ profile, macro, percentile });
 
+  // Results priced on the previous market go stale when fresh figures arrive; re-run the same
+  // inputs so the mix, the bank comparison and the baseline table agree. Only while they are on
+  // screen — re-running from the wizard would jump the borrower to results unasked.
+  const repricedFor = useRef(marketVersion);
+  useEffect(() => {
+    if (marketVersion === repricedFor.current) {
+      return;
+    }
+    repricedFor.current = marketVersion;
+    if (view === 'results' && optimization.variables) {
+      optimization.mutate(optimization.variables);
+    }
+  }, [marketVersion, view, optimization]);
+
   const resetAll = () => {
     reset();
     useRefinance.getState().reset();

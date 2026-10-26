@@ -15,6 +15,7 @@ import type { ConsolidationAnalysis } from '../engine/consolidation';
 import { scenarioOf } from '../lib/api';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../lib/format';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
+import { usePrinting } from '../lib/printing';
 import { useConsolidation, useConsolidationAnalysis } from '../store/consolidationStore';
 import { useWizard } from '../store/wizardStore';
 
@@ -44,13 +45,16 @@ export function ConsolidationPage() {
     [included, debts.length, blocked],
   );
   const [section, setSection] = usePageTab('consolidation', tabs);
+  const printing = usePrinting();
+  // Every section when printing, so a printed or saved report is complete.
+  const shows = (id: Section) => printing || section === id;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <ConsolidationSummary analysis={analysis} onDetails={() => setSection('regulation')} />
       <PageTabs label="חלקי איחוד ההלוואות" idPrefix="consolidation" tabs={tabs} active={section} onSelect={setSection} />
       <TabPanel idPrefix="consolidation" tabs={tabs} active={section} onSelect={setSection}>
-        {section === 'household' && (
+        {shows('household') && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div className="min-w-0">
               <HouseholdCard />
@@ -60,8 +64,8 @@ export function ConsolidationPage() {
             </div>
           </div>
         )}
-        {section === 'debts' && <DebtsTable analysis={analysis} />}
-        {section === 'regulation' && (
+        {shows('debts') && <DebtsTable analysis={analysis} />}
+        {shows('regulation') && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
             <div className="min-w-0">
               <RegulatoryPanel analysis={analysis} />
@@ -71,7 +75,7 @@ export function ConsolidationPage() {
             </div>
           </div>
         )}
-        {section === 'cashflow' && (
+        {shows('cashflow') && (
           <>
             <BeforeAfterPanel analysis={analysis} />
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -84,7 +88,7 @@ export function ConsolidationPage() {
             </div>
           </>
         )}
-        {section === 'plan' && <ActionPlanReport plan={plan} />}
+        {shows('plan') && <ActionPlanReport plan={plan} />}
       </TabPanel>
       <CombinedLinkCard />
     </div>

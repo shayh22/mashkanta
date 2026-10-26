@@ -12,6 +12,7 @@ import { ltvRisk, primeRisk, ptiRisk } from '../engine/risk';
 import { scenarioOf } from '../lib/api';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../lib/format';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
+import { usePrinting } from '../lib/printing';
 import { useCombinedMove } from '../store/combinedStore';
 import { useConsolidation } from '../store/consolidationStore';
 import { outstandingBalance, useRefinance } from '../store/refinanceStore';
@@ -49,6 +50,9 @@ export function CombinedPage() {
 
   const included = debts.filter((debt) => debt.include && debt.balance > 0);
   const [section, setSection] = usePageTab('combined', TABS);
+  const printing = usePrinting();
+  // Every section when printing, so a printed or saved report is complete.
+  const shows = (id: Section) => printing || section === id;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
@@ -100,7 +104,7 @@ export function CombinedPage() {
       )}
       <PageTabs label="חלקי המהלך המשולב" idPrefix="combined" tabs={TABS} active={section} onSelect={setSection} />
       <TabPanel idPrefix="combined" tabs={TABS} active={section} onSelect={setSection}>
-        {section === 'inputs' && (
+        {shows('inputs') && (
           <Card
             title="מיחזור ואיחוד באותו מהלך"
             subtitle="מיחזור המשכנתא משנה את ההחזר הקיים על הנכס ואת חלק המשתנה — ולכן גם כמה מותר לאחד לפי הוראת בנק ישראל מ-1.10.2026. כאן רואים את שני המהלכים יחד."
@@ -157,9 +161,9 @@ export function CombinedPage() {
           </Card>
         )}
 
-        {section === 'compare' && <CombinedComparison />}
+        {shows('compare') && <CombinedComparison />}
 
-        {section === 'cashflow' && move && (
+        {shows('cashflow') && move && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div className="min-w-0">
               <WaterfallChart
@@ -182,8 +186,8 @@ export function CombinedPage() {
           </div>
         )}
 
-        {section === 'plan' && plan && <ActionPlanReport plan={plan} />}
-        {(section === 'cashflow' || section === 'plan') && !move && (
+        {shows('plan') && plan && <ActionPlanReport plan={plan} />}
+        {(shows('cashflow') || shows('plan')) && !move && (
           <Card title="חסרים נתונים">
             <p className="text-sm text-ink-soft">השלימו את נתוני המשכנתא בלשונית "הנתונים".</p>
           </Card>

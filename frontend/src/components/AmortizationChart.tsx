@@ -6,11 +6,11 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { ResponsiveChart } from './charts/ResponsiveChart';
 import type { YearPoint } from '../lib/types';
 import { formatCompact, formatCurrency } from '../lib/format';
 import { Card } from './ui';
@@ -57,7 +57,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
       }
     >
       <div className="h-72 w-full" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           {view === 'balance' ? (
             <AreaChart data={yearly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
               <defs>
@@ -129,7 +129,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
               />
             </LineChart>
           )}
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
     </Card>
   );

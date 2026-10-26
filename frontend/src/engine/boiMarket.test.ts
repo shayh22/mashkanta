@@ -102,4 +102,11 @@ describe('Bank of Israel market data', () => {
     expect(sources.mortgages).toContain('/BIR_MRTG_99/1.0?startperiod=2025-09&format=csv');
     expect(sources.loans).toContain('/BIR/1.0?startperiod=2026-04&format=csv');
   });
+
+  it('leaves the date prime took effect unknown when it did not change within the window', () => {
+    const br = ['SERIES_CODE,TIME_PERIOD,OBS_VALUE', 'MNT_RIB_BOI_D,2025-10-01,3.25', 'MNT_RIB_BOI_D,2026-10-26,3.25'].join('\n');
+    const market = marketFromBoi({ br }, NOW);
+    expect(market.prime?.value).toBe(0.0475);
+    expect(market.prime?.since).toBeUndefined();
+  });
 });

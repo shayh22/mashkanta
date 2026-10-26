@@ -396,7 +396,7 @@ function MacroCard({
       </div>
       {anchors && (
         <p className="mt-3 text-xs text-ink-soft">
-          פריים בתוקף מ-{anchors.primeUpdatedOn} · ציפיות אינפלציה ל-{anchors.cpiUpdatedOn} · המדד הבא מתפרסם ב-{anchors.nextCpiOn}.
+          פריים {/^\d/.test(anchors.primeUpdatedOn) ? `בתוקף מ-${anchors.primeUpdatedOn}` : `ללא שינוי ${anchors.primeUpdatedOn}`} · ציפיות אינפלציה ל-{anchors.cpiUpdatedOn} · המדד הבא מתפרסם ב-{anchors.nextCpiOn}.
         </p>
       )}
     </Card>

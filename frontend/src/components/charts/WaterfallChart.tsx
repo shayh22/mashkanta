@@ -1,4 +1,5 @@
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Tooltip, XAxis, YAxis } from 'recharts';
+import { ResponsiveChart } from './ResponsiveChart';
 import { formatCompact, formatCurrency, formatSignedCurrency } from '../../lib/format';
 import { waterfallBars, type WaterfallBar, type WaterfallStep } from '../../lib/waterfall';
 import { Card } from '../ui';
@@ -32,7 +33,7 @@ export function WaterfallChart({
   return (
     <Card title={title} subtitle={subtitle}>
       <div className="h-72 w-full text-ink-soft" dir="ltr" role="img" aria-label={`${title}: ${bars.map((bar) => `${bar.label} ${formatCurrency(bar.amount)}`).join(', ')}`}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           <BarChart data={[...bars].reverse()} margin={{ top: 24, right: 8, left: 8, bottom: 0 }} barCategoryGap="22%">
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.12} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'currentColor' }} tickLine={false} axisLine={false} interval={0} />
@@ -67,7 +68,7 @@ export function WaterfallChart({
               />
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
         <span><span className="me-1 inline-block h-2 w-2 rounded-sm" style={{ background: FILL.total }} aria-hidden />סך החזר</span>

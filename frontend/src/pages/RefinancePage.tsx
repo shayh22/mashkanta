@@ -18,6 +18,7 @@ import { VERDICT_LABELS, type RefinanceComparison, type RefinanceVerdict as Verd
 import { scenarioOf } from '../lib/api';
 import { formatCurrency, formatSignedCurrency } from '../lib/format';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
+import { usePrinting } from '../lib/printing';
 import { bestRoute, ROUTE_NAME } from '../lib/routes';
 import { useRefinance, useRefinanceAnalysis } from '../store/refinanceStore';
 import { useWizard } from '../store/wizardStore';
@@ -64,6 +65,9 @@ export function RefinancePage() {
     [tracks.length, perTrack.length, worthwhile],
   );
   const [section, setSection] = usePageTab('refinance', tabs);
+  const printing = usePrinting();
+  // Every section when printing, so a printed or saved report is complete.
+  const shows = (id: Section) => printing || section === id;
 
   const missing = (
     <Card title="חסרים נתונים">
@@ -78,7 +82,7 @@ export function RefinancePage() {
       <RefinanceSummary comparison={comparison} onDetails={() => setSection('results')} />
       <PageTabs label="חלקי בדיקת המיחזור" idPrefix="refinance" tabs={tabs} active={section} onSelect={setSection} />
       <TabPanel idPrefix="refinance" tabs={tabs} active={section} onSelect={setSection}>
-        {section === 'data' && (
+        {shows('data') && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
             <div className="min-w-0">
               <ExistingTracksEditor />
@@ -88,9 +92,9 @@ export function RefinancePage() {
             </div>
           </div>
         )}
-        {section === 'tracks' && <TrackVerdicts verdicts={perTrack} />}
-        {section === 'proposal' && <ProposalEditor proposal={proposal} />}
-        {section === 'results' &&
+        {shows('tracks') && <TrackVerdicts verdicts={perTrack} />}
+        {shows('proposal') && <ProposalEditor proposal={proposal} />}
+        {shows('results') &&
           (comparison ? (
             <>
               <RefinanceVerdict comparison={comparison} />
@@ -100,9 +104,9 @@ export function RefinancePage() {
           ) : (
             missing
           ))}
-        {section === 'fees' && (comparison ? <RefinanceFees comparison={comparison} /> : missing)}
-        {section === 'market' && <MarketTrends />}
-        {section === 'plan' && (plan ? <ActionPlanReport plan={plan} /> : missing)}
+        {shows('fees') && (comparison ? <RefinanceFees comparison={comparison} /> : missing)}
+        {shows('market') && <MarketTrends />}
+        {shows('plan') && (plan ? <ActionPlanReport plan={plan} /> : missing)}
       </TabPanel>
       <CombinedLinkCard />
     </div>

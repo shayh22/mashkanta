@@ -61,4 +61,10 @@ describe('live market', () => {
   it('names months in Hebrew', () => {
     expect(monthLabel('2026-08')).toBe('אוגוסט 2026');
   });
+
+  it('shows prime rows in the table at the prime in force, as the engine prices them', () => {
+    applyLiveMarket(AUGUST);
+    const row = currentBaselineRates(0.045).find((entry) => entry.track === 'PRIME' && entry.tier === 'FROM_45_TO_60')!;
+    expect(row.medianRate).toBeCloseTo(rateFor('PRIME', 0.5, 300, 0.045).medianRate, 10);
+  });
 });
