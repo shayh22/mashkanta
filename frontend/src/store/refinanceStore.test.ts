@@ -88,7 +88,7 @@ describe('refinance store', () => {
       },
     ]);
     const after = useRefinance.getState();
-    expect(after.proposalMode).toBe('AUTO');
+    expect(after.proposalMode).toBe('OPTIMAL');
     expect(after.manualProposal).toEqual([]);
     expect(after.keptIds).toEqual([]);
     expect(after.tracks.map((track) => track.id)).toEqual(['new']);

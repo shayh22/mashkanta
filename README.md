@@ -5,14 +5,17 @@ multi-track mixes the way Israeli lenders actually structure them, enforces the 
 constraints a proposal has to satisfy, stress tests it against rate and inflation shocks, and scores
 it against a market baseline built only from public and crowdsourced data.
 
-It works in three modes, each a tab and a deep link:
+It has two paths, each two screens and a deep link:
 
-| Mode | Link | Question it answers |
+| Path | Link | Screens |
 | --- | --- | --- |
-| 🏠 New mortgage | `#/mortgage` | Which mix should I take, and is the offer I got any good? |
-| 🔄 Refinance check | `#/refinance` | What does it cost to repay early, when does switching pay back, and should I stay or move bank? |
-| 🔀 Refinance + consolidation | `#/combined` | What do both moves do together — payment, PTI under the October 2026 rules, and one action plan? |
-| 🧩 Debt consolidation | `#/consolidation` | Can I fold my consumer loans into the home under the October 2026 rules, how much room is left, and what does the monthly relief cost me over the life of the loan? |
+| 🏠 I have a mortgage | `#/own` → `#/own/result` | **My data** — the mortgage (bank statement or by hand), other loans if any, income and risk. **The result** — should I move, the new mix chosen for me, the consolidation loan when there are other loans, then everything else (action plan, editing the mix, fees and breakeven, track by track, consolidation rules and cash flow, switching costs, market) folded away underneath. |
+| 🔑 Buying a home | `#/buy` | The wizard, then the optimal (or hand-built) mix on top of the result with the evidence folded underneath; an offer from a bank can be checked against the market from there. |
+
+Refinance alone, or refinance with debt consolidation, follows from the inputs rather than from a
+choice of mode, and the refinance result shows the mix the engine chose for the household by default
+(the same mix re-priced at market, or a quote typed in, are one click away). Old links
+(`#/refinance`, `#/consolidation`, `#/combined`, `#/mortgage`) lead to the path that replaced them.
 
 Research behind the new modes — the regulation as read from the circular itself, the fee table, the
 market and competitor survey — is in [docs/MARKET_AND_REGULATION_RESEARCH.md](docs/MARKET_AND_REGULATION_RESEARCH.md).
@@ -56,7 +59,7 @@ npm run typecheck
 npm run lint
 npm run build        # -> dist/, ready to upload anywhere
 
-# Browser smoke test: every mode, desktop and 360px phone, light and dark, with axe-core
+# Browser smoke test: every screen of both paths with all sections open, desktop and 360px phone, light and dark, with axe-core
 npx vite preview --port 4173 &
 npm run e2e
 ```
@@ -239,7 +242,7 @@ per rule so the frontend can key off it:
 | `VARIABLE_SHARE` | At most ⅔ may reprice within five years |
 | `FIXED_FLOOR` | At least ⅓ fixed until maturity |
 
-The consolidation mode applies the rules for a loan secured on a home that is not used to buy it, as
+Consolidation applies the rules for a loan secured on a home that is not used to buy it, as
 amended by circular H-06-2840 (PTI change in force from 1 October 2026):
 
 | Code | Rule |
@@ -259,8 +262,9 @@ exactly which line breaks it — that is the whole point of an independent compa
 Colours are CSS-variable tokens with a separately tuned dark palette; the theme follows the system
 until toggled, is applied before first paint by `public/theme-init.js` (an external script, because
 the CSP forbids inline ones), and printing always uses the light palette. Chart series were checked
-for colour-vision-deficiency separation against both surfaces. The modes form an ARIA tablist
-with right-to-left arrow-key handling.
+for colour-vision-deficiency separation against both surfaces. The two paths form an ARIA tablist
+with right-to-left arrow-key handling; details sit in disclosure sections that mount their content
+(and the charting library) only when opened, and all open for printing.
 
 **Visual language.** Quiet and monochrome: neutral greys, hairline borders, and one teal accent for the
 primary action and the figures that matter. Buttons have a 2px edge the face sinks into on press;

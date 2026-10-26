@@ -17,35 +17,33 @@ import { ErrorCard, LoadingCard } from './components/ui';
 import { MarketStatus } from './components/MarketStatus';
 import { SinceLastVisit } from './components/SinceLastVisit';
 import { useVisits } from './store/visitStore';
+import { useHasDebts } from './store/flowStore';
 import { useMarket } from './store/marketStore';
 
-// The refinance and consolidation modes carry the charting library; loading them on demand keeps
-// it off the first visit, which lands on the mortgage wizard.
-const RefinancePage = lazy(() =>
-  import('./pages/RefinancePage').then((module) => ({ default: module.RefinancePage })),
-);
-const ConsolidationPage = lazy(() =>
-  import('./pages/ConsolidationPage').then((module) => ({ default: module.ConsolidationPage })),
-);
-const CombinedPage = lazy(() =>
-  import('./pages/CombinedPage').then((module) => ({ default: module.CombinedPage })),
-);
+// The homeowner's path carries the charting library; loading it on demand keeps it off a visit
+// that only buys.
+const OwnPage = lazy(() => import('./pages/OwnPage').then((module) => ({ default: module.OwnPage })));
 
 /** The three jobs the platform does. Each is addressable by URL hash so it can be linked to. */
-type Mode = 'mortgage' | 'refinance' | 'consolidation' | 'combined';
+type Mode = 'own' | 'buy';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; title: string }[] = [
-  { id: 'mortgage', title: 'משכנתא חדשה' },
-  { id: 'refinance', title: 'מיחזור' },
-  { id: 'consolidation', title: 'איחוד הלוואות' },
-  { id: 'combined', title: 'מיחזור + איחוד' },
+  { id: 'own', title: 'יש לי משכנתא' },
+  { id: 'buy', title: 'קונים דירה' },
 ];
 
+/** Links from before the two paths: the three homeowner modes are one path now. */
+const LEGACY: Record<string, Mode> = { mortgage: 'buy', refinance: 'own', consolidation: 'own', combined: 'own' };
+
 function modeFromHash(): Mode {
-  // `#/<mode>` or `#/<mode>/<section>`; the section is read by the page's own tabs.
-  const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-  return MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'mortgage';
+  // `#/<mode>` or `#/<mode>/<screen>`; the screen is read by the page itself.
+  const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0] ?? '';
+  if (LEGACY[hash]) {
+    window.history.replaceState(null, '', `#/${LEGACY[hash]}`);
+    return LEGACY[hash]!;
+  }
+  return MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'own';
 }
 
 export default function App() {
@@ -54,9 +52,20 @@ export default function App() {
   const { profile, macro, percentile, mixMode, manualShares, setMixMode, reset } = useWizard();
   const [theme, toggleTheme] = useTheme();
 
+  // "Since your last visit" compares results only for the tools in use: a homeowner's refinance,
+  // and their consolidation once other loans are part of the check.
+  const hasDebts = useHasDebts();
   useEffect(() => {
-    useVisits.getState().markVisited(mode);
-  }, [mode]);
+    const visits = useVisits.getState();
+    if (mode === 'buy') {
+      visits.markVisited('mortgage');
+    } else {
+      visits.markVisited('refinance');
+      if (hasDebts) {
+        visits.markVisited('consolidation');
+      }
+    }
+  }, [mode, hasDebts]);
 
   useEffect(() => {
     const onHash = () => setMode(modeFromHash());
@@ -142,13 +151,18 @@ export default function App() {
 
       <main id="main" className="flex-1 px-4 pb-10 pt-6" tabIndex={-1}>
         <div role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`}>
-          {mode === 'mortgage' && (
+          {mode === 'buy' && (
             <div className="space-y-5">
-              <MortgageSubNav view={view} onSelect={setView} hasResults={optimization.isSuccess} />
 
               {view === 'wizard' && (
                 <div className="space-y-5">
                   <MortgageWizard anchors={reference.data?.anchors} onSubmit={runOptimization} />
+                  <p className="no-print text-center text-sm text-ink-soft">
+                    כבר קיבלתם הצעה מהבנק?{' '}
+                    <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => setView('upload')}>
+                      בדקו אותה מול השוק
+                    </button>
+                  </p>
                   {optimization.isPending && (
                     <div className="mx-auto w-full max-w-3xl">
                       <LoadingCard message="סורק את כל התמהילים החוקיים ומריץ מבחני קיצון…" />
@@ -181,6 +195,11 @@ export default function App() {
 
               {view === 'upload' && (
                 <div className="space-y-5">
+                  <div className="no-print mx-auto w-full max-w-4xl">
+                    <button type="button" className="btn-ghost" onClick={() => setView('wizard')}>
+                      <span aria-hidden>→</span> חזרה לחישוב
+                    </button>
+                  </div>
                   <OfferReview />
                   <p className="mx-auto max-w-4xl text-center text-xs text-ink-soft">
                     מספרי תעודת זהות, שמות, כתובות ומספרי חשבון מוסרים מתוך המסמך בזיכרון. אישור עקרוני אחיד
@@ -191,7 +210,7 @@ export default function App() {
             </div>
           )}
 
-          {mode !== 'mortgage' && (
+          {mode === 'own' && (
             <Suspense
               fallback={
                 <div className="mx-auto w-full max-w-3xl">
@@ -199,9 +218,7 @@ export default function App() {
                 </div>
               }
             >
-              {mode === 'refinance' && <RefinancePage />}
-              {mode === 'consolidation' && <ConsolidationPage />}
-              {mode === 'combined' && <CombinedPage />}
+              <OwnPage />
             </Suspense>
           )}
         </div>
@@ -295,7 +312,7 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
       <div
         role="tablist"
         aria-label="מצב עבודה"
-        className="relative mx-auto grid w-full max-w-6xl grid-cols-2 gap-1 rounded-xl bg-surface-sunken p-1 sm:grid-cols-4"
+        className="relative mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-xl bg-surface-sunken p-1"
       >
         {thumb && <span aria-hidden className={`rounded-lg border border-line bg-surface shadow-card ${GLIDE_CLASS}`} style={thumb} />}
         {MODES.map((item, index) => {
@@ -324,46 +341,6 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
         })}
       </div>
     </nav>
-  );
-}
-
-function MortgageSubNav({
-  view,
-  onSelect,
-  hasResults,
-}: {
-  view: MortgageView;
-  onSelect: (view: MortgageView) => void;
-  hasResults: boolean;
-}) {
-  const items: { id: MortgageView; label: string; enabled: boolean }[] = [
-    { id: 'wizard', label: 'חישוב', enabled: true },
-    { id: 'results', label: 'תוצאות', enabled: hasResults },
-    { id: 'upload', label: 'בדיקת הצעה', enabled: true },
-  ];
-  return (
-    <div className="no-print mx-auto flex w-full max-w-6xl justify-center">
-      <div
-        className="inline-flex rounded-xl bg-surface-sunken p-1"
-        role="group"
-        aria-label="שלבי משכנתא חדשה"
-      >
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            disabled={!item.enabled}
-            aria-pressed={view === item.id}
-            onClick={() => onSelect(item.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-40 ${
-              view === item.id ? 'bg-surface text-ink shadow-card' : 'text-ink-soft hover:text-ink'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

@@ -129,6 +129,14 @@ export function migrateConsolidation(persisted: unknown, version: number): unkno
   return version < 2 && legacy ? { ...state, terms: { ...terms, ...allPurposeRates() } } : persisted;
 }
 
+/** True while the list is still the illustrative one the app starts with, not the borrower's own. */
+export function isSampleDebts(debts: readonly ConsumerDebt[]): boolean {
+  return (
+    debts.length === DEFAULT_DEBTS.length &&
+    debts.every((debt, index) => debt.label === DEFAULT_DEBTS[index]!.label && debt.balance === DEFAULT_DEBTS[index]!.balance)
+  );
+}
+
 const INITIAL = {
   netIncome: 26_000,
   debts: DEFAULT_DEBTS,

@@ -15,45 +15,43 @@ function renderApp() {
 
 describe('mode navigation', () => {
   beforeEach(() => {
-    window.history.replaceState(null, '', '/#/mortgage');
+    window.history.replaceState(null, '', '/#/buy');
     document.documentElement.classList.remove('dark');
   });
   afterEach(cleanup);
 
-  it('is a tablist with exactly one selected, focusable tab', () => {
+  it('offers two paths as a tablist with one selected, focusable tab', () => {
     renderApp();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(4);
-    expect(tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
-    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1, -1, -1]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['יש לי משכנתא', 'קונים דירה']);
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0]);
   });
 
-  it('moves forward with the left arrow in RTL, wraps, and updates the link', async () => {
+  it('moves with the arrow keys, right to left, and updates the link', async () => {
     const user = userEvent.setup();
     renderApp();
-    const [mortgage, refinance, consolidation, combined] = screen.getAllByRole('tab');
-    mortgage!.focus();
+    const [own, buy] = screen.getAllByRole('tab');
+    buy!.focus();
     await user.keyboard('{ArrowLeft}');
-    expect(document.activeElement).toBe(refinance);
-    expect(refinance!.getAttribute('aria-selected')).toBe('true');
-    expect(window.location.hash).toBe('#/refinance');
-    await user.keyboard('{ArrowLeft}');
-    expect(document.activeElement).toBe(consolidation);
-    await user.keyboard('{ArrowLeft}');
-    expect(document.activeElement).toBe(combined);
-    expect(window.location.hash).toBe('#/combined');
-    await user.keyboard('{ArrowLeft}');
-    expect(document.activeElement).toBe(mortgage);
-    await user.keyboard('{End}');
-    expect(document.activeElement).toBe(combined);
+    expect(document.activeElement).toBe(own);
+    expect(own!.getAttribute('aria-selected')).toBe('true');
+    expect(window.location.hash).toBe('#/own');
     await user.keyboard('{ArrowRight}');
-    expect(document.activeElement).toBe(consolidation);
+    expect(document.activeElement).toBe(buy);
+    expect(window.location.hash).toBe('#/buy');
   });
 
-  it('opens the mode named in the link', () => {
-    window.history.replaceState(null, '', '/#/consolidation');
+  it.each([
+    ['#/refinance/results', 'יש לי משכנתא', '#/own'],
+    ['#/consolidation', 'יש לי משכנתא', '#/own'],
+    ['#/combined/plan', 'יש לי משכנתא', '#/own'],
+    ['#/mortgage', 'קונים דירה', '#/buy'],
+  ])('sends an old link %s to the path that replaced it', (hash, tab, now) => {
+    window.history.replaceState(null, '', `/${hash}`);
     renderApp();
-    expect(screen.getByRole('tab', { name: /איחוד הלוואות/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: tab }).getAttribute('aria-selected')).toBe('true');
+    expect(window.location.hash).toBe(now);
   });
 
   it('toggles the dark theme from the header', async () => {
