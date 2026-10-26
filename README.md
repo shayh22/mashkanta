@@ -11,6 +11,7 @@ It works in three modes, each a tab and a deep link:
 | --- | --- | --- |
 | 🏠 New mortgage | `#/mortgage` | Which mix should I take, and is the offer I got any good? |
 | 🔄 Refinance check | `#/refinance` | What does it cost to repay early, when does switching pay back, and should I stay or move bank? |
+| 🔀 Refinance + consolidation | `#/combined` | What do both moves do together — payment, PTI under the October 2026 rules, and one action plan? |
 | 🧩 Debt consolidation | `#/consolidation` | Can I fold my consumer loans into the home under the October 2026 rules, how much room is left, and what does the monthly relief cost me over the life of the loan? |
 
 Research behind the new modes — the regulation as read from the circular itself, the fee table, the

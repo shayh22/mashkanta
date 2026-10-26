@@ -23,15 +23,15 @@ describe('mode navigation', () => {
   it('is a tablist with exactly one selected, focusable tab', () => {
     renderApp();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
     expect(tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
-    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1, -1]);
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1, -1, -1]);
   });
 
   it('moves forward with the left arrow in RTL, wraps, and updates the link', async () => {
     const user = userEvent.setup();
     renderApp();
-    const [mortgage, refinance, consolidation] = screen.getAllByRole('tab');
+    const [mortgage, refinance, consolidation, combined] = screen.getAllByRole('tab');
     mortgage!.focus();
     await user.keyboard('{ArrowLeft}');
     expect(document.activeElement).toBe(refinance);
@@ -40,11 +40,14 @@ describe('mode navigation', () => {
     await user.keyboard('{ArrowLeft}');
     expect(document.activeElement).toBe(consolidation);
     await user.keyboard('{ArrowLeft}');
+    expect(document.activeElement).toBe(combined);
+    expect(window.location.hash).toBe('#/combined');
+    await user.keyboard('{ArrowLeft}');
     expect(document.activeElement).toBe(mortgage);
     await user.keyboard('{End}');
-    expect(document.activeElement).toBe(consolidation);
+    expect(document.activeElement).toBe(combined);
     await user.keyboard('{ArrowRight}');
-    expect(document.activeElement).toBe(refinance);
+    expect(document.activeElement).toBe(consolidation);
   });
 
   it('opens the mode named in the link', () => {
