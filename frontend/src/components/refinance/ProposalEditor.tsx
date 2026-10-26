@@ -33,7 +33,14 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
           { value: 'AUTO', title: 'אוטומטית לפי השוק', subtitle: 'אותו תמהיל, מחיר שוק' },
           { value: 'MANUAL', title: 'הצעה שקיבלתי', subtitle: 'עריכה ידנית של המסלולים' },
         ]}
-        onChange={(mode) => state.setProposalMode(mode, proposal)}
+        onChange={(mode) =>
+          // The manual table holds only what is being refinanced; kept tracks are added back by
+          // the analysis, so seeding them here would freeze them in if they are later un-kept.
+          state.setProposalMode(
+            mode,
+            proposal.filter((track) => !track.carriedOver),
+          )
+        }
       />
 
       {state.proposalMode === 'AUTO' ? (
@@ -59,9 +66,13 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
           <ul className="grid gap-2 sm:grid-cols-2">
             {proposal.map((track) => (
               <li key={track.id} className="card-muted flex items-center justify-between !p-3 text-sm">
-                <span className="font-medium text-ink">{TRACK_LABEL[track.type]}</span>
+                <span className="font-medium text-ink">
+                  {TRACK_LABEL[track.type]}
+                  {track.carriedOver && <span className="badge-neutral ms-2">נשאר כמות שהוא</span>}
+                </span>
                 <span className="tabular text-ink-muted">
-                  {formatCurrency(track.amount)} · {formatPercent(track.annualRate)} · {formatTerm(track.termMonths)}
+                  {formatCurrency(track.amount)} · {formatPercent(track.annualRate)} ·{' '}
+                  {formatTerm(track.termMonths)}
                 </span>
               </li>
             ))}
@@ -128,7 +139,9 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
                         max={360}
                         step={12}
                         digits={0}
-                        onChange={(value) => state.updateProposed(track.id, { termMonths: Math.round(value) })}
+                        onChange={(value) =>
+                          state.updateProposed(track.id, { termMonths: Math.round(value) })
+                        }
                       />
                     </td>
                     <td className="py-2 text-end">

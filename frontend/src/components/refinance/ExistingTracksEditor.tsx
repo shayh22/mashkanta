@@ -11,8 +11,17 @@ import { ScrollRegion, Card, CurrencyField, NumberInput } from '../ui';
  * lists. Seniority matters as much as the rate: it decides the discount on the capitalization fee.
  */
 export function ExistingTracksEditor() {
-  const { tracks, propertyValue, setPropertyValue, addTrack, updateTrack, removeTrack, setTracks } =
-    useRefinance();
+  const {
+    tracks,
+    propertyValue,
+    setPropertyValue,
+    addTrack,
+    updateTrack,
+    removeTrack,
+    setTracks,
+    keptIds,
+    toggleKept,
+  } = useRefinance();
   const balance = outstandingBalance(tracks);
 
   const seedFromDocument = useCallback(
@@ -62,9 +71,10 @@ export function ExistingTracksEditor() {
           <p className="py-6 text-center text-sm text-ink-soft">הוסיפו מסלול או העלו מסמך כדי להתחיל.</p>
         ) : (
           <ScrollRegion label="טבלת מסלולים קיימים">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-line text-xs text-ink-soft">
+                  <th className="py-2 text-start font-medium">למחזר</th>
                   <th className="py-2 text-start font-medium">מסלול</th>
                   <th className="py-2 text-start font-medium">יתרת קרן (₪)</th>
                   <th className="py-2 text-start font-medium">ריבית נוכחית (%)</th>
@@ -75,7 +85,20 @@ export function ExistingTracksEditor() {
               </thead>
               <tbody className="divide-y divide-line/60">
                 {tracks.map((track) => (
-                  <tr key={track.id}>
+                  <tr key={track.id} className={keptIds.includes(track.id) ? 'opacity-60' : ''}>
+                    <td className="py-2 pe-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-600"
+                        checked={track.type !== 'ELIGIBILITY' && !keptIds.includes(track.id)}
+                        disabled={track.type === 'ELIGIBILITY'}
+                        aria-label={`למחזר את מסלול ${TRACK_OPTIONS.find((o) => o.value === track.type)?.label ?? ''}`}
+                        title={
+                          track.type === 'ELIGIBILITY' ? 'הלוואת זכאות נשארת תמיד — היא מסובסדת' : undefined
+                        }
+                        onChange={() => toggleKept(track.id)}
+                      />
+                    </td>
                     <td className="py-2 pe-2">
                       <select
                         className="input min-w-[9rem] py-1.5"
@@ -159,7 +182,10 @@ export function ExistingTracksEditor() {
           ייבוא מסלולים ממסמך (אישור עקרוני או דוח יתרות)
         </summary>
         <div className="mt-4">
-          <ApprovalUploader ltv={propertyValue > 0 ? balance / propertyValue : 0.5} onExtracted={seedFromDocument} />
+          <ApprovalUploader
+            ltv={propertyValue > 0 ? balance / propertyValue : 0.5}
+            onExtracted={seedFromDocument}
+          />
           <p className="hint">
             הקובץ מעובד בדפדפן בלבד. אחרי הייבוא בדקו ועדכנו את הוותק — הוא אינו מופיע בדרך כלל במסמך.
           </p>

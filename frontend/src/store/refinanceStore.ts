@@ -5,6 +5,9 @@ import { scenarioOf } from '../lib/api';
 import type { ExistingTrack } from '../engine/prepayment';
 import {
   compareRoutes,
+  trackByTrack,
+  withKeptTracks,
+  type TrackVerdict,
   DEFAULT_ROUTES,
   likeForLikeProposal,
   type ProposedTrack,
@@ -55,6 +58,8 @@ interface RefinanceState {
   /** Where in the market distribution the automatic proposal is priced; 0.3 is a negotiated deal. */
   percentile: number;
   manualProposal: ProposedTrack[];
+  /** Tracks left as they are in a partial refinance. */
+  keptIds: string[];
   noticeGiven: boolean;
   dayOfMonth: number;
   discountRate: number;
@@ -70,6 +75,8 @@ interface RefinanceState {
   updateProposed: (id: string, patch: Partial<ProposedTrack>) => void;
   addProposed: () => void;
   removeProposed: (id: string) => void;
+  toggleKept: (id: string) => void;
+  setKeptIds: (ids: string[]) => void;
   setNoticeGiven: (value: boolean) => void;
   setDayOfMonth: (value: number) => void;
   setDiscountRate: (value: number) => void;
@@ -84,6 +91,7 @@ const INITIAL = {
   proposalMode: 'AUTO' as ProposalMode,
   percentile: 0.3,
   manualProposal: [] as ProposedTrack[],
+  keptIds: [] as string[],
   noticeGiven: true,
   dayOfMonth: 20,
   discountRate: 0.04,
@@ -115,7 +123,18 @@ export const useRefinance = create<RefinanceState>()(
         set((state) => ({
           tracks: state.tracks.map((track) => (track.id === id ? { ...track, ...patch } : track)),
         })),
-      removeTrack: (id) => set((state) => ({ tracks: state.tracks.filter((track) => track.id !== id) })),
+      removeTrack: (id) =>
+        set((state) => ({
+          tracks: state.tracks.filter((track) => track.id !== id),
+          keptIds: state.keptIds.filter((kept) => kept !== id),
+        })),
+      toggleKept: (id) =>
+        set((state) => ({
+          keptIds: state.keptIds.includes(id)
+            ? state.keptIds.filter((kept) => kept !== id)
+            : [...state.keptIds, id],
+        })),
+      setKeptIds: (keptIds) => set({ keptIds }),
 
       setProposalMode: (proposalMode, seed) =>
         set((state) => ({
@@ -168,6 +187,7 @@ export const useRefinance = create<RefinanceState>()(
         proposalMode: state.proposalMode,
         percentile: state.percentile,
         manualProposal: state.manualProposal,
+        keptIds: state.keptIds,
         noticeGiven: state.noticeGiven,
         dayOfMonth: state.dayOfMonth,
         discountRate: state.discountRate,
@@ -194,6 +214,8 @@ export interface RefinanceView {
   balance: number;
   proposal: ProposedTrack[];
   comparison?: RefinanceComparison;
+  /** Each track refinanced on its own at the current bank. */
+  perTrack: TrackVerdict[];
 }
 
 /** The whole analysis, recomputed only when an input changes. It takes a few milliseconds. */
@@ -204,29 +226,33 @@ export function useRefinanceAnalysis(): RefinanceView {
   return useMemo(() => {
     const balance = outstandingBalance(state.tracks);
     const ltv = state.propertyValue > 0 ? balance / state.propertyValue : 0;
+    const kept = new Set(state.keptIds);
     const proposal =
       state.proposalMode === 'AUTO'
-        ? likeForLikeProposal(state.tracks, ltv, state.percentile)
-        : state.manualProposal;
+        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept)
+        : withKeptTracks(state.manualProposal, state.tracks, kept);
     if (!tracksValid(state.tracks) || proposal.length === 0) {
-      return { ltv, balance, proposal };
+      return { ltv, balance, proposal, perTrack: [] };
     }
     const scenario = scenarioOf(macro);
-    const comparison = compareRoutes(state.tracks, proposal, state.routes, {
+    const options = {
       scenario,
       discountRate: state.discountRate,
       ltv,
       noticeGiven: state.noticeGiven,
       dayOfMonth: state.dayOfMonth,
       cpiAnnual: scenario.cpiAnnual,
-    });
-    return { ltv, balance, proposal, comparison };
+    };
+    const comparison = compareRoutes(state.tracks, proposal, state.routes, options);
+    const perTrack = trackByTrack(state.tracks, state.percentile, options);
+    return { ltv, balance, proposal, comparison, perTrack };
   }, [
     state.tracks,
     state.propertyValue,
     state.proposalMode,
     state.percentile,
     state.manualProposal,
+    state.keptIds,
     state.routes,
     state.discountRate,
     state.noticeGiven,
