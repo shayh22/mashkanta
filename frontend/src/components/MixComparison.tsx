@@ -55,7 +55,7 @@ function MixCard({ proposal, saving }: { proposal: MixProposal; saving?: Savings
   return (
     <article
       className={`rounded-2xl border p-4 ${
-        proposal.recommended ? 'border-brand-400 bg-brand-50/40 ring-1 ring-brand-400' : 'border-slate-200'
+        proposal.recommended ? 'border-brand-400 bg-brand-50/40 ring-1 ring-brand-400' : 'border-line'
       }`}
     >
       <header className="flex items-start justify-between gap-3">
@@ -90,7 +90,7 @@ function MixCard({ proposal, saving }: { proposal: MixProposal; saving?: Savings
       {saving && (
         <p
           className={`mt-3 rounded-xl px-3 py-2 text-xs font-medium ${
-            saving.totalPaidSaving > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-ink-soft'
+            saving.totalPaidSaving > 0 ? 'bg-emerald-500/10 text-positive' : 'bg-surface-muted text-ink-soft'
           }`}
         >
           {saving.totalPaidSaving > 0
@@ -114,7 +114,7 @@ export function AllocationBar({
 }) {
   return (
     <div className="mt-3">
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-sunken">
         {allocations.map((allocation) => (
           <div
             key={allocation.track}
@@ -157,10 +157,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 export function AllocationTable({ proposal }: { proposal: MixProposal }) {
   return (
     <Card title="פירוט המסלולים" subtitle="הרכב התמהיל המומלץ, מסלול אחר מסלול">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-xs text-ink-soft">
+            <tr className="border-b border-line text-xs text-ink-soft">
               <th className="py-2 text-start font-medium">מסלול</th>
               <th className="py-2 text-start font-medium">סכום</th>
               <th className="py-2 text-start font-medium">חלק</th>
@@ -170,7 +170,7 @@ export function AllocationTable({ proposal }: { proposal: MixProposal }) {
               <th className="py-2 text-start font-medium">עלות כוללת</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line/60">
             {proposal.summary.allocations.map((allocation) => (
               <tr key={allocation.track}>
                 <td className="py-2.5">
@@ -193,7 +193,7 @@ export function AllocationTable({ proposal }: { proposal: MixProposal }) {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 font-semibold">
+            <tr className="border-t border-line font-semibold">
               <td className="py-2.5">סה"כ</td>
               <td className="tabular py-2.5">{formatCurrency(proposal.summary.totalPrincipal)}</td>
               <td className="tabular py-2.5">100%</td>

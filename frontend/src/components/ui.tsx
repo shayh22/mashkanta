@@ -45,12 +45,12 @@ export function Stat({
   tone?: 'neutral' | 'positive' | 'negative';
 }) {
   const toneClass =
-    tone === 'positive' ? 'text-emerald-600' : tone === 'negative' ? 'text-rose-600' : 'text-ink';
+    tone === 'positive' ? 'text-positive' : tone === 'negative' ? 'text-negative' : 'text-ink';
   return (
     <div>
       <dt className="text-xs font-medium text-ink-soft">{label}</dt>
       <dd className={`tabular mt-1 text-xl font-semibold ${toneClass}`}>{value}</dd>
-      {note && <p className="mt-0.5 text-xs text-ink-soft">{note}</p>}
+      {note && <dd className="mt-0.5 text-xs text-ink-soft">{note}</dd>}
     </div>
   );
 }
@@ -83,7 +83,7 @@ export function Field({
       </label>
       {children}
       {hint && (
-        <p className={hintTone === 'notice' ? 'hint font-medium text-amber-600' : 'hint'}>{hint}</p>
+        <p className={hintTone === 'notice' ? 'hint font-medium text-caution' : 'hint'}>{hint}</p>
       )}
     </div>
   );
@@ -182,7 +182,7 @@ export function SegmentedControl<T extends string>({
               className={`rounded-xl border px-3 py-2.5 text-start transition ${
                 selected
                   ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                  : 'border-slate-300 bg-white hover:bg-slate-50'
+                  : 'border-line-strong bg-surface hover:bg-surface-muted'
               }`}
             >
               <span className="block text-sm font-semibold text-ink">{option.title}</span>
@@ -270,7 +270,7 @@ export function ProgressSteps({
                     ? 'bg-brand-600 text-white'
                     : state === 'done'
                       ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-200 text-slate-500'
+                      : 'bg-line text-ink-soft'
                 }`}
               >
                 {state === 'done' ? '✓' : number}
@@ -283,7 +283,7 @@ export function ProgressSteps({
                 {label}
               </span>
             </button>
-            {number < labels.length && <span className="h-px flex-1 bg-slate-200" aria-hidden />}
+            {number < labels.length && <span className="h-px flex-1 bg-line" aria-hidden />}
           </li>
         );
       })}
@@ -307,16 +307,117 @@ export function LoadingCard({ message }: { message: string }) {
 /** Error state that surfaces the backend's own Hebrew message rather than a generic string. */
 export function ErrorCard({ title, message, details = [] }: { title: string; message: string; details?: string[] }) {
   return (
-    <div className="card border-rose-200 bg-rose-50/50" role="alert">
-      <h3 className="text-sm font-semibold text-rose-700">{title}</h3>
-      <p className="mt-1 text-sm text-rose-600">{message}</p>
+    <div className="card border-rose-500/30 bg-rose-500/10" role="alert">
+      <h3 className="text-sm font-semibold text-negative">{title}</h3>
+      <p className="mt-1 text-sm text-negative">{message}</p>
       {details.length > 0 && (
-        <ul className="mt-2 list-inside list-disc text-xs text-rose-600">
+        <ul className="mt-2 list-inside list-disc text-xs text-negative">
           {details.map((detail) => (
             <li key={detail}>{detail}</li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * A compact numeric cell for editable tables. `scale` lets a percentage field show 4.5 while the
+ * engine stores 0.045, so no component ever multiplies by 100 by hand.
+ */
+export function NumberInput({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  scale = 1,
+  digits = 2,
+  className = '',
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  scale?: number;
+  digits?: number;
+  className?: string;
+}) {
+  return (
+    <input
+      className={`input tabular py-1.5 ${className}`}
+      type="number"
+      dir="ltr"
+      inputMode="decimal"
+      min={min}
+      max={max}
+      step={step}
+      aria-label={label}
+      value={Number((value * scale).toFixed(digits))}
+      onChange={(event) => {
+        const parsed = Number(event.target.value);
+        onChange(Number.isFinite(parsed) ? parsed / scale : 0);
+      }}
+    />
+  );
+}
+
+/** An accessible on/off switch. */
+export function Toggle({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: string;
+}) {
+  const id = useId();
+  return (
+    <div className="flex items-start gap-3">
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+          checked ? 'bg-brand-600' : 'bg-line-strong'
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+            checked ? '-translate-x-[22px]' : '-translate-x-0.5'
+          }`}
+          aria-hidden
+        />
+      </button>
+      <label htmlFor={id} className="cursor-pointer">
+        <span className="block text-sm font-medium text-ink-muted">{label}</span>
+        {hint && <span className="hint mt-0.5 block">{hint}</span>}
+      </label>
+    </div>
+  );
+}
+
+/**
+ * A horizontally scrollable wrapper for wide tables. It is focusable and labelled so keyboard users
+ * can scroll it too (WCAG 2.1.1); the negative margin keeps focus rings from being clipped.
+ */
+export function ScrollRegion({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={`-mx-1 overflow-x-auto px-1 focus-visible:ring-offset-0 ${className}`}
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
+      {children}
     </div>
   );
 }

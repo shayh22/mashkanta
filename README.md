@@ -5,6 +5,18 @@ multi-track mixes the way Israeli lenders actually structure them, enforces the 
 constraints a proposal has to satisfy, stress tests it against rate and inflation shocks, and scores
 it against a market baseline built only from public and crowdsourced data.
 
+It works in three modes, each a tab and a deep link:
+
+| Mode | Link | Question it answers |
+| --- | --- | --- |
+| 🏠 New mortgage | `#/mortgage` | Which mix should I take, and is the offer I got any good? |
+| 🔄 Refinance check | `#/refinance` | What does it cost to repay early, when does switching pay back, and should I stay or move bank? |
+| 🧩 Debt consolidation | `#/consolidation` | Can I fold my consumer loans into the home under the October 2026 rules, how much room is left, and what does the monthly relief cost me over the life of the loan? |
+
+Research behind the new modes — the regulation as read from the circular itself, the fee table, the
+market and competitor survey — is in [docs/MARKET_AND_REGULATION_RESEARCH.md](docs/MARKET_AND_REGULATION_RESEARCH.md).
+The build plan and its log are [ROADMAP.md](ROADMAP.md) and [PROGRESS.md](PROGRESS.md).
+
 Full functional requirements are in [SPECIFICATION.md](SPECIFICATION.md).
 
 ---
@@ -19,6 +31,10 @@ Full functional requirements are in [SPECIFICATION.md](SPECIFICATION.md).
 | Enforces the Bank of Israel LTV, payment-ratio and track-share limits | `engine/regulatory.ts` |
 | Stress tests against four rate shocks, four inflation paths and two combined scenarios | `engine/stress.ts` |
 | Ranks every lender on the same mix | `engine/banks.ts` |
+| Prices the early repayment fee per the Banking Order: capitalization, seniority discount, notice, CPI, operational | `engine/prepayment.ts` |
+| Decides whether refinancing pays — same bank vs. competitor, breakeven month, NPV, verdict | `engine/refinance.ts` |
+| Tests debt consolidation against the home under the 1 October 2026 PTI formula, cumulative LTV 50/70/₪200K, cumulative ⅔ variable and the ₪120K exemption | `engine/consolidation.ts` |
+| Traffic-light risk dials and a prioritised action plan with print/PDF and share | `engine/risk.ts`, `engine/actionPlan.ts` |
 
 The Java service in `backend/` exposes the same capabilities over HTTP (`/api/v1/mortgage/simulate`,
 `/optimize`, `/refinance`, `/documents/upload-approval`, `/market-baseline/current`) and is kept as
@@ -32,9 +48,14 @@ The calculator is a static site — no server, no database, nothing to deploy bu
 cd frontend
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 23 engine tests
+npm test             # 81 tests: engine, stores, action plan end to end
 npm run typecheck
+npm run lint
 npm run build        # -> dist/, ready to upload anywhere
+
+# Browser smoke test: every mode, desktop and 360px phone, light and dark, with axe-core
+npx vite preview --port 4173 &
+npm run e2e
 ```
 
 ### Deploying to Cloudflare
@@ -204,8 +225,28 @@ per rule so the frontend can key off it:
 | `VARIABLE_SHARE` | At most ⅔ may reprice within five years |
 | `FIXED_FLOOR` | At least ⅓ fixed until maturity |
 
+The consolidation mode applies the rules for a loan secured on a home that is not used to buy it, as
+amended by circular H-06-2840 (PTI change in force from 1 October 2026):
+
+| Code | Rule |
+| --- | --- |
+| `CONS_PTI` | $(P_{new}+E)/(N-F)$ — the existing secured payment $E$ in the numerator; $F$ and $E$ count only loans with more than 18 months left. Blocking above 50%, warning above 40%. Exempt when all-purpose loans on the property total ≤ ₪120,000. |
+| `CONS_LTV` | All credit on the property ≤ 50% of value, or ≤ 70% with at most ₪200,000 above 50% (cumulative). |
+| `CONS_VARIABLE` | ≤ ⅔ variable across all credit on the property; the excess moves to the fixed track. |
+
+The worked examples published with the change (capacity falling from ₪5,650 to ₪2,650; ₪80,000 of
+variable room on a ₪300,000 loan) are unit tests.
+
 Findings are reported, never thrown. A borrower is entitled to see a non-compliant mix and understand
 exactly which line breaks it — that is the whole point of an independent comparison tool.
+
+### The interface
+
+Colours are CSS-variable tokens with a separately tuned dark palette; the theme follows the system
+until toggled, is applied before first paint by `public/theme-init.js` (an external script, because
+the CSP forbids inline ones), and printing always uses the light palette. Chart series were checked
+for colour-vision-deficiency separation against both surfaces. The three modes form an ARIA tablist
+with right-to-left arrow-key handling.
 
 ### Market baseline
 
@@ -246,7 +287,8 @@ path tried to write it.
 ## Testing
 
 ```bash
-cd frontend && npm test      # 23 engine tests (vitest)
+cd frontend && npm test      # 81 tests (vitest)
+cd frontend && npm run e2e   # axe-core, console errors and overflow in a real browser
 cd backend  && mvn test      # 65 tests on the reference implementation
 ```
 

@@ -15,9 +15,9 @@ const MASK = '[REDACTED]';
 const ID_CANDIDATE = /(?<!\d)(\d{9})(?!\d)/g;
 const PHONE = /(?<!\d)0\d{1,2}[-\s]?\d{7}(?!\d)/g;
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]{2,}/g;
-const ACCOUNT = /(חשבון מספר|מס' חשבון|חשבון|סניף)\s*[:\-]?\s*(\d[\d\-/]{3,})/g;
-const NAME = /(שם הלווה|שם הלקוח|שם המבקש|שם מלא|הלווה|לכבוד)\s*[:\-]?\s*([^\n\r]{2,60})/g;
-const ADDRESS = /(כתובת הנכס|כתובת|רחוב|גוש|חלקה)\s*[:\-]?\s*([^\n\r]{2,80})/g;
+const ACCOUNT = /(חשבון מספר|מס' חשבון|חשבון|סניף)\s*[:-]?\s*(\d[\d/-]{3,})/g;
+const NAME = /(שם הלווה|שם הלקוח|שם המבקש|שם מלא|הלווה|לכבוד)\s*[:-]?\s*([^\n\r]{2,60})/g;
+const ADDRESS = /(כתובת הנכס|כתובת|רחוב|גוש|חלקה)\s*[:-]?\s*([^\n\r]{2,80})/g;
 
 export interface RedactionResult {
   readonly sanitizedText: string;

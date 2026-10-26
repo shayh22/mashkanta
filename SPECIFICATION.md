@@ -160,6 +160,59 @@ Every candidate portfolio is subjected to automated macroeconomic shock simulati
 | **Regulatory Basket 3** (Prime + Fixed Non-Linked) | 33.3% Prime (פריים), 66.7% Fixed Non-Linked (קל"צ) | High certainty; zero CPI exposure; single variable anchor. |
 | **Recommended Optimal Basket** (*סל אופטימלי מומלץ*) | Dynamic Profile-Tailored Mix across Prime, Fixed, and Variable tracks | Algorithmic balance minimizing total cost while capping volatility risk. |
 
+### 5.5 Mortgage Refinancing (*מיחזור משכנתא*) — `engine/prepayment.ts`, `engine/refinance.ts`
+
+**Input:** one row per existing track — type, outstanding balance, current rate, remaining months,
+months since origination (seniority), optionally the Bank of Israel average at origination and the
+months to the next reset of a variable track. Tracks can be imported from a document.
+
+**Early repayment fee** per the Banking Order (Early Repayment of a Housing Loan), 2002:
+
+| Component | Rule |
+| :--- | :--- |
+| Capitalization differential (*הפרשי היוון*) | Only if today's average rate $r_{avg}$ is below $r_{ref}=\min(r_{loan}, r_{orig})$: $PV(CF, r_{avg}) - PV(CF, r_{ref})$. Fixed tracks: flows to maturity. Variable tracks: flows to the next reset, with the balance then as the last flow. None on prime (resets ≤ 12 months), on directed loans, or on a reset date. |
+| Seniority discount | Regular loans: 20% from year 3, 30% from year 5. Bank money alongside a directed loan: 10/20/30/40% from years 1/2/3/4. |
+| No-notice fee | 0.1% of the amount, waived with written notice 10–45 days ahead. |
+| Average-CPI fee | Linked tracks repaid on days 1–15: ½ × average monthly CPI change × amount. |
+| Operational fee | ₪60, once per repayment event. |
+| Borrower's gain | A rate gap in the borrower's favour reduces the other fees down to zero. |
+
+**Routes:** internal (same bank, no switching costs) and external (competitor: sharper rate, file
+opening, appraisal, lien registration — all editable). For each route: monthly saving, upfront cost,
+cumulative path $S_m=\sum_{k\le m}(P^{old}_k-P^{new}_k)-C_0$, breakeven month, NPV at a chosen discount
+rate, lifetime saving. Verdict: **immediate** (NPV > 0, breakeven ≤ 12 months), **long-term** (NPV > 0,
+breakeven within the term) or **not worthwhile**.
+
+### 5.6 Debt Consolidation Against the Home (*איחוד הלוואות / הלוואה לכל מטרה*) — `engine/consolidation.ts`
+
+Implements Directive 329 as amended by circular H-06-2840 (PTI change effective 1 October 2026 per
+H-06-2852). Sources and worked examples: `docs/MARKET_AND_REGULATION_RESEARCH.md`.
+
+- **PTI:** $\text{PTI}=\frac{P_{new}+E}{N-F}$ where $E$ is the payment on loans already secured on the
+  property and $F$ the payments on other loans, each counted only with more than 18 months left.
+  Capacity $P^{max}_{new}=c(N-F)-E$ against the previous $c(N-F-E)$, at $c$ = 50% (regulatory) and 40%
+  (bank policy); converted to a loan amount at the proposed rate and term.
+- **LTV (cumulative):** ≤ 50%, or ≤ 70% provided the cumulative amount above 50% is ≤ ₪200,000 (§10a,
+  FAQ 2.31); earlier all-purpose loans on the property count.
+- **Variable share:** ≤ ⅔ of all credit secured on the property at the bank (§7, FAQ 5.1); the
+  excess of the borrower's preferred variable share moves to the fixed track automatically.
+- **Exemption:** all-purpose loans up to ₪120,000 cumulative are exempt from PTI and ⅔ (§11, §12.2).
+- **Debt table:** car, credit card, non-bank, overdraft, balloon/bridge, other. Debts with ≤ 18 months
+  left are flagged; each debt gets a consolidate / keep / optional recommendation.
+- **Before vs. after:** monthly relief ("oxygen") against the lifetime cost of stretching the debt, a
+  monthly timeline, and a waterfall of the payment.
+- **Smart shortening:** a share $s$ of the relief is paid back each month (prime first — no
+  capitalization fee — at a constant outlay); the smallest $s$ at which the total paid does not
+  exceed today's remaining cost is solved by bisection.
+
+### 5.7 Risk Gauges and Action Plan — `engine/risk.ts`, `engine/actionPlan.ts`
+
+Traffic-light dials for LTV (50% / 70%), PTI (40% / 50%), variable exposure (⅓ / ⅔) and CPI
+exposure (⅓ / ½). The action plan turns either analysis into prioritised items with the shekel
+figure behind each: decision and route, notice and settlement-day savings, an upcoming seniority
+step, best-decile negotiation targets, which loans to close, and the ways back under the PTI
+ceiling. It prints alone to PDF and shares as text.
+
 ---
 
 ## 6. Technical Specifications: Spring Boot Backend
@@ -207,7 +260,10 @@ The backend is designed as a stateless, modular microservice architecture built 
 - **Data Visualization:** Recharts / Chart.js for interactive amortization area charts and scenario simulators.
 
 ### 7.2 Design System & Visual Principles
-- **Aesthetic Direction:** Clean, modern financial dashboard utilizing a card-based layout with soft shadows (`shadow-sm`, `shadow-md`), subtle borders (`border-slate-200/80`), and glassmorphic badges (`backdrop-blur-md`).
+- **Aesthetic Direction:** Clean, modern financial dashboard: frosted-glass cards (`bg-surface/90 backdrop-blur-xl`) over a soft brand glow, subtle borders and glassmorphic badges.
+- **Themes:** Every colour is a CSS-variable token (`canvas`, `surface`, `line`, `ink`, `positive`, `negative`, `caution`, `brand-*`, `--chart-*`) with a separately tuned dark palette. The theme follows the system until the user toggles it, is applied before first paint by `public/theme-init.js`, and print always uses the light palette.
+- **Navigation:** Three work modes — 🏠 new mortgage, 🔄 refinance check, 🧩 debt consolidation — as an ARIA tablist with RTL arrow-key handling and `#/<mode>` deep links.
+- **Accessibility gate:** `npm run e2e` runs axe-core (WCAG 2 A/AA), console-error and horizontal-overflow checks over every mode on desktop and a 360px phone in both themes.
 - **Typography & RTL:** Full Right-to-Left (RTL) hierarchy styled with Israeli web standard fonts (*Heebo* / *Rubik*), ensuring strict alignment of currency symbols (₪) and tabular numeric figures.
 - **Semantic Palette:**
   - Primary / Slate: `#0F172A` (Navy), `#334155` (Slate-700), `#F8FAFC` (Canvas).
@@ -222,6 +278,11 @@ The backend is designed as a stateless, modular microservice architecture built 
 4. **What-If Sensitivity Simulator (`<ScenarioSimulator />`):** Quick-toggle sliders for BoI rate adjustments and inflation shifts with instant re-rendering.
 5. **Drag-and-Drop Document Uploader (`<ApprovalUploader />`):** Accessible drag-and-drop file upload zone for PDF approvals-in-principle with side-by-side verification.
 6. **Export & Sharing Module (`<ReportExportModal />`):** Instant client-side PDF export of branded mortgage comparison dossiers and direct WhatsApp/email sharing.
+7. **Refinance Simulator (`<RefinancePage />`):** Existing-track editor with document import, automatic or quoted proposal, route costs, verdict banner, route comparison, breakeven curve, fee breakdown with seniority alerts.
+8. **Consolidation Simulator (`<ConsolidationPage />`):** Household and property inputs, debt table with 18-month flags and recommendations, October 2026 feasibility, credit room, before/after, smart shortening.
+9. **Waterfall Chart (`<WaterfallChart />`):** Monthly payment today → each change → after.
+10. **Risk Gauges (`<RiskPanel />`):** Traffic-light dials at the Directive 329 thresholds.
+11. **Action Plan (`<ActionPlanReport />`):** Prioritised recommendations with print-to-PDF and share.
 
 ---
 

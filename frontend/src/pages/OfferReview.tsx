@@ -8,15 +8,7 @@ import { ApprovalUploader } from '../components/ApprovalUploader';
 import { OpportunityPanel } from '../components/OpportunityPanel';
 import { CompliancePanel } from '../components/CompliancePanel';
 import { Card, ErrorCard, LoadingCard, Stat } from '../components/ui';
-
-const TRACK_OPTIONS: { value: TrackType; label: string }[] = [
-  { value: 'PRIME', label: 'פריים' },
-  { value: 'FIXED_UNLINKED', label: 'קבועה לא צמודה' },
-  { value: 'FIXED_LINKED', label: 'קבועה צמודה' },
-  { value: 'VARIABLE_UNLINKED', label: 'משתנה לא צמודה' },
-  { value: 'VARIABLE_LINKED', label: 'משתנה צמודה' },
-  { value: 'ELIGIBILITY', label: 'זכאות' },
-];
+import { TRACK_OPTIONS } from '../lib/trackOptions';
 
 /**
  * "Is the offer I was given any good?" — the question the platform exists to answer.
@@ -97,10 +89,10 @@ export function OfferReview() {
           </p>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs text-ink-soft">
+                  <tr className="border-b border-line text-xs text-ink-soft">
                     <th className="py-2 text-start font-medium">מסלול</th>
                     <th className="py-2 text-start font-medium">סכום</th>
                     <th className="py-2 text-start font-medium">ריבית שנתית</th>
@@ -108,7 +100,7 @@ export function OfferReview() {
                     <th className="py-2" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line/60">
                   {tracks.map((track, index) => (
                     <tr key={index}>
                       <td className="py-2 pe-2">
@@ -174,7 +166,7 @@ export function OfferReview() {
                       <td className="py-2 text-end">
                         <button
                           type="button"
-                          className="text-xs font-medium text-rose-600"
+                          className="text-xs font-medium text-negative"
                           onClick={() => setTracks((current) => current.filter((_, i) => i !== index))}
                         >
                           הסרה

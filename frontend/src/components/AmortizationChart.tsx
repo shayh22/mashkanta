@@ -35,7 +35,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
           : 'ההחזר החודשי הממוצע בכל שנה'
       }
       action={
-        <div className="no-print flex rounded-lg bg-slate-100 p-0.5">
+        <div className="no-print flex rounded-lg bg-surface-sunken p-0.5">
           {(
             [
               ['balance', 'יתרה'],
@@ -47,7 +47,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
               type="button"
               onClick={() => setView(key)}
               className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                view === key ? 'bg-white text-ink shadow-sm' : 'text-ink-soft'
+                view === key ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft'
               }`}
             >
               {label}
@@ -62,19 +62,19 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
             <AreaChart data={yearly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
               <defs>
                 <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="interestFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.26} />
-                  <stop offset="100%" stopColor="#F59E0B" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.26} />
+                  <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748B' }} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--line))" vertical={false} />
+              <XAxis dataKey="year" tick={{ fontSize: 12, fill: 'rgb(var(--ink-soft))' }} tickLine={false} axisLine={false} />
               <YAxis
                 tickFormatter={formatCompact}
-                tick={{ fontSize: 12, fill: '#64748B' }}
+                tick={{ fontSize: 12, fill: 'rgb(var(--ink-soft))' }}
                 tickLine={false}
                 axisLine={false}
                 width={64}
@@ -85,7 +85,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
                 type="monotone"
                 dataKey="remainingBalance"
                 name="יתרת קרן"
-                stroke="#4F46E5"
+                stroke="var(--chart-1)"
                 strokeWidth={2}
                 fill="url(#balanceFill)"
               />
@@ -93,18 +93,18 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
                 type="monotone"
                 dataKey="cumulativeInterest"
                 name="ריבית מצטברת"
-                stroke="#F59E0B"
+                stroke="var(--chart-2)"
                 strokeWidth={2}
                 fill="url(#interestFill)"
               />
             </AreaChart>
           ) : (
             <LineChart data={yearly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748B' }} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--line))" vertical={false} />
+              <XAxis dataKey="year" tick={{ fontSize: 12, fill: 'rgb(var(--ink-soft))' }} tickLine={false} axisLine={false} />
               <YAxis
                 tickFormatter={formatCompact}
-                tick={{ fontSize: 12, fill: '#64748B' }}
+                tick={{ fontSize: 12, fill: 'rgb(var(--ink-soft))' }}
                 tickLine={false}
                 axisLine={false}
                 width={64}
@@ -115,7 +115,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
                 type="monotone"
                 dataKey="averageMonthlyPayment"
                 name="החזר חודשי ממוצע"
-                stroke="#4F46E5"
+                stroke="var(--chart-1)"
                 strokeWidth={2.5}
                 dot={false}
               />
@@ -123,7 +123,7 @@ export function AmortizationChart({ yearly, title }: { yearly: YearPoint[]; titl
                 type="monotone"
                 dataKey="indexationAccrued"
                 name="הצמדה שנתית"
-                stroke="#F43F5E"
+                stroke="rgb(var(--negative))"
                 strokeWidth={2}
                 dot={false}
               />
@@ -157,7 +157,7 @@ function ChartTooltip({
     return null;
   }
   return (
-    <div dir="rtl" className="rounded-xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur">
+    <div dir="rtl" className="rounded-xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur">
       <p className="mb-1.5 text-xs font-semibold text-ink">
         {unitLabel} {label}
       </p>

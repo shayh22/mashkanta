@@ -69,7 +69,7 @@ export function parseApproval(redactedText: string, primeRate: number): ParsedAp
   const bankCode = BANKS.find(([hebrew]) => redactedText.includes(hebrew))?.[1];
 
   for (const rawLine of redactedText.split(/\r?\n/)) {
-    const line = rawLine.replace(/ /g, ' ').trim();
+    const line = rawLine.replace(/\u00a0/g, ' ').trim();
     if (line.length < 8) {
       continue;
     }

@@ -223,11 +223,11 @@ function LtvMeter({ ltv, maxLtv, equity }: { ltv: number; maxLtv: number; equity
     <div className="card-muted">
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium text-ink-muted">שיעור מימון (LTV)</span>
-        <span className={`tabular text-lg font-semibold ${exceeded ? 'text-rose-600' : 'text-ink'}`}>
+        <span className={`tabular text-lg font-semibold ${exceeded ? 'text-negative' : 'text-ink'}`}>
           {formatPercent(ltv, 1)}
         </span>
       </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-line">
         <div className={`h-full rounded-full transition-all ${tone}`} style={{ width: `${width}%` }} />
       </div>
       <div className="mt-2 flex justify-between text-xs text-ink-soft">
@@ -235,7 +235,7 @@ function LtvMeter({ ltv, maxLtv, equity }: { ltv: number; maxLtv: number; equity
         <span>תקרה: {formatPercent(maxLtv, 0)}</span>
       </div>
       {exceeded && (
-        <p className="mt-2 text-xs font-medium text-rose-600">
+        <p className="mt-2 text-xs font-medium text-negative">
           שיעור המימון חורג מהתקרה הרגולטורית. הקטינו את סכום ההלוואה או הגדילו את ההון העצמי.
         </p>
       )}
@@ -259,19 +259,19 @@ function PaymentCapacityMeter({
       <dl className="mt-3 grid grid-cols-2 gap-4">
         <div>
           <dt className="text-xs text-ink-soft">אזור ירוק (עד 30% מההכנסה)</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold text-emerald-600">
+          <dd className="tabular mt-0.5 text-lg font-semibold text-positive">
             {formatCurrency(comfortable)}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-ink-soft">תקרה רגולטורית (40%)</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold text-amber-600">
+          <dd className="tabular mt-0.5 text-lg font-semibold text-caution">
             {formatCurrency(maximum)}
           </dd>
         </div>
       </dl>
       {income > 0 && maximum === 0 && (
-        <p className="mt-2 text-xs font-medium text-rose-600">
+        <p className="mt-2 text-xs font-medium text-negative">
           ההתחייבויות הקיימות מנצלות את מלוא יחס ההחזר המותר. לא ניתן לאשר משכנתא נוספת במצב זה.
         </p>
       )}
@@ -368,7 +368,7 @@ function MacroCard({
       title="הנחות מאקרו"
       subtitle={anchors?.source ?? 'ערכי בסיס'}
       action={
-        <button type="button" className="text-xs font-medium text-brand-600" onClick={() => onChange({ prime: undefined, cpiAnnual: undefined })}>
+        <button type="button" className="text-xs font-medium text-brand-700" onClick={() => onChange({ prime: undefined, cpiAnnual: undefined })}>
           איפוס לערכים המפורסמים
         </button>
       }
@@ -419,7 +419,7 @@ function LiquidityTimeline() {
           {profile.liquidityEvents.map((event, index) => (
             <li
               key={`${event.month}-${event.source}-${index}`}
-              className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
+              className="flex items-center justify-between rounded-xl bg-surface-muted px-3 py-2"
             >
               <span className="text-sm text-ink-muted">
                 {event.source} · חודש {event.month} · {formatCurrency(event.amount)}
@@ -429,7 +429,7 @@ function LiquidityTimeline() {
               </span>
               <button
                 type="button"
-                className="text-xs font-medium text-rose-600"
+                className="text-xs font-medium text-negative"
                 onClick={() => removeLiquidityEvent(index)}
               >
                 הסרה
