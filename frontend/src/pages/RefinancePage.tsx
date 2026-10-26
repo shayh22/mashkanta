@@ -1,6 +1,7 @@
 import { ExistingTracksEditor } from '../components/refinance/ExistingTracksEditor';
 import { ProposalEditor, RefinanceSettings } from '../components/refinance/ProposalEditor';
 import { RefinanceResults } from '../components/refinance/RefinanceResults';
+import { TrackVerdicts } from '../components/refinance/TrackVerdicts';
 import { useMemo } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
 import { Card } from '../components/ui';
@@ -15,7 +16,7 @@ import { useRefinanceAnalysis } from '../store/refinanceStore';
  * few hundred months and takes a few milliseconds, so there is no submit button to forget.
  */
 export function RefinancePage() {
-  const { proposal, comparison, ltv } = useRefinanceAnalysis();
+  const { proposal, comparison, ltv, perTrack } = useRefinanceAnalysis();
   const noticeGiven = useRefinance((state) => state.noticeGiven);
   const macro = useWizard((state) => state.macro);
   const plan = useMemo(
@@ -28,6 +29,7 @@ export function RefinancePage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="min-w-0 space-y-5">
           <ExistingTracksEditor />
+          <TrackVerdicts verdicts={perTrack} />
           <ProposalEditor proposal={proposal} />
           <RefinanceSettings />
         </div>

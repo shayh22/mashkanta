@@ -28,6 +28,11 @@ export interface ProposedTrack {
   readonly amount: number;
   readonly annualRate: number;
   readonly termMonths: number;
+  /**
+   * The existing track kept as it is — not repaid, so it carries no fee and no route pricing. Used
+   * for eligibility loans and for tracks the borrower leaves out of a partial refinance.
+   */
+  readonly carriedOver?: boolean;
 }
 
 export interface SwitchingCosts {
@@ -121,7 +126,9 @@ export function totalCosts(costs: SwitchingCosts): number {
 export function existingSpecs(tracks: readonly ExistingTrack[], scenario: MacroScenario): TrackSpec[] {
   return tracks
     .filter((track) => track.balance > 0 && track.remainingMonths > 0)
-    .map((track) => trackFromRate(track.type, track.balance, track.remainingMonths, track.annualRate, scenario));
+    .map((track) =>
+      trackFromRate(track.type, track.balance, track.remainingMonths, track.annualRate, scenario),
+    );
 }
 
 export function proposedSpecs(
@@ -132,7 +139,15 @@ export function proposedSpecs(
   return tracks
     .filter((track) => track.amount > 0 && track.termMonths > 0)
     .map((track) =>
-      trackFromRate(track.type, track.amount, track.termMonths, Math.max(0, track.annualRate + rateDelta), scenario),
+      trackFromRate(
+        track.type,
+        track.amount,
+        track.termMonths,
+        // A carried-over track keeps its own rate: a competitor's sharper price only applies to
+        // what it actually lends.
+        Math.max(0, track.annualRate + (track.carriedOver ? 0 : rateDelta)),
+        scenario,
+      ),
     );
 }
 
@@ -141,30 +156,58 @@ export function marketAverageFor(track: ExistingTrack, ltv: number): number {
   return rateFor(track.type, ltv, track.remainingMonths).medianRate;
 }
 
+/** An existing track kept exactly as it is in the replacement mortgage. */
+export function carryOver(track: ExistingTrack): ProposedTrack {
+  return {
+    id: track.id,
+    type: track.type,
+    amount: track.balance,
+    termMonths: track.remainingMonths,
+    annualRate: track.annualRate,
+    carriedOver: true,
+  };
+}
+
 /**
  * A like-for-like replacement: the same tracks and terms, re-priced at the market. Keeping the
  * structure fixed isolates the price improvement — a mix change is a separate decision.
  *
- * Eligibility (directed) loans are carried over unchanged: they are subsidised below market and
- * refinancing them would throw the subsidy away.
+ * Eligibility (directed) loans are always carried over unchanged: they are subsidised below market
+ * and refinancing them would throw the subsidy away. Tracks in `kept` are carried over too — a
+ * partial refinance repays only the tracks worth repaying.
  */
 export function likeForLikeProposal(
   tracks: readonly ExistingTrack[],
   ltv: number,
   percentile: number,
+  kept: ReadonlySet<string> = new Set(),
 ): ProposedTrack[] {
   return tracks
     .filter((track) => track.balance > 0 && track.remainingMonths > 0)
-    .map((track) => ({
-      id: track.id,
-      type: track.type,
-      amount: track.balance,
-      termMonths: track.remainingMonths,
-      annualRate:
-        track.type === 'ELIGIBILITY'
-          ? track.annualRate
-          : atPercentile(rateFor(track.type, ltv, track.remainingMonths), percentile),
-    }));
+    .map((track) =>
+      track.type === 'ELIGIBILITY' || kept.has(track.id)
+        ? carryOver(track)
+        : {
+            id: track.id,
+            type: track.type,
+            amount: track.balance,
+            termMonths: track.remainingMonths,
+            annualRate: atPercentile(rateFor(track.type, ltv, track.remainingMonths), percentile),
+          },
+    );
+}
+
+/** A hand-entered proposal plus the kept tracks carried over beside it. */
+export function withKeptTracks(
+  proposal: readonly ProposedTrack[],
+  existing: readonly ExistingTrack[],
+  kept: ReadonlySet<string>,
+): ProposedTrack[] {
+  const carried = existing
+    .filter((track) => kept.has(track.id) && track.balance > 0 && track.remainingMonths > 0)
+    .map(carryOver);
+  const carriedIds = new Set(carried.map((track) => track.id));
+  return [...proposal.filter((track) => !carriedIds.has(track.id)), ...carried];
 }
 
 function verdictOf(npv: number, breakeven: number, horizon: number): RefinanceVerdict {
@@ -184,11 +227,9 @@ export function analyseRoute(
   const current = priceMix(existingSpecs(existing, options.scenario), options.scenario);
   const replacement = priceMix(proposedSpecs(proposed, options.scenario, route.rateDelta), options.scenario);
 
-  // Eligibility tracks carried over unchanged are not repaid, so they carry no fee.
-  const carried = new Set(
-    proposed.filter((track) => track.type === 'ELIGIBILITY').map((track) => track.id),
-  );
-  const repaid = existing.filter((track) => !(track.type === 'ELIGIBILITY' && carried.has(track.id)));
+  // Tracks carried over unchanged are not repaid, so they carry no fee.
+  const carried = new Set(proposed.filter((track) => track.carriedOver).map((track) => track.id));
+  const repaid = existing.filter((track) => !carried.has(track.id));
   const prepayment = quotePrepayment(repaid, (track) => marketAverageFor(track, options.ltv), options);
 
   const switchingCost = totalCosts(route.costs);
@@ -262,4 +303,46 @@ export function explainVerdict(analysis: RouteAnalysis): string {
         ? `החיסכון בהחזרים אינו מכסה עלות מעבר של ${fee} ₪ לאורך יתרת התקופה.`
         : `הערך הנוכחי הנקי שלילי (${npv} ₪) — החיסכון העתידי שווה היום פחות מעלות המעבר.`;
   }
+}
+
+/** Whether refinancing one track on its own pays, at the current bank. */
+export interface TrackVerdict {
+  readonly id: string;
+  readonly type: TrackType;
+  readonly fee: number;
+  readonly monthlySaving: number;
+  readonly netPresentValue: number;
+  readonly breakevenMonth: number;
+  readonly worthwhile: boolean;
+}
+
+/**
+ * Prices refinancing each track on its own, like for like at the current bank. A track that does
+ * not pay on its own — usually a fixed track whose capitalization fee exceeds what re-pricing
+ * saves — is a candidate to keep while the rest is refinanced.
+ */
+export function trackByTrack(
+  existing: readonly ExistingTrack[],
+  percentile: number,
+  options: RefinanceOptions,
+): TrackVerdict[] {
+  return existing
+    .filter((track) => track.type !== 'ELIGIBILITY' && track.balance > 0 && track.remainingMonths > 0)
+    .map((track) => {
+      const analysis = analyseRoute(
+        [track],
+        likeForLikeProposal([track], options.ltv, percentile),
+        DEFAULT_ROUTES.INTERNAL,
+        options,
+      );
+      return {
+        id: track.id,
+        type: track.type,
+        fee: analysis.prepayment.total,
+        monthlySaving: analysis.monthlySaving,
+        netPresentValue: analysis.netPresentValue,
+        breakevenMonth: analysis.breakevenMonth,
+        worthwhile: analysis.netPresentValue > 0,
+      };
+    });
 }

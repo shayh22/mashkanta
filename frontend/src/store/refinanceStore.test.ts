@@ -50,4 +50,15 @@ describe('refinance store', () => {
     expect(routes.EXTERNAL.costs.appraisal).toBe(3_000);
     expect(routes.INTERNAL.costs.appraisal).toBe(0);
   });
+
+  it('keeps and un-keeps tracks, and forgets a kept id when its track is removed', () => {
+    const id = useRefinance.getState().tracks[1]!.id;
+    useRefinance.getState().toggleKept(id);
+    expect(useRefinance.getState().keptIds).toEqual([id]);
+    useRefinance.getState().toggleKept(id);
+    expect(useRefinance.getState().keptIds).toEqual([]);
+    useRefinance.getState().toggleKept(id);
+    useRefinance.getState().removeTrack(id);
+    expect(useRefinance.getState().keptIds).toEqual([]);
+  });
 });
