@@ -27,6 +27,7 @@
     /* Categorical chart series, validated for colour-vision deficiency against each surface. */
     --chart-1: #4f46e5;
     --chart-2: #d97706;
+    --chart-3: #0f8f68;
   }
 
   .dark {
@@ -49,6 +50,7 @@
     --brand-700: 199 210 254;
     --chart-1: #7c83f0;
     --chart-2: #c97a0a;
+    --chart-3: #199e70;
   }
 
   html {
@@ -179,6 +181,7 @@ input[type='range']::-moz-range-thumb {
     --brand-700: 55 48 163;
     --chart-1: #4f46e5;
     --chart-2: #d97706;
+    --chart-3: #0f8f68;
   }
 
   body {
