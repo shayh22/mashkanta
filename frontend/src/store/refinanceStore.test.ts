@@ -61,4 +61,13 @@ describe('refinance store', () => {
     useRefinance.getState().removeTrack(id);
     expect(useRefinance.getState().keptIds).toEqual([]);
   });
+
+  it('drops the bank fee once the borrower changes what is being repaid', () => {
+    const track = { ...useRefinance.getState().tracks[0]!, statedFee: 250 };
+    useRefinance.getState().setTracks([track]);
+    useRefinance.getState().updateTrack(track.id, { monthsElapsed: 70 });
+    expect(useRefinance.getState().tracks[0]!.statedFee).toBe(250);
+    useRefinance.getState().updateTrack(track.id, { balance: track.balance + 1_000 });
+    expect(useRefinance.getState().tracks[0]!.statedFee).toBeUndefined();
+  });
 });

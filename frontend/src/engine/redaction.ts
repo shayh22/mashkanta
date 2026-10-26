@@ -13,6 +13,13 @@ const MASK = '[REDACTED]';
 
 /** Nine digit runs — candidates for an Israeli identity number, confirmed by check digit. */
 const ID_CANDIDATE = /(?<!\d)(\d{9})(?!\d)/g;
+/**
+ * An identity number next to its label. Banks often print it without the leading zero, as eight
+ * digits, which the check-digit scan above cannot see — the label is what identifies it.
+ */
+const LABELLED_ID = /(מספר זהות|מס' זהות|מס\. זהות|ת\.ז\.?|ת"ז)\s*[:-]?\s*(\d{5,9})(?!\d)/g;
+/** A letter's addressee block: "לכבוד" through the salutation, which is name and street address. */
+const ADDRESSEE = /(לכבוד)([^\n]*)((?:\n(?![^\n]*א\.ג\.נ)[^\n]*){1,6})(?=\n[^\n]*א\.ג\.נ)/;
 const PHONE = /(?<!\d)0\d{1,2}[-\s]?\d{7}(?!\d)/g;
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]{2,}/g;
 const ACCOUNT = /(חשבון מספר|מס' חשבון|חשבון|סניף)\s*[:-]?\s*(\d[\d/-]{3,})/g;
@@ -63,6 +70,18 @@ export function redact(text: string | null | undefined): RedactionResult {
       return MASK;
     }
     return match;
+  });
+
+  working = working.replace(LABELLED_ID, (_match, label: string) => {
+    bump('NATIONAL_ID');
+    return `${label}: ${MASK}`;
+  });
+
+  // The addressee block has no labels to anchor on, so it goes whole: every line between
+  // "לכבוד" and the salutation, which in a bank letter is the borrower's name and address.
+  working = working.replace(ADDRESSEE, (_match, label: string, _rest: string, block: string) => {
+    bump('NAME');
+    return `${label} ${MASK}${block.replace(/[^\n]+/g, MASK)}`;
   });
 
   working = working.replace(EMAIL, () => {
