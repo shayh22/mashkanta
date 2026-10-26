@@ -1,6 +1,7 @@
 import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { isUsable } from './src/engine/boiMarket';
+import { handleExtract } from './worker/extract';
 import { readMarket } from './worker/market';
 
 /**
@@ -21,10 +22,40 @@ function marketApi(): Plugin {
       })
       .catch(next);
   };
+  // The same document endpoint as production, with the key from the environment and an
+  // in-memory stand-in for the edge cache.
+  const memory = new Map<string, Response>();
+  const cache = {
+    match: async (key: Request) => memory.get(key.url)?.clone(),
+    put: async (key: Request, value: Response) => void memory.set(key.url, value),
+  } as unknown as Cache;
+  const extract: Connect.NextHandleFunction = (request, response, next) => {
+    if (!request.url?.startsWith('/api/extract')) {
+      next();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      const origin = `http://${request.headers.host}`;
+      const forwarded = new Request(`${origin}${request.url}`, {
+        method: request.method,
+        headers: { 'content-type': 'application/json', origin: String(request.headers.origin ?? origin) },
+        body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
+      });
+      handleExtract(forwarded, { OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, OPENROUTER_MODEL: process.env.OPENROUTER_MODEL }, cache, fetch)
+        .then(async (result) => {
+          response.statusCode = result.status;
+          response.setHeader('content-type', 'application/json; charset=utf-8');
+          response.end(await result.text());
+        })
+        .catch(next);
+    });
+  };
   return {
     name: 'market-api',
-    configureServer: (server) => void server.middlewares.use(handler),
-    configurePreviewServer: (server) => void server.middlewares.use(handler),
+    configureServer: (server) => void server.middlewares.use(handler).use(extract),
+    configurePreviewServer: (server) => void server.middlewares.use(handler).use(extract),
   };
 }
 

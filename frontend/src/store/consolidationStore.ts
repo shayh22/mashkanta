@@ -16,7 +16,7 @@ import { browserStorage, storageKey, uniqueId } from './persistence';
 import { useMarketVersion } from './marketVersion';
 import { ALL_PURPOSE_MARGIN } from '../engine/actionPlan';
 
-const newDebtId = () => uniqueId('d');
+export const newDebtId = () => uniqueId('d');
 
 /** The offered all-purpose loan rates: the live published averages when known, else August 2026's. */
 export function allPurposeRates(market?: LiveMarket): Pick<ConsolidationTerms, 'variableRate' | 'fixedRate'> {
@@ -103,6 +103,8 @@ interface ConsolidationState {
   addDebt: () => void;
   updateDebt: (id: string, patch: Partial<ConsumerDebt>) => void;
   removeDebt: (id: string) => void;
+  /** Debts read from a document: added to the list, or replacing it. */
+  importDebts: (debts: ConsumerDebt[], replace: boolean) => void;
   /** Includes every debt the engine recommends consolidating and leaves the rest out. */
   applyRecommendations: (blendedRate: number) => void;
   setReinvestShare: (share: number) => void;
@@ -170,6 +172,7 @@ export const useConsolidation = create<ConsolidationState>()(
           debts: state.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)),
         })),
       removeDebt: (id) => set((state) => ({ debts: state.debts.filter((debt) => debt.id !== id) })),
+      importDebts: (debts, replace) => set((state) => ({ debts: replace ? debts : [...state.debts, ...debts] })),
       applyRecommendations: (blendedRate) =>
         set((state) => ({
           debts: state.debts.map((debt) => ({

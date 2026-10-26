@@ -302,6 +302,36 @@ and still re-blends the crowdsourced data nightly.
 
 ---
 
+## Reading unfamiliar documents with AI
+
+Known formats — the Hapoalim mortgage details statement and the standard approval-in-principle — are
+parsed in the browser and never leave it. When a document matches no local parser (another bank's
+statement, a consumer-loan statement, an offer letter, a scan or a screenshot), the app offers to read
+it with a language model through OpenRouter:
+
+1. The browser extracts the text and **redacts** it (ID numbers, names, addresses, account numbers)
+   before anything else; a scan or photo is rendered to page images, which cannot be redacted.
+2. It shows exactly what would be sent — the redacted text, or the images with a warning and a separate
+   confirmation — and sends nothing until the borrower agrees.
+3. `/api/extract` (`frontend/worker/extract.ts`) forwards it to OpenRouter with a strict JSON schema
+   for the document kind and returns the structured fields. The key is a Worker secret, the endpoint
+   answers same-origin requests only, caps each visitor at 20 requests an hour, bounds the payload,
+   asks OpenRouter to route only to providers that do not retain data, and logs nothing.
+4. Every number is range-checked (`src/engine/aiExtraction.ts`), and the result is shown for the
+   borrower to confirm before it fills anything in.
+
+**Switching it on** (off until a key is set; the UI hides or explains the option meanwhile):
+
+```bash
+cd frontend
+npx wrangler secret put OPENROUTER_API_KEY        # or: dashboard → Workers → mashkanta → Settings → Variables and Secrets
+# optional — any OpenRouter model that reads images and supports structured outputs:
+npx wrangler secret put OPENROUTER_MODEL          # default: anthropic/claude-haiku-5.5
+```
+
+Set a credit limit on the key in OpenRouter as well. For local development, export
+`OPENROUTER_API_KEY` before `npm run dev`.
+
 ## Privacy engineering
 
 In the browser build the guarantee is structural rather than procedural: **the document is never

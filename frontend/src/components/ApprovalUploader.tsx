@@ -3,6 +3,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError, fetchDocumentJob, uploadApproval } from '../lib/api';
 import type { DocumentJob } from '../lib/types';
 import { formatCurrency, formatPercent } from '../lib/format';
+import { toOfferTracks } from '../engine/aiExtraction';
+import { isImageFile } from '../engine/documents';
+import { AiDocumentReader } from './AiDocumentReader';
 import { Card } from './ui';
 
 const REDACTION_LABELS: Record<string, string> = {
@@ -49,19 +52,64 @@ export function ApprovalUploader({
     },
   });
 
+  // The last file chosen, offered for reading with AI when the local parser finds no tracks in it.
+  const [lastFile, setLastFile] = useState<File>();
+  const [aiFile, setAiFile] = useState<File>();
+  const [aiResult, setAiResult] = useState<{ count: number; warnings: string[] }>();
+
   const handleFiles = useCallback(
     (files: FileList | null) => {
       const file = files?.[0];
       if (file) {
         setJobId(null);
-        upload.mutate(file);
+        setLastFile(file);
+        setAiFile(undefined);
+        setAiResult(undefined);
+        // A photo or screenshot can only be read with AI.
+        if (isImageFile(file)) {
+          setAiFile(file);
+        } else {
+          upload.mutate(file);
+        }
       }
     },
     [upload],
   );
 
+  const importFromAi = (data: unknown) => {
+    const { items, warnings, bank } = toOfferTracks(data);
+    setAiResult({ count: items.length, warnings });
+    setAiFile(undefined);
+    if (items.length > 0 && onExtracted) {
+      const now = new Date().toISOString();
+      onExtracted({
+        jobId: `ai-${now}`,
+        status: 'COMPLETED',
+        submittedAt: now,
+        completedAt: now,
+        redactedSpans: 0,
+        result: {
+          pageCount: 1,
+          redactedSpans: 0,
+          redactionsByCategory: {},
+          ...(bank ? { bankCode: bank } : {}),
+          totalAmount: items.reduce((sum, track) => sum + track.amount, 0),
+          tracks: items,
+          warnings,
+        },
+      });
+    }
+  };
+
   const result = job.data?.status === 'COMPLETED' ? job.data.result : undefined;
   const completedJob = job.data?.status === 'COMPLETED' ? job.data : undefined;
+
+  useEffect(() => {
+    // Nothing recognised in a text document: offer to read it with AI.
+    if (completedJob && completedJob.result?.tracks.length === 0 && lastFile) {
+      setAiFile(lastFile);
+    }
+  }, [completedJob, lastFile]);
 
   useEffect(() => {
     // Notify the parent once the job settles, in an effect rather than during render — polling
@@ -91,7 +139,7 @@ export function ApprovalUploader({
           dragging ? 'border-brand-500 bg-brand-50' : 'border-line-strong bg-surface-muted/50'
         }`}
       >
-        <p className="text-sm font-medium text-ink">גררו לכאן את קובץ ה-PDF של האישור העקרוני</p>
+        <p className="text-sm font-medium text-ink">גררו לכאן את האישור העקרוני או ההצעה — PDF או צילום מסך</p>
         <p className="mt-1 text-xs text-ink-soft">עד 10MB · הקובץ עצמו אינו נשמר בשום שלב</p>
         <button type="button" className="btn-ghost mt-4" onClick={() => inputRef.current?.click()}>
           בחירת קובץ
@@ -99,11 +147,42 @@ export function ApprovalUploader({
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.txt,application/pdf"
+          accept=".pdf,.txt,application/pdf,image/png,image/jpeg,image/webp"
           className="sr-only"
           onChange={(event) => handleFiles(event.target.files)}
         />
       </div>
+
+      {aiFile && (
+        <AiDocumentReader
+          kind="offer"
+          file={aiFile}
+          reason={
+            isImageFile(aiFile)
+              ? 'זו תמונה — המחשבון קורא בעצמו רק אישור עקרוני אחיד בקובץ PDF.'
+              : 'לא זוהו במסמך מסלולים בפורמט האישור העקרוני האחיד.'
+          }
+          onData={importFromAi}
+        />
+      )}
+      {aiResult && (
+        <div className="mt-3 space-y-1 text-sm" aria-live="polite">
+          {aiResult.count > 0 ? (
+            <p className="font-medium text-positive">
+              ✓ זוהו {aiResult.count} מסלולים עם AI — בדקו אותם בטבלה מול המסמך.
+            </p>
+          ) : (
+            <p className="text-negative">לא זוהו במסמך מסלולי הלוואה. אפשר להזין אותם ידנית.</p>
+          )}
+          {aiResult.warnings.length > 0 && (
+            <ul className="list-inside list-disc text-caution">
+              {aiResult.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <label className="mt-3 flex items-start gap-2 text-xs text-ink-muted">
         <input
