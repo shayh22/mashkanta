@@ -1,4 +1,4 @@
-// End-to-end smoke check: every mode and every section tab in it, desktop and phone, light and dark.
+// End-to-end smoke check: every screen of both paths with every folded section open, desktop and phone, light and dark.
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
@@ -21,23 +21,24 @@ try {
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
-const MODES = ['mortgage', 'refinance', 'consolidation', 'combined'];
+/** Every screen of both paths. Each opens every folded section, so all of it is checked. */
+const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results'];
 const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, height: 780 } };
 
 const browser = await playwright.chromium.launch();
 const problems = [];
 
-// The first visit lands on the mortgage wizard, which has no charts. Recharts is over 100KB
-// gzipped; it must arrive only with a page that draws one.
-{
+// The first screen of either path has no charts. Recharts is over 100KB gzipped; it must arrive
+// only with a page that draws one.
+for (const first of ['own', 'buy']) {
   const page = await browser.newPage();
   const scripts = [];
   page.on('request', (request) => request.resourceType() === 'script' && scripts.push(request.url()));
-  await page.goto(`${base}/#/mortgage`);
+  await page.goto(`${base}/#/${first}`);
   await page.waitForLoadState('networkidle');
   const charts = scripts.filter((url) => /\/charts-[\w-]+\.js$/.test(url));
   if (charts.length > 0) {
-    problems.push(`first visit downloaded the charting library: ${charts.join(', ')}`);
+    problems.push(`first visit to ${first} downloaded the charting library: ${charts.join(', ')}`);
   }
   await page.close();
 }
@@ -51,7 +52,7 @@ const problems = [];
   if (!market?.prime?.value || !market?.housing) {
     problems.push(`/api/market: HTTP ${response.status()} ${JSON.stringify(market?.missing ?? market)}`);
   }
-  await page.goto(`${base}/#/mortgage`);
+  await page.goto(`${base}/#/buy`);
   const status = page.getByRole('status').filter({ hasText: 'נתוני בנק ישראל' });
   await status.waitFor({ timeout: 20_000 }).catch(() => problems.push('header never showed live market data'));
   await page.close();
@@ -72,58 +73,57 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
     );
     page.on('pageerror', (error) => problems.push(`${tag(current)} exception: ${error.message}`));
 
-    for (const mode of [...MODES, 'mortgage-results']) {
-      current = mode;
-      if (mode === 'mortgage-results') {
+    for (const screen of SCREENS) {
+      current = screen;
+      await page.goto(`${base}/#/own`);
+      if (screen === 'own-debts' || screen === 'own-result') {
+        await page.getByRole('button', { name: screen === 'own-debts' ? 'יש' : 'אין', exact: true }).click();
+      }
+      if (screen === 'own-result') {
+        await page.getByRole('button', { name: /לתוצאה/ }).click();
+        await page.getByRole('heading', { name: /התמהיל שנבחר לכם/ }).waitFor({ timeout: 15_000 });
+      }
+      if (screen.startsWith('buy')) {
+        await page.goto(`${base}/#/buy`);
+      }
+      if (screen === 'buy-results') {
         // Walk the wizard to the optimizer's results, the heaviest page in the app.
-        await page.goto(`${base}/#/mortgage`);
         await page.getByRole('button', { name: 'המשך' }).click();
         await page.getByRole('button', { name: 'המשך' }).click();
         await page.getByRole('button', { name: 'חשב תמהיל אופטימלי' }).click();
-        await page.getByRole('button', { name: 'תוצאות', pressed: true }).waitFor({ timeout: 15_000 });
-      } else {
-        await page.goto(`${base}/#/${mode}`);
+        await page.getByText('פרטים נוספים').waitFor({ timeout: 15_000 });
+      }
+      // Open every folded section, so its content is checked too.
+      const closed = page.locator('main button[aria-expanded="false"]');
+      for (let guard = 0; guard < 20 && (await closed.count()) > 0; guard++) {
+        await closed.first().click();
       }
       await page.waitForTimeout(1800);
       const dark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       if (dark !== (scheme === 'dark')) {
-        problems.push(`${tag(mode)} theme class did not follow the system preference`);
+        problems.push(`${tag(screen)} theme class did not follow the system preference`);
       }
 
-      // Every section tab of the mode, not just the one it opens on.
-      const sections = page.locator('[role="tablist"]:not([aria-label="מצב עבודה"]) [role="tab"]');
-      const count = await sections.count();
-      for (let index = 0; index < Math.max(1, count); index++) {
-        let section = mode;
-        if (count > 0) {
-          const tab = sections.nth(index);
-          section = `${mode}/${(await tab.getAttribute('id'))?.split('-tab-')[1]}`;
-          current = section;
-          await tab.click();
-          await page.waitForTimeout(index === 0 ? 300 : 900);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      if (overflow > 1) {
+        problems.push(`${tag(screen)} horizontal overflow of ${overflow}px`);
+      }
+      await page.evaluate(axeSource);
+      auditing = true;
+      const result = await page.evaluate(async () =>
+        axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
+      );
+      // Let any console message the audit triggered arrive before attribution resumes.
+      await page.waitForTimeout(200);
+      auditing = false;
+      for (const violation of result.violations) {
+        if (violation.impact === 'serious' || violation.impact === 'critical') {
+          const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
+          problems.push(`${tag(screen)} axe ${violation.id} (${violation.nodes.length}): ${where}`);
         }
-
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-        if (overflow > 1) {
-          problems.push(`${tag(section)} horizontal overflow of ${overflow}px`);
-        }
-        await page.evaluate(axeSource);
-        auditing = true;
-        const result = await page.evaluate(async () =>
-          axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa'] }),
-        );
-        // Let any console message the audit triggered arrive before attribution resumes.
-        await page.waitForTimeout(200);
-        auditing = false;
-        for (const violation of result.violations) {
-          if (violation.impact === 'serious' || violation.impact === 'critical') {
-            const where = violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ');
-            problems.push(`${tag(section)} axe ${violation.id} (${violation.nodes.length}): ${where}`);
-          }
-        }
-        if (shots) {
-          await page.screenshot({ path: `${shots}/${device}-${scheme}-${section.replace('/', '-')}.png`, fullPage: true });
-        }
+      }
+      if (shots) {
+        await page.screenshot({ path: `${shots}/${device}-${scheme}-${screen}.png`, fullPage: true });
       }
     }
     await page.close();
@@ -135,4 +135,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('smoke: all modes and their section tabs clean on desktop and phone, light and dark');
+console.log('smoke: every screen of both paths, all sections open, clean on desktop and phone, light and dark');

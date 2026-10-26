@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-/** One section of a mode's tabs; see `components/PageTabs.tsx`. */
+/** One screen of a path, addressable as `#/<path>/<screen>`. */
 export interface PageTab<T extends string> {
   readonly id: T;
   readonly label: string;
-  readonly icon: string;
-  /** A short marker beside the label — a count, or ! when the tab needs attention. */
-  readonly badge?: string;
 }
 
 /** The second segment of `#/<mode>/<tab>`. */

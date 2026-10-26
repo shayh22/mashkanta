@@ -173,20 +173,3 @@ function Row({
     </tr>
   );
 }
-
-/** A pointer from the single-move pages to the combined one. */
-export function CombinedLinkCard() {
-  return (
-    <section className="card flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 className="text-base font-semibold text-ink">🔀 מיחזור ואיחוד באותו מהלך</h2>
-        <p className="mt-1 text-sm text-ink-soft">
-          מיחזור המשכנתא משנה את מגבלות האיחוד (PTI ו-⅔ משתנה). ראו את שני המהלכים יחד, עם תוכנית פעולה אחת.
-        </p>
-      </div>
-      <a href="#/combined" className="btn-primary">
-        למהלך המשולב
-      </a>
-    </section>
-  );
-}

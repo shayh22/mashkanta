@@ -19,6 +19,8 @@ import {
 } from '../engine/refinance';
 import { optimalRefinance, type OptimalRefinance } from '../engine/refinanceOptimal';
 import { useWizard } from './wizardStore';
+import { useConsolidation } from './consolidationStore';
+import { useHasDebts } from './flowStore';
 import { browserStorage, storageKey, uniqueId } from './persistence';
 
 /** AUTO: the same tracks at market prices. OPTIMAL: a new mix chosen by the engine. MANUAL: a quote typed in. */
@@ -93,7 +95,8 @@ interface RefinanceState {
 const INITIAL = {
   propertyValue: 2_300_000,
   tracks: DEFAULT_TRACKS,
-  proposalMode: 'AUTO' as ProposalMode,
+  // The engine's own choice of mix, so the result always shows a mix chosen for the borrower.
+  proposalMode: 'OPTIMAL' as ProposalMode,
   percentile: 0.3,
   manualProposal: [] as ProposedTrack[],
   keptIds: [] as string[],
@@ -110,7 +113,7 @@ export const useRefinance = create<RefinanceState>()(
 
       setPropertyValue: (propertyValue) => set({ propertyValue }),
       setTracks: (tracks) => set({ tracks }),
-      importTracks: (tracks) => set({ tracks, keptIds: [], manualProposal: [], proposalMode: 'AUTO' }),
+      importTracks: (tracks) => set({ tracks, keptIds: [], manualProposal: [], proposalMode: 'OPTIMAL' }),
       addTrack: () =>
         set((state) => ({
           tracks: [
@@ -196,8 +199,13 @@ export const useRefinance = create<RefinanceState>()(
     }),
     {
       name: storageKey('refinance'),
-      version: 1,
+      version: 2,
       storage: browserStorage,
+      // Version 1 defaulted to re-pricing the same mix; the engine's choice is the default now.
+      migrate: (persisted, version) => {
+        const state = persisted as { proposalMode?: ProposalMode } | undefined;
+        return version < 2 && state?.proposalMode === 'AUTO' ? { ...state, proposalMode: 'OPTIMAL' } : (persisted as object);
+      },
       partialize: (state) => ({
         propertyValue: state.propertyValue,
         tracks: state.tracks,
@@ -241,8 +249,22 @@ export interface RefinanceView {
 export function useRefinanceAnalysis(): RefinanceView {
   const state = useRefinance();
   const macro = useWizard((wizard) => wizard.macro);
-  // The household as entered for a new mortgage: income and appetite for risk shape the optimal mix.
-  const household = useWizard((wizard) => wizard.profile);
+  // The household behind the optimal mix: income from the homeowner's inputs, appetite for risk as
+  // set in the wizard, and the payments of other loans that stay as they are.
+  const profile = useWizard((wizard) => wizard.profile);
+  const netIncome = useConsolidation((consolidation) => consolidation.netIncome);
+  const debts = useConsolidation((consolidation) => consolidation.debts);
+  const hasDebts = useHasDebts();
+  const household = useMemo(
+    () => ({
+      ...profile,
+      monthlyNetIncome: netIncome,
+      existingMonthlyObligations: hasDebts
+        ? debts.filter((debt) => !debt.include).reduce((sum, debt) => sum + Math.max(0, debt.monthlyPayment), 0)
+        : 0,
+    }),
+    [profile, netIncome, debts, hasDebts],
+  );
   const marketVersion = useMarketVersion();
 
   // The search takes a tenth of a second, so it runs only in OPTIMAL mode and only on its own inputs.
