@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { toConsumerDebts } from '../../engine/aiExtraction';
+import { extractLoanSchedule, isImageFile } from '../../engine/documents';
+import { scheduleToDebt } from '../../engine/schedule';
 import { DEBT_KIND_LABELS, type ConsumerDebt } from '../../engine/consolidation';
 import { useAiEnabled } from '../../lib/aiClient';
 import { formatCurrency, formatPercent } from '../../lib/format';
@@ -7,29 +9,72 @@ import { newDebtId, useConsolidation } from '../../store/consolidationStore';
 import { AiDocumentReader } from '../AiDocumentReader';
 import { Card, ScrollRegion } from '../ui';
 
+/** Today in the borrower's time zone, as an ISO date — which schedule rows are already paid. */
+const localToday = () => new Date().toLocaleDateString('en-CA');
+
 /**
- * Reads the household's loans from a bank or lender document. Loan statements differ from lender
- * to lender and there is no local parser for them, so this always goes through the AI reader —
- * with the borrower's consent, and with the result shown for confirmation before it changes the
- * list. Shown only when AI reading is switched on.
+ * Reads the household's loans from a document. A loan's amortization schedule (לוח סילוקין) is
+ * read right here in the browser — balance today, payment, payments left and rate. Anything else
+ * (a statement listing several loans, a screenshot) goes to the AI reader when it is switched on,
+ * with the borrower's consent. Either way the result is shown for confirmation before it changes
+ * the list.
  */
 export function DebtImporter() {
   const enabled = useAiEnabled();
   const importDebts = useConsolidation((state) => state.importDebts);
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File>();
-  const [found, setFound] = useState<{ debts: ConsumerDebt[]; warnings: string[] }>();
+  const [found, setFound] = useState<{ debts: ConsumerDebt[]; warnings: string[]; summary?: string }>();
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [done, setDone] = useState<string>();
+  const [notice, setNotice] = useState<string>();
+  const [reading, setReading] = useState(false);
 
-  if (!enabled) {
-    return null;
-  }
+  const show = (debts: ConsumerDebt[], warnings: string[], summary?: string) => {
+    setFound({ debts, warnings, summary });
+    setChosen(new Set(debts.map((debt) => debt.id)));
+  };
+
+  const pick = async (picked: File) => {
+    setFound(undefined);
+    setDone(undefined);
+    setNotice(undefined);
+    setFile(undefined);
+    const unreadable = 'זה לא לוח סילוקין שהמחשבון מכיר. אפשר להזין את ההלוואה ידנית בטבלה.';
+    if (isImageFile(picked)) {
+      if (enabled) {
+        setFile(picked);
+      } else {
+        setNotice(`צילום מסך אפשר לקרוא רק עם AI, שאינו מופעל כרגע. ${unreadable}`);
+      }
+      return;
+    }
+    setReading(true);
+    try {
+      const { schedule, warnings } = await extractLoanSchedule(picked, localToday());
+      if (schedule && schedule.remainingMonths > 0) {
+        show(
+          [scheduleToDebt(schedule, newDebtId())],
+          [...schedule.warnings, ...warnings],
+          `לוח סילוקין: שולמו ${schedule.paidCount} מתוך ${schedule.rows.length} תשלומים; היתרה והתשלומים שנותרו נכונים להיום. נקרא בדפדפן, בלי AI.`,
+        );
+      } else if (schedule) {
+        setNotice('לפי לוח הסילוקין ההלוואה כבר נפרעה — אין מה לאחד.');
+      } else if (enabled) {
+        setFile(picked);
+      } else {
+        setNotice(unreadable);
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'קריאת המסמך נכשלה.');
+    } finally {
+      setReading(false);
+    }
+  };
 
   const read = (data: unknown) => {
     const { items, warnings } = toConsumerDebts(data, newDebtId);
-    setFound({ debts: items, warnings });
-    setChosen(new Set(items.map((debt) => debt.id)));
+    show(items, warnings);
     setFile(undefined);
   };
 
@@ -43,10 +88,10 @@ export function DebtImporter() {
   return (
     <Card
       title="ייבוא הלוואות ממסמך"
-      subtitle="פירוט הלוואות מהבנק, מחברת האשראי או מגוף חוץ-בנקאי — PDF או צילום מסך. הנתונים יוצגו לאישור לפני שיוזנו."
+      subtitle="לוח סילוקין של הלוואה, או פירוט הלוואות מהבנק, מחברת האשראי או מגוף חוץ-בנקאי. הנתונים יוצגו לאישור לפני שיוזנו."
       action={
-        <button type="button" className="btn-ghost" onClick={() => inputRef.current?.click()}>
-          בחירת מסמך
+        <button type="button" className="btn-ghost" onClick={() => inputRef.current?.click()} disabled={reading}>
+          {reading ? 'קורא…' : 'בחירת מסמך'}
         </button>
       }
     >
@@ -60,16 +105,19 @@ export function DebtImporter() {
           const picked = event.target.files?.[0];
           event.target.value = '';
           if (picked) {
-            setFound(undefined);
-            setDone(undefined);
-            setFile(picked);
+            void pick(picked);
           }
         }}
       />
 
-      {!file && !found && !done && (
+      {!file && !found && !done && !notice && (
         <p className="text-sm text-ink-soft">
-          לכל גוף מלווה פורמט משלו, ולכן המסמך נקרא עם AI — רק באישורכם, ואחרי השחרת פרטים מזהים בטקסט.
+          לוח סילוקין נקרא בדפדפן בלבד. מסמך בפורמט אחר{enabled ? ' נקרא עם AI — רק באישורכם, ואחרי השחרת פרטים מזהים בטקסט' : ' יש להזין ידנית'}.
+        </p>
+      )}
+      {notice && (
+        <p className="text-sm text-caution" role="status">
+          {notice}
         </p>
       )}
 
@@ -88,7 +136,10 @@ export function DebtImporter() {
             <p className="text-negative">לא זוהו הלוואות במסמך. אפשר להוסיף אותן ידנית בטבלה.</p>
           ) : (
             <>
-              <p className="font-medium text-ink">זוהו {found.debts.length} הלוואות. סמנו אילו להוסיף:</p>
+              {found.summary && <p className="text-positive">✓ {found.summary}</p>}
+              <p className="font-medium text-ink">
+                {found.debts.length === 1 ? 'זוהתה הלוואה אחת.' : `זוהו ${found.debts.length} הלוואות.`} סמנו אילו להוסיף:
+              </p>
               <ScrollRegion label="הלוואות שזוהו במסמך">
                 <table className="tabular w-full min-w-[560px] text-sm">
                   <thead>

@@ -20,6 +20,11 @@ const ID_CANDIDATE = /(?<!\d)(\d{9})(?!\d)/g;
 const LABELLED_ID = /(מספר זהות|מס' זהות|מס\. זהות|ת\.ז\.?|ת"ז)\s*[:-]?\s*(\d{5,9})(?!\d)/g;
 /** A letter's addressee block: "לכבוד" through the salutation, which is name and street address. */
 const ADDRESSEE = /(לכבוד)([^\n]*)((?:\n(?![^\n]*א\.ג\.נ)[^\n]*){1,6})(?=\n[^\n]*א\.ג\.נ)/;
+/**
+ * "לכבוד:" whose own line carries another field — the print date, laid out beside it — with the
+ * name on the line below: a short line of words, no digits, no labels.
+ */
+const ADDRESSEE_NEXT_LINE = /(לכבוד)\s*:?([^\n]*)\n([^\n\d:]{2,60})(?=\n)/;
 const PHONE = /(?<!\d)0\d{1,2}[-\s]?\d{7}(?!\d)/g;
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]{2,}/g;
 const ACCOUNT = /(חשבון מספר|מס' חשבון|חשבון|סניף)\s*[:-]?\s*(\d[\d/-]{3,})/g;
@@ -87,6 +92,17 @@ export function redact(text: string | null | undefined): RedactionResult {
     return `${date ? `${date}\n` : ''}${label} ${MASK}${block.replace(/[^\n]+/g, MASK)}`;
   });
 
+  working = working.replace(ADDRESSEE_NEXT_LINE, (match, label: string, rest: string, name: string) => {
+    const others = rest.replace(/^\s*:?\s*/, '');
+    // Only when the label's own line holds something else (or nothing) and the next line reads as a
+    // name; "לכבוד: <name>" on one line is left to the labelled-name rule below.
+    if ((others && !/[\d:]/.test(others)) || name.trim().split(/\s+/).length > 5) {
+      return match;
+    }
+    bump('NAME');
+    return `${others ? `${others}\n` : ''}${label}: ${MASK}`;
+  });
+
   working = working.replace(EMAIL, () => {
     bump('EMAIL');
     return MASK;
@@ -98,7 +114,11 @@ export function redact(text: string | null | undefined): RedactionResult {
 
   // Keep the Hebrew label so the document stays readable, and mask only the value after it.
   const labelled = (pattern: RegExp, category: string) => {
-    working = working.replace(pattern, (_match, label: string) => {
+    working = working.replace(pattern, (match, label: string, value: string) => {
+      // Already masked by an earlier rule.
+      if (value.startsWith(MASK)) {
+        return match;
+      }
       bump(category);
       return `${label}: ${MASK}`;
     });
