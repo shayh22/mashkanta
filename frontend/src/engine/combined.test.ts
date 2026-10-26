@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { analyseCombined, positionFromMix } from './combined';
+import { combinedPlan, planToText } from './actionPlan';
+import { analyseCombined, combinedSteps, positionFromMix } from './combined';
 import type { ConsolidationInput } from './consolidation';
 import type { ExistingTrack } from './prepayment';
-import { analyseRoute, DEFAULT_ROUTES, type ProposedTrack, type RefinanceOptions } from './refinance';
+import {
+  analyseRoute,
+  compareRoutes,
+  DEFAULT_ROUTES,
+  type ProposedTrack,
+  type RefinanceOptions,
+} from './refinance';
 import { baselineScenario } from './scenario';
 
 const options: RefinanceOptions = {
@@ -117,5 +124,35 @@ describe('refinance and consolidation in one move', () => {
       6,
     );
     expect(financed.paymentAfter).toBeGreaterThan(cash.paymentAfter);
+  });
+});
+
+describe('the combined move, step by step', () => {
+  it('builds a waterfall that closes exactly on the payment after both moves', () => {
+    const move = analyseCombined(household, refinance, { financeUpfrontCosts: true });
+    const steps = combinedSteps(move);
+    expect(steps[0]!.label).toBe('מיחזור המשכנתא');
+    expect(steps[0]!.delta).toBeCloseTo(refinance.proposedPayment - refinance.currentPayment, 6);
+    expect(steps.at(-1)!.delta).toBeCloseTo(move.combined.allocation.payment, 6);
+    const total = steps.reduce((sum, step) => sum + step.delta, 0);
+    expect(move.paymentToday + total).toBeCloseTo(move.paymentAfter, 6);
+  });
+
+  it('plans the refinance first and the consolidation second, under one bottom line', () => {
+    const comparison = compareRoutes(existing, proposal, DEFAULT_ROUTES, options);
+    const best = comparison.best === 'EXTERNAL' ? comparison.external : comparison.internal;
+    const move = analyseCombined(household, best, { financeUpfrontCosts: false });
+    const plan = combinedPlan(move, comparison, proposal, 0.5, options.scenario.primeAnnual, true);
+    const titles = plan.sections.map((section) => section.title);
+    expect(titles[0]).toBe('השורה התחתונה');
+    const firstRefinance = titles.findIndex((title) => title.startsWith('מיחזור'));
+    const firstConsolidation = titles.findIndex((title) => title.startsWith('איחוד'));
+    expect(firstRefinance).toBeGreaterThan(0);
+    expect(firstConsolidation).toBeGreaterThan(firstRefinance);
+    // The consolidation's own bottom line is folded into the combined one, not repeated.
+    expect(titles.filter((title) => title.includes('השורה התחתונה'))).toHaveLength(1);
+    const text = planToText(plan);
+    expect(text).toContain('קודם המיחזור');
+    expect(text).toContain(`הכינו`);
   });
 });

@@ -19,9 +19,12 @@ const RefinancePage = lazy(() =>
 const ConsolidationPage = lazy(() =>
   import('./pages/ConsolidationPage').then((module) => ({ default: module.ConsolidationPage })),
 );
+const CombinedPage = lazy(() =>
+  import('./pages/CombinedPage').then((module) => ({ default: module.CombinedPage })),
+);
 
 /** The three jobs the platform does. Each is addressable by URL hash so it can be linked to. */
-type Mode = 'mortgage' | 'refinance' | 'consolidation';
+type Mode = 'mortgage' | 'refinance' | 'consolidation' | 'combined';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; icon: string; title: string; subtitle: string }[] = [
@@ -33,6 +36,7 @@ const MODES: { id: Mode; icon: string; title: string; subtitle: string }[] = [
     subtitle: 'עמלות פירעון, נקודת איזון וחיסכון',
   },
   { id: 'consolidation', icon: '🧩', title: 'איחוד הלוואות', subtitle: 'הבראה תזרימית כנגד הנכס' },
+  { id: 'combined', icon: '🔀', title: 'מיחזור + איחוד', subtitle: 'שני המהלכים יחד, תוכנית אחת' },
 ];
 
 function modeFromHash(): Mode {
@@ -146,7 +150,9 @@ export default function App() {
                 </div>
               }
             >
-              {mode === 'refinance' ? <RefinancePage /> : <ConsolidationPage />}
+              {mode === 'refinance' && <RefinancePage />}
+              {mode === 'consolidation' && <ConsolidationPage />}
+              {mode === 'combined' && <CombinedPage />}
             </Suspense>
           )}
         </div>
@@ -214,7 +220,7 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
       <div
         role="tablist"
         aria-label="מצב עבודה"
-        className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:gap-3"
+        className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4"
       >
         {MODES.map((item, index) => {
           const selected = item.id === mode;

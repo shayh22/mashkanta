@@ -19,7 +19,7 @@ try {
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
-const MODES = ['mortgage', 'refinance', 'consolidation'];
+const MODES = ['mortgage', 'refinance', 'consolidation', 'combined'];
 const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, height: 780 } };
 
 const browser = await playwright.chromium.launch();
