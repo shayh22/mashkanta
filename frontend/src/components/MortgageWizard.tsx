@@ -9,6 +9,7 @@ import {
 import type { BuyerSegment, MacroAnchors } from '../lib/types';
 import { formatCurrency, formatPercent, formatTerm } from '../lib/format';
 import { Card, CurrencyField, Field, ProgressSteps, RangeField, SegmentedControl } from './ui';
+import { DEFAULT_PRIME } from '../engine/scenario';
 
 const STEP_LABELS = ['נכס והלוואה', 'פרופיל לווה', 'סיכון והעדפות'];
 
@@ -360,7 +361,7 @@ function MacroCard({
   macro: { prime?: number; cpiAnnual?: number };
   onChange: (patch: { prime?: number; cpiAnnual?: number }) => void;
 }) {
-  const prime = macro.prime ?? anchors?.prime ?? 0.0575;
+  const prime = macro.prime ?? anchors?.prime ?? DEFAULT_PRIME;
   const cpi = macro.cpiAnnual ?? anchors?.cpiAnnual ?? 0.024;
 
   return (

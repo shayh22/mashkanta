@@ -166,6 +166,10 @@ worst relative drift across all comparisons: 0.00002992%
 Lifetime cost matches to the shekel, and the optimizer selects the identical mix at every risk
 tolerance from 1 to 10.
 
+The check runs both engines at the Java seed (prime 5.75%). Since October 2026 the browser engine's
+own market table and default prime (4.75%) follow the Bank of Israel's August 2026 averages, so the
+two **intentionally diverge** in data while the parity check still pins the calculation logic.
+
 ### The calculation engine
 
 `AmortizationEngine` is pure and stateless: it takes a `TrackSpec` and a `MacroScenario` and returns
@@ -252,6 +256,12 @@ for colour-vision-deficiency separation against both surfaces. The three modes f
 with right-to-left arrow-key handling.
 
 ### Market baseline
+
+The browser build's table (`frontend/src/engine/baseline.ts`, `BASELINE_AS_OF`) is anchored to the
+Bank of Israel's average rates on new housing loans, dataset `BIR_MRTG_99` (SDMX API at
+`edge.boi.gov.il`), August 2026: each track's distribution is centred on the published average with
+its LTV spread kept. Prime-track rows move with the prime rate entered by the user. The Java backend's
+table below is the original seed.
 
 Seeded from the Bank of Israel monthly average rate table by LTV bucket, then blended with verified
 community observations that survive an outlier screen. Both the median and the top decile are shown:

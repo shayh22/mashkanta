@@ -45,8 +45,11 @@ export interface ActionPlan {
   readonly generatedOn: string;
 }
 
-/** Typical margins over prime for an all-purpose loan secured on a home. */
-export const ALL_PURPOSE_MARGIN = { target: 0.004, ceiling: 0.009 } as const;
+/**
+ * Margins over prime for an all-purpose loan secured on a home: the ceiling is the market average
+ * (Bank of Israel, August 2026, about prime + 1.5), the target half a point under it.
+ */
+export const ALL_PURPOSE_MARGIN = { target: 0.01, ceiling: 0.015 } as const;
 
 const ils = (value: number) => `${Math.round(value).toLocaleString('he-IL')} ₪`;
 const pct = (value: number, digits = 2) => `${(value * 100).toFixed(digits)}%`;

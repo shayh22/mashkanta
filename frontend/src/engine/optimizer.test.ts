@@ -54,7 +54,14 @@ describe('optimizer', () => {
 
   it('gives a conservative borrower less rate-sensitive principal than a dynamic one', () => {
     const variable = (p: MixProposal) => shareWhere(p, (t) => TRACKS[t].variableRate);
-    expect(variable(run(firstHome(1)).recommended)).toBeLessThan(variable(run(firstHome(10)).recommended));
+    // Strictly less where variable tracks are priced to compete. In the August 2026 market prime
+    // sits above fixed unlinked, so every borrower may rationally hold none; there the ordering only
+    // has to hold weakly.
+    const cheapPrime = baselineScenario(0.0375, 0.024, 0.042);
+    const at = (tolerance: number, scenarioUsed = scenario) =>
+      variable(optimize(firstHome(tolerance), profileRisk(firstHome(tolerance)), scenarioUsed, 0.5).recommended);
+    expect(at(1, cheapPrime)).toBeLessThan(at(10, cheapPrime));
+    expect(at(1)).toBeLessThanOrEqual(at(10));
   });
 
   it('prices the three regulatory baskets with their mandated compositions', () => {
