@@ -89,6 +89,38 @@ const INDEX = new Map<string, MarketRate>(
   BASELINE_RATES.map((entry) => [`${entry.track}:${entry.tier}`, entry]),
 );
 
+/** The seeded median in the middle LTV bucket — the one calibrated to the published average. */
+export function seededAverage(track: TrackType): number {
+  return INDEX.get(`${track}:FROM_45_TO_60`)!.medianRate;
+}
+
+/**
+ * Per-track shifts that re-centre the seeded distributions on live published averages, with the
+ * source those averages came from. Empty until live data arrives; see `liveMarket.ts`.
+ */
+let marketShift: { shifts: Partial<Record<TrackType, number>>; source?: string } = { shifts: {} };
+
+export function setMarketShifts(shifts: Partial<Record<TrackType, number>>, source?: string): void {
+  marketShift = { shifts, source };
+}
+
+/** The table as currently priced: the seed, moved onto the live averages where they are known. */
+export function currentBaselineRates(): MarketRate[] {
+  return BASELINE_RATES.map((entry) => {
+    const shift = marketShift.shifts[entry.track];
+    if (shift === undefined) {
+      return { ...entry };
+    }
+    return {
+      ...entry,
+      bestRate: entry.bestRate + shift,
+      medianRate: entry.medianRate + shift,
+      worstRate: entry.worstRate + shift,
+      source: marketShift.source ?? entry.source,
+    };
+  });
+}
+
 /**
  * Fixed-rate tracks price the lender's duration risk, so a 30-year quote sits above a 15-year one.
  * Prime carries no duration premium — it re-prices every month regardless of term.
@@ -114,7 +146,10 @@ export function rateFor(track: TrackType, ltv: number, termMonths: number, prime
   if (!base) {
     throw new Error(`no baseline rate for ${track}`);
   }
-  const adjustment = termPremium(track, termMonths) + (track === 'PRIME' ? prime - DEFAULT_PRIME : 0);
+  const adjustment =
+    termPremium(track, termMonths) +
+    (track === 'PRIME' ? prime - DEFAULT_PRIME : 0) +
+    (marketShift.shifts[track] ?? 0);
   if (adjustment === 0) {
     return base;
   }

@@ -9,18 +9,27 @@ import {
   type ConsumerDebt,
   type PropertyPosition,
 } from '../engine/consolidation';
+import type { LiveMarket } from '../engine/boiMarket';
+import { liveMarket } from '../engine/liveMarket';
 import { DEFAULT_PRIME } from '../engine/scenario';
 import { browserStorage, storageKey, uniqueId } from './persistence';
 
 const newDebtId = () => uniqueId('d');
 
-/** Prime plus a typical all-purpose margin, and a fixed rate a little above it. */
+/** The offered all-purpose loan rates: the live published averages when known, else August 2026's. */
+export function allPurposeRates(market?: LiveMarket): Pick<ConsolidationTerms, 'variableRate' | 'fixedRate'> {
+  // Bank of Israel averages for loans secured on a home, unlinked: variable as prime plus the
+  // average margin, fixed as published. Seeded at August 2026 (about prime + 1.5, fixed 6.61%).
+  const prime = market?.prime?.value ?? DEFAULT_PRIME;
+  return {
+    variableRate: prime + (market?.allPurpose?.variableMarginOverPrime ?? 0.015),
+    fixedRate: market?.allPurpose?.fixedUnlinked ?? 0.0661,
+  };
+}
+
 export const DEFAULT_TERMS: ConsolidationTerms = {
   termMonths: 180,
-  // Bank of Israel averages for consumer loans secured on a home, August 2026: unlinked variable
-  // about prime + 1.5, unlinked fixed 6.61%.
-  variableRate: DEFAULT_PRIME + 0.015,
-  fixedRate: 0.0661,
+  ...allPurposeRates(),
   preferredVariableShare: 0.5,
   extraCash: 0,
   closingCosts: 2_500,
@@ -95,6 +104,11 @@ interface ConsolidationState {
   /** Includes every debt the engine recommends consolidating and leaves the rest out. */
   applyRecommendations: (blendedRate: number) => void;
   setReinvestShare: (share: number) => void;
+  /**
+   * Moves the offered rates from one market's averages to another's — but only while they are
+   * still the previous averages, so rates the borrower typed in from a real offer are never touched.
+   */
+  syncMarketRates: (previous: ReturnType<typeof allPurposeRates>, next: ReturnType<typeof allPurposeRates>) => void;
   reset: () => void;
 }
 
@@ -113,6 +127,13 @@ export const useConsolidation = create<ConsolidationState>()(
       setNetIncome: (netIncome) => set({ netIncome: Math.max(0, netIncome) }),
       setProperty: (patch) => set((state) => ({ property: { ...state.property, ...patch } })),
       setTerms: (patch) => set((state) => ({ terms: { ...state.terms, ...patch } })),
+      syncMarketRates: (previous, next) =>
+        set((state) => {
+          const same = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+          const untouched =
+            same(state.terms.variableRate, previous.variableRate) && same(state.terms.fixedRate, previous.fixedRate);
+          return untouched ? { terms: { ...state.terms, ...next } } : {};
+        }),
       addDebt: () =>
         set((state) => ({
           debts: [
@@ -142,7 +163,7 @@ export const useConsolidation = create<ConsolidationState>()(
           })),
         })),
       setReinvestShare: (reinvestShare) => set({ reinvestShare: Math.min(1, Math.max(0, reinvestShare)) }),
-      reset: () => set(INITIAL),
+      reset: () => set({ ...INITIAL, terms: { ...DEFAULT_TERMS, ...allPurposeRates(liveMarket()) } }),
     }),
     {
       name: storageKey('consolidation'),
