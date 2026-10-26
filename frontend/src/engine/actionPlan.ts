@@ -1,7 +1,7 @@
 import type { TrackType } from '../lib/types';
 import { liveMarket } from './liveMarket';
 import { rateFor } from './baseline';
-import { CONSOLIDATION_LIMITS, DEBT_KIND_LABELS, type ConsolidationAnalysis } from './consolidation';
+import { CONSOLIDATION_LIMITS, consumerLoanAverage, DEBT_KIND_LABELS, type ConsolidationAnalysis } from './consolidation';
 import { payment as annuityPayment, monthlyRate } from './math';
 import type { CombinedMove } from './combined';
 import { VERDICT_LABELS, type RefinanceComparison, type RouteAnalysis } from './refinance';
@@ -261,7 +261,21 @@ export function consolidationPlan(analysis: ConsolidationAnalysis, prime: number
         : `להשאיר: ${debt.label}.`,
     detail: advice.get(debt.id)?.reason,
   }));
-  sections.push({ title: 'אילו הלוואות לסגור ואילו להשאיר', items: [...close, ...keep] });
+  // Kept loans priced well above the market are worth renegotiating even without consolidating.
+  const average = consumerLoanAverage();
+  const reprice: PlanItem[] = analysis.kept.flatMap((debt) => {
+    const gap = advice.get(debt.id)?.aboveMarket;
+    return gap === undefined
+      ? []
+      : [
+          {
+            priority: 'MEDIUM' as Priority,
+            text: `לבקש הורדת ריבית: ${debt.label} (${pct(debt.annualRate)}).`,
+            detail: `גבוהה ב-${pct(gap, 1)} מממוצע ההלוואות הצרכניות לא מובטחות (${pct(average.rate)}, בנק ישראל) — כדאי גם אם היא נשארת מחוץ לאיחוד.`,
+          },
+        ];
+  });
+  sections.push({ title: 'אילו הלוואות לסגור ואילו להשאיר', items: [...close, ...keep, ...reprice] });
 
   const pti: PlanItem[] = [];
   if (allocation.amount > 0 && !r.ptiExempt && !r.bankFeasible) {

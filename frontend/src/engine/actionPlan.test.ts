@@ -152,6 +152,13 @@ describe('consolidation action plan', () => {
     expect(text).toContain('להשאיר: קצרה');
   });
 
+  it('suggests renegotiating a kept loan priced well above the consumer-loan average', () => {
+    const text = planToText(consolidationPlan(analyseConsolidation(household), DEFAULT_PRIME));
+    expect(text).toContain('לבקש הורדת ריבית: חוץ-בנקאית');
+    // The short loan at 7% is under the average and is not called out.
+    expect(text).not.toContain('לבקש הורדת ריבית: קצרה');
+  });
+
   it('shows the ways back under the 40% policy ceiling when the payment is too high', () => {
     const analysis = analyseConsolidation(household);
     expect(analysis.regulation.bankFeasible).toBe(false);
