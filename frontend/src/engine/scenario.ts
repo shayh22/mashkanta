@@ -1,7 +1,7 @@
 /** The macro-economic path a simulation is priced against. Ported from the Java `MacroScenario`. */
 
 /** Bank of Israel prime as of the last synchronisation, used when the caller sends nothing. */
-export const DEFAULT_PRIME = 0.0575;
+export const DEFAULT_PRIME = 0.0475;
 /** Central Bureau of Statistics trailing inflation. */
 export const DEFAULT_CPI = 0.024;
 /** 5-year non-linked government bond yield, the anchor for variable tracks. */

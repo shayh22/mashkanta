@@ -135,7 +135,7 @@ const household: ConsolidationInput = {
   },
   terms: {
     termMonths: 60,
-    variableRate: DEFAULT_PRIME + 0.012,
+    variableRate: DEFAULT_PRIME + 0.02,
     fixedRate: DEFAULT_PRIME + 0.013,
     preferredVariableShare: 0.5,
     extraCash: 0,

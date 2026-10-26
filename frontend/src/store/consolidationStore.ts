@@ -17,8 +17,10 @@ const newDebtId = () => uniqueId('d');
 /** Prime plus a typical all-purpose margin, and a fixed rate a little above it. */
 export const DEFAULT_TERMS: ConsolidationTerms = {
   termMonths: 180,
-  variableRate: DEFAULT_PRIME + 0.0075,
-  fixedRate: DEFAULT_PRIME + 0.011,
+  // Bank of Israel averages for consumer loans secured on a home, August 2026: unlinked variable
+  // about prime + 1.5, unlinked fixed 6.61%.
+  variableRate: DEFAULT_PRIME + 0.015,
+  fixedRate: 0.0661,
   preferredVariableShare: 0.5,
   extraCash: 0,
   closingCosts: 2_500,
