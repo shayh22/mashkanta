@@ -1,4 +1,5 @@
 import type { TrackType } from '../lib/types';
+import { DEFAULT_PRIME } from './scenario';
 
 /**
  * The LTV buckets the Bank of Israel publishes its average rate table by (קו המשווה).
@@ -91,13 +92,20 @@ function termPremium(track: TrackType, termMonths: number): number {
   return Math.max(0, years - 20) * 0.0002 - Math.max(0, 20 - years) * 0.00025;
 }
 
-/** The rate distribution for a track at the borrower's LTV, adjusted for the requested term. */
-export function rateFor(track: TrackType, ltv: number, termMonths: number): MarketRate {
+/**
+ * The rate distribution for a track at the borrower's LTV, adjusted for the requested term.
+ *
+ * The seeded prime figures are all-in rates observed while prime stood at {@link DEFAULT_PRIME};
+ * what lenders actually compete on is the margin. They are therefore moved one for one with the
+ * prime rate in force, so a borrower who sets prime to 4.75% sees prime offered at the same
+ * margin rather than at a margin that silently widened by a point.
+ */
+export function rateFor(track: TrackType, ltv: number, termMonths: number, prime = DEFAULT_PRIME): MarketRate {
   const base = INDEX.get(`${track}:${tierOf(ltv)}`);
   if (!base) {
     throw new Error(`no baseline rate for ${track}`);
   }
-  const adjustment = termPremium(track, termMonths);
+  const adjustment = termPremium(track, termMonths) + (track === 'PRIME' ? prime - DEFAULT_PRIME : 0);
   if (adjustment === 0) {
     return base;
   }
