@@ -20,6 +20,11 @@ interface Context {
 }
 
 const EDGE_TTL_SECONDS = 6 * 60 * 60;
+/**
+ * Part of the cache key. Bump it whenever the response gains or changes a field, or a deploy keeps
+ * serving the previous shape from the edge for up to EDGE_TTL_SECONDS.
+ */
+const SCHEMA_VERSION = 2;
 const MIN_FRESH_INTERVAL_MS = 60_000;
 
 const json = (body: unknown, status: number, cacheControl: string) =>
@@ -43,7 +48,7 @@ export default {
     }
 
     const cache = (caches as unknown as { default: Cache }).default;
-    const key = new Request(`${url.origin}/api/market`);
+    const key = new Request(`${url.origin}/api/market?v=${SCHEMA_VERSION}`);
     const cached = await cache.match(key);
     const cachedAt = Number(cached?.headers.get('x-fetched-at') ?? 0);
     if (cached && (!url.searchParams.has('fresh') || Date.now() - cachedAt < MIN_FRESH_INTERVAL_MS)) {
