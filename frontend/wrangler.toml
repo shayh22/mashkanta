@@ -13,6 +13,12 @@ compatibility_date = "2026-09-01"
 # The account must also have claimed a workers.dev subdomain — that part is a dashboard action.
 workers_dev = true
 
+# The app's own address on the owner's domain. `custom_domain` makes Cloudflare create the DNS record
+# and certificate on deploy; the zone must be in the same account. workers.dev keeps working too.
+routes = [
+  { pattern = "mashkanta.birkat-hanasi.com", custom_domain = true },
+]
+
 [assets]
 directory = "./dist"
 # Unmatched paths render the SPA shell and let the client route them. This is the native mechanism,

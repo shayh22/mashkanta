@@ -70,13 +70,20 @@ It is configured for **Workers Static Assets**, which is what Cloudflare's build
 the deploy command is `npx wrangler deploy`. `frontend/wrangler.toml` carries:
 
 ```toml
+main = "worker/index.ts"
+routes = [{ pattern = "mashkanta.birkat-hanasi.com", custom_domain = true }]
+
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
 ```
 
-There is no `main` entry point, because no Worker script needs to run — asset requests are served
-straight from the edge.
+Asset requests are served straight from the edge; only `/api/*` runs the Worker script (the live
+market data, see below). The app is served at **https://mashkanta.birkat-hanasi.com** — Cloudflare
+creates the DNS record and certificate on deploy because the zone is in the same account — and at
+https://mashkanta.shayh22.workers.dev.
 
 Build settings in the dashboard:
 
