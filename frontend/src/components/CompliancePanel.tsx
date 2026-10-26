@@ -18,7 +18,7 @@ export function CompliancePanel({ compliance }: { compliance: ComplianceReport }
   return (
     <Card
       title="בדיקה רגולטורית"
-      subtitle="הוראות ניהול בנקאי תקין 329 ו-451 של בנק ישראל"
+      term="directive329"
       action={<LevelBadge level={compliance.level}>{LEVEL_TEXT[compliance.level]}</LevelBadge>}
     >
       <dl className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">

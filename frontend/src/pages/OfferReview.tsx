@@ -62,7 +62,6 @@ export function OfferReview() {
 
       <Card
         title="ההצעה שקיבלתם"
-        subtitle="ניתן לערוך את המסלולים שחולצו מהמסמך, או להזין אותם ידנית."
         action={
           <button
             type="button"
@@ -221,11 +220,13 @@ export function OfferReview() {
               />
               <Stat
                 label="עלות כוללת"
+                term="totalCost"
                 value={formatCurrency(review.data.mix.totalPaid)}
                 note={`מתוכם ${formatCurrency(review.data.mix.totalCost)} ריבית והצמדה`}
               />
               <Stat
                 label="ריבית כוללת מתואמת"
+                term="irr"
                 value={formatPercent(review.data.mix.nominalIrr)}
                 note={`ריאלית: ${formatPercent(review.data.mix.realIrr)}`}
               />

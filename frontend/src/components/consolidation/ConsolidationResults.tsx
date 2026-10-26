@@ -41,7 +41,7 @@ export function RegulatoryPanel({ analysis }: { analysis: ConsolidationAnalysis 
         </div>
       </section>
 
-      <Card title="מרווח אשראי פנוי" subtitle="(החזר חדש + החזר קיים על הנכס) ÷ (הכנסה − התחייבויות אחרות מעל 18 חודשים)">
+      <Card title="מרווח אשראי פנוי" term="pti">
         <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
           <Stat
             label="PTI לפי 1.10.2026"
@@ -70,7 +70,7 @@ export function RegulatoryPanel({ analysis }: { analysis: ConsolidationAnalysis 
         </dl>
       </Card>
 
-      <Card title="בדיקה רגולטורית" subtitle="הוראת ניהול בנקאי תקין 329, כנוסחה מ-1.10.2026 (חוזר ח-06-2840)">
+      <Card title="בדיקה רגולטורית" term="directive329">
         <ul className="space-y-3">
           {r.findings.map((item) => (
             <li key={item.code} className="flex items-start gap-3">
@@ -100,7 +100,7 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
   }
 
   return (
-    <Card title="לפני ואחרי" subtitle="חמצן תזרימי מיידי מול העלות הכוללת לאורך חיי ההלוואה.">
+    <Card title="לפני ואחרי" term="relief">
       <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
         <Stat label="סך החזרים היום" value={formatCurrency(analysis.paymentBefore)} />
         <Stat label="אחרי איחוד" value={formatCurrency(analysis.paymentAfter)} />
@@ -152,8 +152,7 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
         </ResponsiveChart>
       </div>
       <p className="mt-2 text-xs text-ink-soft">
-        ההחזר החודשי הכולל (משכנתא + הלוואות) לאורך השנים. בלי איחוד ההחזר גבוה היום ויורד כשההלוואות מסתיימות;
-        עם איחוד הוא נמוך יותר אך נמשך {formatTerm(analysis.allocation.termMonths)}.
+        עם איחוד: נמוך יותר היום, אבל נמשך {formatTerm(analysis.allocation.termMonths)}.
       </p>
     </Card>
   );
@@ -176,7 +175,7 @@ export function ShorteningSimulator({ analysis }: { analysis: ConsolidationAnaly
   return (
     <Card
       title="קיצור תקופה חכם"
-      subtitle="מפנים חלק מהחיסכון החודשי להחזר מוקדם — תחילה לפריים, שבו אין עמלת היוון — כדי לבלום את ההתייקרות."
+      subtitle="חלק מהחיסכון החודשי → פירעון מוקדם"
     >
       <RangeField
         label="חלק מהחמצן התזרימי שמוחזר להלוואה"
@@ -213,7 +212,6 @@ export function ConsolidationWaterfall({ analysis }: { analysis: ConsolidationAn
   return (
     <WaterfallChart
       title="מפל ההחזר החודשי"
-      subtitle="סך ההחזרים היום, ההלוואות שנסגרות, ההלוואה החדשה — וסך ההחזרים אחרי האיחוד."
       start={analysis.paymentBefore}
       steps={[
         ...analysis.included.map((debt) => ({ label: debt.label, delta: -debt.monthlyPayment })),

@@ -43,7 +43,7 @@ export function RefinanceVerdict({ comparison }: { comparison: RefinanceComparis
           {style.icon}
         </span>
         <div>
-          <p className="text-xs font-medium opacity-80">הדרך המשתלמת יותר: {ROUTE_NAME[comparison.best]}</p>
+          <p className="text-xs font-medium">הדרך המשתלמת יותר: {ROUTE_NAME[comparison.best]}</p>
           <h2 className="text-lg font-bold">{VERDICT_LABELS[best.verdict]}</h2>
           <p className="mt-1 text-sm">{explainVerdict(best)}</p>
         </div>
@@ -169,7 +169,7 @@ function FeeBreakdown({ analysis }: { analysis: RouteAnalysis }) {
   return (
     <Card
       title="פירוט עמלות הפירעון המוקדם"
-      subtitle="לפי צו הבנקאות (פירעון מוקדם של הלוואה לדיור). עמלת ההיוון מחושבת מול הריבית הממוצעת שבנק ישראל מפרסם היום."
+      term="prepaymentFee"
     >
       <ScrollRegion label="טבלה">
         <table className="tabular w-full min-w-[640px] text-sm">

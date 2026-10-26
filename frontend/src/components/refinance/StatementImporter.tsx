@@ -100,7 +100,7 @@ export function StatementImporter() {
   return (
     <Card
       title="ייבוא מהבנק"
-      subtitle="העלו מכתב &quot;פרטי משכנתאות&quot; (דוח יתרות לסילוק) — הוא כולל את כל המרכיבים ואת עמלת הפירעון שהבנק עצמו מחשב."
+      subtitle="דוח יתרות לסילוק (PDF)"
     >
       <div
         className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${

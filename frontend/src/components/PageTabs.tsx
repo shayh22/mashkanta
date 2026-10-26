@@ -1,5 +1,8 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, type KeyboardEvent, type ReactNode } from 'react';
+import { GLIDE_CLASS, useGlide } from '../lib/glide';
+import type { TermId } from '../lib/glossary';
 import type { PageTab } from '../lib/pageTabs';
+import { Term } from './Glossary';
 
 /**
  * Section tabs inside a mode: one topic on screen at a time instead of four to nine screens of
@@ -23,8 +26,10 @@ function revealSection(idPrefix: string) {
 }
 
 /**
- * An ARIA tablist that sticks under the header. In a right-to-left layout the left arrow moves to
- * the next tab, which is where it visually is. On a phone the row scrolls sideways.
+ * An ARIA tablist that sticks under the header, drawn as underline tabs: plain labels on a hairline,
+ * with one underline that glides to the selected tab (after Underline Tabs on design.yaps.ai, MIT).
+ * In a right-to-left layout the left arrow moves to the next tab, which is where it visually is. On
+ * a phone the row scrolls sideways.
  */
 export function PageTabs<T extends string>({
   label,
@@ -39,7 +44,8 @@ export function PageTabs<T extends string>({
   active: T;
   onSelect: (id: T) => void;
 }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === active));
+  const { items: refs, style: underline } = useGlide<HTMLButtonElement>(activeIndex);
 
   const choose = (index: number) => {
     onSelect(tabs[index]!.id);
@@ -64,13 +70,15 @@ export function PageTabs<T extends string>({
   useEffect(() => {
     // Keep the active tab visible in the sideways-scrolling row on a phone.
     refs.current[tabs.findIndex((tab) => tab.id === active)]?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
-  }, [active, tabs]);
+  }, [active, tabs, refs]);
 
   return (
-    <div
-      className="no-print sticky top-[var(--header-h,61px)] z-30 -mx-4 border-b border-line/70 bg-canvas/85 px-4 backdrop-blur-xl sm:mx-0 sm:rounded-2xl sm:border sm:bg-surface/85 sm:px-1.5 sm:shadow-card"
-    >
-      <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_28px)]">
+    <div className="no-print sticky top-[var(--header-h,57px)] z-30 -mx-4 border-b border-line bg-canvas/90 px-4 backdrop-blur-md sm:mx-0 sm:px-0">
+      <div
+        role="tablist"
+        aria-label={label}
+        className="relative flex gap-1 overflow-x-auto [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_28px)]"
+      >
         {tabs.map((tab, index) => {
           const selected = tab.id === active;
           return (
@@ -87,18 +95,15 @@ export function PageTabs<T extends string>({
               tabIndex={selected ? 0 : -1}
               onClick={() => choose(index)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition ${
-                selected
-                  ? 'bg-brand-600 text-white shadow-glow'
-                  : 'text-ink-muted hover:bg-surface-sunken hover:text-ink'
+              className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-3 text-sm transition-colors ${
+                selected ? 'font-semibold text-ink' : 'text-ink-soft hover:text-ink'
               }`}
             >
-              <span aria-hidden>{tab.icon}</span>
               {tab.label}
               {tab.badge && (
                 <span
                   className={`rounded-full px-1.5 text-[11px] font-semibold leading-5 ${
-                    selected ? 'bg-white text-[#3730a3]' : 'bg-surface-sunken text-ink-muted'
+                    tab.badge === '!' ? 'bg-rose-500/10 text-negative' : 'bg-surface-sunken text-ink-soft'
                   }`}
                 >
                   {tab.badge}
@@ -107,6 +112,13 @@ export function PageTabs<T extends string>({
             </button>
           );
         })}
+        {underline && (
+          <span
+            aria-hidden
+            className={`!h-0.5 rounded-full bg-brand-600 ${GLIDE_CLASS}`}
+            style={{ ...underline, top: undefined, bottom: 0 }}
+          />
+        )}
       </div>
     </div>
   );
@@ -166,11 +178,11 @@ export function TabPanel<T extends string>({
 
 export type SummaryTone = 'positive' | 'caution' | 'negative' | 'neutral';
 
-const TONE: Record<SummaryTone, { ring: string; chip: string; icon: string }> = {
-  positive: { ring: 'from-emerald-500/15', chip: 'bg-emerald-500/15 text-positive', icon: '✓' },
-  caution: { ring: 'from-amber-500/15', chip: 'bg-amber-500/15 text-caution', icon: '!' },
-  negative: { ring: 'from-rose-500/15', chip: 'bg-rose-500/15 text-negative', icon: '✕' },
-  neutral: { ring: 'from-brand-500/10', chip: 'bg-brand-50 text-brand-700', icon: 'i' },
+const TONE: Record<SummaryTone, { chip: string; icon: string }> = {
+  positive: { chip: 'bg-emerald-500/15 text-positive', icon: '✓' },
+  caution: { chip: 'bg-amber-500/15 text-caution', icon: '!' },
+  negative: { chip: 'bg-rose-500/15 text-negative', icon: '✕' },
+  neutral: { chip: 'bg-brand-50 text-brand-700', icon: 'i' },
 };
 
 export interface SummaryFigure {
@@ -178,6 +190,8 @@ export interface SummaryFigure {
   readonly value: string;
   readonly note?: string;
   readonly tone?: 'positive' | 'negative';
+  /** A glossary entry for the label. */
+  readonly term?: TermId;
 }
 
 /** The bottom line of a mode, kept above the tabs so it is in view whichever section is open. */
@@ -201,7 +215,7 @@ export function SummaryBar({
     <section
       aria-label={label}
       aria-live="polite"
-      className={`card overflow-hidden bg-gradient-to-l ${style.ring} via-surface/90 to-surface/90`}
+      className="card overflow-hidden"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-start gap-3 lg:w-[34%]">
@@ -221,7 +235,10 @@ export function SummaryBar({
           <dl className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3 border-line/70 sm:grid-cols-4 lg:border-s lg:ps-5">
             {figures.map((figure) => (
               <div key={figure.label} className="min-w-0">
-                <dt className="text-xs font-medium text-ink-soft">{figure.label}</dt>
+                <dt className="flex items-center text-xs font-medium text-ink-soft">
+                  {figure.label}
+                  {figure.term && <Term id={figure.term} />}
+                </dt>
                 <dd
                   className={`tabular mt-0.5 text-lg font-semibold sm:text-xl ${
                     figure.tone === 'positive' ? 'text-positive' : figure.tone === 'negative' ? 'text-negative' : 'text-ink'
