@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import type { BaselineResponse, OptimizationResponse } from '../lib/types';
 import { formatCurrency, formatPercent, formatTerm } from '../lib/format';
 import { AllocationTable, MixComparison } from '../components/MixComparison';
@@ -9,15 +9,14 @@ import { MarketBaselinePanel } from '../components/MarketBaselinePanel';
 import { Card, LoadingCard, Stat } from '../components/ui';
 import { PageTabs, TabPanel } from '../components/PageTabs';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
+import { usePrinting } from '../lib/printing';
 
 // The charting library is a third of the whole bundle and is only ever reached here, so it is
 // split out and fetched while the borrower is reading the headline numbers above it.
-const AmortizationChart = lazy(() =>
-  import('../components/AmortizationChart').then((module) => ({ default: module.AmortizationChart })),
-);
-const ScenarioSimulator = lazy(() =>
-  import('../components/ScenarioSimulator').then((module) => ({ default: module.ScenarioSimulator })),
-);
+const loadAmortization = () => import('../components/AmortizationChart');
+const loadScenarios = () => import('../components/ScenarioSimulator');
+const AmortizationChart = lazy(() => loadAmortization().then((module) => ({ default: module.AmortizationChart })));
+const ScenarioSimulator = lazy(() => loadScenarios().then((module) => ({ default: module.ScenarioSimulator })));
 
 const RELAXED_LABELS: Record<string, string> = {
   VOLATILITY_CAPACITY: 'יכולת הספיגה שהצהרתם עליה — לא נמצא תמהיל שעומד בה',
@@ -46,6 +45,14 @@ export function ResultsDashboard({
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [section, setSection] = usePageTab('mortgage', TABS);
+  const printing = usePrinting();
+  // The charts sit on the second tab; fetch them now so a print from any tab has them ready.
+  useEffect(() => {
+    void loadAmortization();
+    void loadScenarios();
+  }, []);
+  // Every section when printing, so a printed or saved report is complete.
+  const shows = (id: Section) => printing || section === id;
   const { recommended, riskProfile } = result;
   const bestSaving = result.savings.reduce(
     (best, saving) => (saving.totalPaidSaving > best ? saving.totalPaidSaving : best),
@@ -114,28 +121,28 @@ export function ResultsDashboard({
 
       <PageTabs label="פירוט התוצאות" idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection} />
       <TabPanel idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection}>
-        {section === 'mix' && (
+        {shows('mix') && (
           <>
             <AllocationTable proposal={recommended} />
             <MixComparison recommended={recommended} baskets={result.baskets} savings={result.savings} />
           </>
         )}
 
-        {section === 'payments' && (
+        {shows('payments') && (
           <Suspense fallback={<LoadingCard message="טוען את הגרפים…" />}>
             <AmortizationChart yearly={recommended.summary.yearly} />
             <ScenarioSimulator stress={recommended.stress} capacity={riskProfile.volatilityCapacity} />
           </Suspense>
         )}
 
-        {section === 'rules' && (
+        {shows('rules') && (
           <>
             <CompliancePanel compliance={recommended.compliance} />
             <TermSensitivity options={result.termSensitivity} chosen={recommended.summary.termMonths} />
           </>
         )}
 
-        {section === 'market' && (
+        {shows('market') && (
           <>
             <BankComparison quotes={result.bankQuotes} />
             {result.alternatives.length > 0 && (

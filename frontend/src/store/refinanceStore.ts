@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { scenarioOf } from '../lib/api';
-import { useMarketVersion } from './marketStore';
+import { useMarketVersion } from './marketVersion';
 import type { ExistingTrack } from '../engine/prepayment';
 import {
   compareRoutes,

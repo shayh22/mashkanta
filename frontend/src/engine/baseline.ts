@@ -104,11 +104,14 @@ export function setMarketShifts(shifts: Partial<Record<TrackType, number>>, sour
   marketShift = { shifts, source };
 }
 
-/** The table as currently priced: the seed, moved onto the live averages where they are known. */
-export function currentBaselineRates(): MarketRate[] {
+/**
+ * The table as currently priced: the seed, moved onto the live averages where they are known, with
+ * prime rows at the given prime rate exactly as {@link rateFor} prices them.
+ */
+export function currentBaselineRates(prime = DEFAULT_PRIME): MarketRate[] {
   return BASELINE_RATES.map((entry) => {
-    const shift = marketShift.shifts[entry.track];
-    if (shift === undefined) {
+    const shift = (marketShift.shifts[entry.track] ?? 0) + (entry.track === 'PRIME' ? prime - DEFAULT_PRIME : 0);
+    if (shift === 0) {
       return { ...entry };
     }
     return {
@@ -116,7 +119,7 @@ export function currentBaselineRates(): MarketRate[] {
       bestRate: entry.bestRate + shift,
       medianRate: entry.medianRate + shift,
       worstRate: entry.worstRate + shift,
-      source: marketShift.source ?? entry.source,
+      source: marketShift.shifts[entry.track] === undefined ? entry.source : (marketShift.source ?? entry.source),
     };
   });
 }

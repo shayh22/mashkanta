@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { marketFromBoi, type LiveMarket } from '../engine/boiMarket';
 import { applyLiveMarket, liveMarket } from '../engine/liveMarket';
-import { allPurposeRates, DEFAULT_TERMS, useConsolidation } from './consolidationStore';
+import { allPurposeRates, DEFAULT_TERMS, migrateConsolidation, useConsolidation } from './consolidationStore';
 import br from '../engine/__fixtures__/boi/br.csv?raw';
 import loans from '../engine/__fixtures__/boi/loans.csv?raw';
 import mortgages from '../engine/__fixtures__/boi/mortgages.csv?raw';
 import zcm from '../engine/__fixtures__/boi/zcm.csv?raw';
-import { useMarket } from './marketStore';
+import { fillGaps, useMarket } from './marketStore';
 
 const AUGUST = marketFromBoi(
   { br, zcm, mortgages, loans },
@@ -75,5 +75,39 @@ describe('market store', () => {
     applyLiveMarket(LATER);
     useConsolidation.getState().reset();
     expect(useConsolidation.getState().terms).toMatchObject(allPurposeRates(LATER));
+  });
+
+  it('keeps the last good figures for anything a partial read lacks', async () => {
+    serve(AUGUST);
+    await useMarket.getState().refresh();
+    // The mortgage file timed out upstream: prime arrived, the housing averages did not.
+    const partial: LiveMarket = {
+      fetchedAt: '2026-10-27T08:00:00Z',
+      prime: { value: 0.045, asOf: '2026-10-27', since: '2026-10-27' },
+      missing: ['housing', 'allPurpose'],
+    };
+    serve(partial);
+
+    await useMarket.getState().refresh(true);
+
+    const market = useMarket.getState().market!;
+    expect(market.prime?.value).toBe(0.045);
+    expect(market.housing).toEqual(AUGUST.housing);
+    expect(market.history).toEqual(AUGUST.history);
+    expect(fillGaps(AUGUST, undefined)).toBe(AUGUST);
+  });
+
+  it('asks the edge every time rather than reusing a copy the browser kept', async () => {
+    serve(AUGUST);
+    await useMarket.getState().refresh();
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toMatchObject({ cache: 'no-store' });
+  });
+
+  it('moves default rates saved by an older version onto today\'s defaults, and only those', () => {
+    const legacy = { terms: { ...DEFAULT_TERMS, variableRate: 0.065, fixedRate: 0.0685 } };
+    expect((migrateConsolidation(legacy, 1) as typeof legacy).terms).toMatchObject(allPurposeRates());
+    const own = { terms: { ...DEFAULT_TERMS, variableRate: 0.07, fixedRate: 0.0685 } };
+    expect(migrateConsolidation(own, 1)).toBe(own);
+    expect(migrateConsolidation(legacy, 2)).toBe(legacy);
   });
 });

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import { analyseCombined, type CombinedMove } from '../engine/combined';
+import { bestRoute } from '../lib/routes';
 import type { RefinanceComparison } from '../engine/refinance';
 import { useConsolidation } from './consolidationStore';
 import { useRefinanceAnalysis, type RefinanceView } from './refinanceStore';
@@ -39,8 +40,7 @@ export function useCombinedMove(): CombinedView {
     if (!comparison) {
       return undefined;
     }
-    const best = comparison.best === 'EXTERNAL' ? comparison.external : comparison.internal;
-    return analyseCombined({ netIncome, debts, property, terms }, best, {
+    return analyseCombined({ netIncome, debts, property, terms }, bestRoute(comparison), {
       financeUpfrontCosts: financeCosts,
     });
   }, [refinance.comparison, netIncome, debts, property, terms, financeCosts]);

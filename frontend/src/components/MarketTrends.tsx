@@ -1,4 +1,5 @@
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { ResponsiveChart } from './charts/ResponsiveChart';
 import type { MarketMonth } from '../engine/boiMarket';
 import { monthLabel } from '../engine/liveMarket';
 import { formatPercent } from '../lib/format';
@@ -100,7 +101,7 @@ export function MarketTrends() {
         role="img"
         aria-label={`גרף ריביות ממוצעות לפי מסלול וריבית הפריים, ${monthLabel(first)} עד ${monthLabel(last)}`}
       >
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           <LineChart data={[...history]} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.12} vertical={false} />
             <XAxis
@@ -138,12 +139,12 @@ export function MarketTrends() {
               />
             ))}
           </LineChart>
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
 
       {currentPrime && (
         <p className="mt-2 text-xs text-ink-soft">
-          הפריים כיום: {formatPercent(currentPrime.value)} (בתוקף מ-{dayMonthYear(currentPrime.since)}). ממוצעי המסלולים
+          הפריים כיום: {formatPercent(currentPrime.value)} {currentPrime.since ? ` (בתוקף מ-${dayMonthYear(currentPrime.since)})` : ''}. ממוצעי המסלולים
           מתפרסמים בפיגור של כחודשיים.
         </p>
       )}

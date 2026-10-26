@@ -1,4 +1,5 @@
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { ResponsiveChart } from '../charts/ResponsiveChart';
 import { CONSOLIDATION_LIMITS, repayWithExtra, type ConsolidationAnalysis } from '../../engine/consolidation';
 import { formatCompact, formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../../lib/format';
 import { useConsolidation } from '../../store/consolidationStore';
@@ -117,7 +118,7 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
       </dl>
 
       <div className="mt-6 h-64 w-full text-ink-soft" dir="ltr" role="img" aria-label="החזר חודשי כולל לפני ואחרי האיחוד לאורך הזמן">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.12} vertical={false} />
             <XAxis
@@ -148,7 +149,7 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
             <Line type="stepAfter" dataKey="before" name="בלי איחוד" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
             <Line type="stepAfter" dataKey="after" name="עם איחוד" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
           </LineChart>
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
       <p className="mt-2 text-xs text-ink-soft">
         ההחזר החודשי הכולל (משכנתא + הלוואות) לאורך השנים. בלי איחוד ההחזר גבוה היום ויורד כשההלוואות מסתיימות;

@@ -41,8 +41,11 @@ export interface LiveMarket {
   /** When the figures were read from the Bank of Israel, ISO timestamp. */
   readonly fetchedAt: string;
   readonly boiRate?: Observation;
-  /** Derived from {@link boiRate}; `since` is the first day the current rate applied. */
-  readonly prime?: Observation & { readonly since: string };
+  /**
+   * Derived from {@link boiRate}. `since` is the first day the current rate applied, or absent when
+   * the rate has not changed within the fetched window and the real date is therefore unknown.
+   */
+  readonly prime?: Observation & { readonly since?: string };
   /** 5-year inflation expectation implied by the bond market (breakeven). */
   readonly inflationExpectation?: Observation;
   /** 5-year zero-coupon nominal government yield — the anchor for 5-year variable unlinked tracks. */
@@ -165,7 +168,7 @@ function onOrBefore(rows: readonly CsvRow[], match: Readonly<Record<string, stri
   );
 }
 
-/** The first period of the run of identical values that ends at the latest observation. */
+/** The first period of the run of identical values that ends at the latest observation, if it began in the window. */
 function inForceSince(rows: readonly CsvRow[], match: Readonly<Record<string, string>>): string | undefined {
   const series = rows
     .filter((row) => Object.entries(match).every(([key, value]) => row[key] === value) && row.OBS_VALUE)
@@ -175,11 +178,12 @@ function inForceSince(rows: readonly CsvRow[], match: Readonly<Record<string, st
   if (!last) {
     return undefined;
   }
-  let since = last.asOf;
-  for (let i = series.length - 2; i >= 0 && series[i]!.value === last.value; i--) {
-    since = series[i]!.asOf;
+  let first = series.length - 1;
+  while (first > 0 && series[first - 1]!.value === last.value) {
+    first--;
   }
-  return since;
+  // The run reaching the start of the window means the change happened before it.
+  return first === 0 ? undefined : series[first]!.asOf;
 }
 
 const inRange = (value: number | undefined, min: number, max: number) =>
@@ -210,7 +214,7 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
   const boiValue = rate(boiObservation?.value, 0, 0.15);
   const boiRate = boiObservation && boiValue !== undefined ? { value: boiValue, asOf: boiObservation.asOf } : undefined;
   const prime = boiRate
-    ? { value: round(boiRate.value + PRIME_SPREAD), asOf: boiRate.asOf, since: inForceSince(br, BOI_RATE) ?? boiRate.asOf }
+    ? { value: round(boiRate.value + PRIME_SPREAD), asOf: boiRate.asOf, since: inForceSince(br, BOI_RATE) }
     : undefined;
   if (!prime) {
     missing.push('prime');
@@ -229,36 +233,14 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
   const bondYield5y = monthly('ZC_TSB_ZND_05Y_MA', 'bondYield5y', -0.02, 0.15);
   const linkedYield5y = monthly('ZC_TSB_ZRD_05Y_MA', 'linkedYield5y', -0.05, 0.1);
 
-  // Averages across all LTV, payment-to-income and property-value bands. A series is published for
-  // the whole population (PTI band P01) where the bank reports one; unlinked variable housing loans
-  // appear only under band P07, which is taken when P01 is absent.
-  const average = (item: string, indexation: string, kind: string, dataType: string) => {
-    const base = { BS_ITEM: item, INDEXATION_TYPE: indexation, IR_FV_TYPE: kind, DATA_TYPE: dataType, LTV: 'L0' };
-    return latest(mortgages, { ...base, PTI: 'P01' }) ?? latest(mortgages, { ...base, PTI: 'P07' });
-  };
-
   const history = housingHistory(mortgages, br);
 
-  // The month every housing figure is read for: the latest one the fixed unlinked average covers.
-  // Mixing months would compare a September fixed rate with an August variable one.
-  const anchorMonth = average('A2C', 'NI', 'F', 'R')?.asOf;
-  const forMonth = (observation: Observation | undefined) =>
-    observation && observation.asOf === anchorMonth ? observation.value : undefined;
-
+  // The latest month the fixed unlinked average covers; every housing figure is read for that one
+  // month, since mixing months would compare a September fixed rate with an August variable one.
+  const anchorMonth = history.at(-1)?.month;
   let housing: LiveMarket['housing'];
   if (anchorMonth) {
-    const linkedBenchmark = forMonth(average('A2C', 'CPI', 'V', 'RB'));
-    const linkedMargin = forMonth(average('A2C', 'CPI', 'V', 'RM'));
-    housing = {
-      asOf: anchorMonth,
-      fixedUnlinked: rate(forMonth(average('A2C', 'NI', 'F', 'R')), 0.005),
-      fixedLinked: rate(forMonth(average('A2C', 'CPI', 'F', 'R')), 0, 0.15),
-      variableLinked:
-        linkedBenchmark !== undefined && linkedMargin !== undefined
-          ? rate(linkedBenchmark + linkedMargin, 0, 0.15)
-          : undefined,
-      primeMargin: rate(forMonth(average('A2C', 'NI', 'V', 'RM')), -0.02, 0.03),
-    };
+    housing = { asOf: anchorMonth, ...housingMonth(mortgages, anchorMonth) };
     for (const key of ['fixedUnlinked', 'fixedLinked', 'variableLinked', 'primeMargin'] as const) {
       if (housing[key] === undefined) {
         missing.push(`housing.${key}`);
@@ -269,6 +251,8 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
   }
 
   let allPurpose: LiveMarket['allPurpose'];
+  const average = (item: string, indexation: string, kind: string, dataType: string) =>
+    bandAverage(mortgages, item, indexation, kind, dataType);
   const apMonth = average('A2B2', 'NI', 'F', 'R')?.asOf;
   if (apMonth) {
     const at = (observation: Observation | undefined) =>
@@ -325,8 +309,34 @@ export function marketFromBoi(files: Partial<BoiFiles>, fetchedAt: Date): LiveMa
 }
 
 /**
- * The housing averages month by month. Each month is read on its own, so a series that misses a
- * month leaves a gap there rather than borrowing a neighbour's value.
+ * The latest observation of a mortgage series averaged across every LTV, payment-to-income and
+ * property-value band. A series is published for the whole population (PTI band P01) where the
+ * bank reports one; unlinked variable housing loans appear only under band P07, taken when P01 is
+ * absent.
+ */
+function bandAverage(rows: readonly CsvRow[], item: string, indexation: string, kind: string, dataType: string) {
+  const base = { BS_ITEM: item, INDEXATION_TYPE: indexation, IR_FV_TYPE: kind, DATA_TYPE: dataType, LTV: 'L0' };
+  return latest(rows, { ...base, PTI: 'P01' }) ?? latest(rows, { ...base, PTI: 'P07' });
+}
+
+/** The housing averages for one month, each validated; the headline figures and the history share it. */
+function housingMonth(mortgages: readonly CsvRow[], month: string) {
+  const rows = mortgages.filter((row) => row.TIME_PERIOD === month);
+  const value = (indexation: string, kind: string, dataType: string) =>
+    bandAverage(rows, 'A2C', indexation, kind, dataType)?.value;
+  const benchmark = value('CPI', 'V', 'RB');
+  const margin = value('CPI', 'V', 'RM');
+  return {
+    fixedUnlinked: rate(value('NI', 'F', 'R'), 0.005),
+    fixedLinked: rate(value('CPI', 'F', 'R'), 0, 0.15),
+    variableLinked: benchmark !== undefined && margin !== undefined ? rate(benchmark + margin, 0, 0.15) : undefined,
+    primeMargin: rate(value('NI', 'V', 'RM'), -0.02, 0.03),
+  };
+}
+
+/**
+ * The housing averages month by month, with prime at each month end. Each month is read on its
+ * own, so a series that misses a month leaves a gap there rather than borrowing a neighbour's value.
  */
 function housingHistory(mortgages: readonly CsvRow[], br: readonly CsvRow[]): MarketMonth[] {
   const isFixedUnlinked = (row: CsvRow) =>
@@ -337,22 +347,14 @@ function housingHistory(mortgages: readonly CsvRow[], br: readonly CsvRow[]): Ma
     .slice(-HISTORY_MONTHS);
 
   return months.map((month) => {
-    const rows = mortgages.filter((row) => row.TIME_PERIOD === month);
-    const value = (indexation: string, kind: string, dataType: string) => {
-      const base = { BS_ITEM: 'A2C', INDEXATION_TYPE: indexation, IR_FV_TYPE: kind, DATA_TYPE: dataType, LTV: 'L0' };
-      return (latest(rows, { ...base, PTI: 'P01' }) ?? latest(rows, { ...base, PTI: 'P07' }))?.value;
-    };
-    const benchmark = value('CPI', 'V', 'RB');
-    const margin = value('CPI', 'V', 'RM');
-    const boi = onOrBefore(br, { SERIES_CODE: 'MNT_RIB_BOI_D' }, endOfMonth(month));
-    const boiValue = rate(boi?.value, 0, 0.15);
+    const { fixedUnlinked, fixedLinked, variableLinked } = housingMonth(mortgages, month);
+    const boi = rate(onOrBefore(br, { SERIES_CODE: 'MNT_RIB_BOI_D' }, endOfMonth(month))?.value, 0, 0.15);
     return {
       month,
-      prime: boiValue === undefined ? undefined : round(boiValue + PRIME_SPREAD),
-      fixedUnlinked: rate(value('NI', 'F', 'R'), 0.005),
-      fixedLinked: rate(value('CPI', 'F', 'R'), 0, 0.15),
-      variableLinked:
-        benchmark !== undefined && margin !== undefined ? rate(benchmark + margin, 0, 0.15) : undefined,
+      prime: boi === undefined ? undefined : round(boi + PRIME_SPREAD),
+      fixedUnlinked,
+      fixedLinked,
+      variableLinked,
     };
   });
 }

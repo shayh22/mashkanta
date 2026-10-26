@@ -83,7 +83,7 @@ function currentAnchors(): MacroAnchors {
     cpiAnnual: live?.inflationExpectation?.value ?? DEFAULT_CPI,
     bondYield5y: live?.bondYield5y?.value ?? DEFAULT_ANCHOR,
     linkedYield5y: live?.linkedYield5y?.value ?? 0.018,
-    primeUpdatedOn: live?.prime?.since ?? BASELINE_AS_OF,
+    primeUpdatedOn: live?.prime ? (live.prime.since ?? 'יותר משנה') : BASELINE_AS_OF,
     cpiUpdatedOn: live?.inflationExpectation?.asOf ?? iso(lastCpi),
     nextCpiOn: iso(nextCpi),
     source: live
@@ -243,10 +243,11 @@ export async function fetchReference(): Promise<ReferenceResponse> {
 }
 
 export async function fetchBaseline(): Promise<BaselineResponse> {
+  const anchors = currentAnchors();
   return {
-    rates: currentBaselineRates(),
+    rates: currentBaselineRates(anchors.prime),
     lastRefreshed: liveMarket()?.fetchedAt.slice(0, 10) ?? BASELINE_AS_OF,
-    anchors: currentAnchors(),
+    anchors,
   };
 }
 

@@ -59,6 +59,11 @@ export default {
     if (!isUsable(market)) {
       return cached ?? json({ error: 'Bank of Israel data unavailable', missing: market.missing }, 502, 'no-store');
     }
+    // A read that lost one of the files (a timeout, a bad day upstream) must not displace a complete
+    // one for six hours: serve the complete copy if there is one, otherwise the partial one uncached.
+    if (market.missing.length > 0) {
+      return cached ?? json(market, 200, 'no-store');
+    }
     // The browser keeps it briefly; the edge keeps it for EDGE_TTL_SECONDS.
     const response = json(market, 200, `public, max-age=300, s-maxage=${EDGE_TTL_SECONDS}`);
     response.headers.set('x-fetched-at', String(Date.now()));

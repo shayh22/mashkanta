@@ -4,11 +4,11 @@ import {
   CartesianGrid,
   Cell,
   LabelList,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { ResponsiveChart } from './charts/ResponsiveChart';
 import type { StressMatrix } from '../lib/types';
 import { formatCompact, formatCurrency, formatSignedCurrency } from '../lib/format';
 import { Card } from './ui';
@@ -50,7 +50,7 @@ export function ScenarioSimulator({
       }
     >
       <div className="h-64 w-full" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 40 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--line))" vertical={false} />
             <XAxis
@@ -80,7 +80,7 @@ export function ScenarioSimulator({
               <LabelList dataKey="increase" content={<ImmuneMarker />} />
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
 
       {immuneCount > 0 && (
