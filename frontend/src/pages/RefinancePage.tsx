@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
 import { CombinedLinkCard } from '../components/consolidation/CombinedMoveCard';
 import { MarketTrends } from '../components/MarketTrends';
+import { MixExplainer } from '../components/MixExplainer';
 import { PageTabs, SummaryBar, TabPanel, type SummaryTone } from '../components/PageTabs';
 import { ExistingTracksEditor } from '../components/refinance/ExistingTracksEditor';
 import { ProposalEditor, RefinanceSettings } from '../components/refinance/ProposalEditor';
@@ -16,6 +17,7 @@ import { Card } from '../components/ui';
 import { refinancePlan } from '../engine/actionPlan';
 import { VERDICT_LABELS, type RefinanceComparison, type RefinanceVerdict as Verdict } from '../engine/refinance';
 import { scenarioOf } from '../lib/api';
+import { refinanceExplainRequest } from '../lib/explainRequest';
 import { formatCurrency, formatSignedCurrency } from '../lib/format';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
 import { usePrinting } from '../lib/printing';
@@ -37,13 +39,20 @@ const VERDICT_TONE: Record<Verdict, SummaryTone> = {
  * do. The verdict stays in view above the tabs, and recomputes on every keystroke.
  */
 export function RefinancePage() {
-  const { proposal, comparison, ltv, perTrack } = useRefinanceAnalysis();
+  const { proposal, comparison, ltv, perTrack, optimal } = useRefinanceAnalysis();
   const tracks = useRefinance((state) => state.tracks);
+  const proposalMode = useRefinance((state) => state.proposalMode);
+  const riskTolerance = useWizard((state) => state.profile.riskTolerance);
   const noticeGiven = useRefinance((state) => state.noticeGiven);
   const macro = useWizard((state) => state.macro);
   const plan = useMemo(
     () => comparison && refinancePlan(comparison, proposal, ltv, scenarioOf(macro).primeAnnual, noticeGiven),
     [comparison, proposal, ltv, macro, noticeGiven],
+  );
+  const explainRequest = useMemo(
+    () =>
+      comparison && refinanceExplainRequest(comparison, proposal, proposalMode, ltv, scenarioOf(macro), riskTolerance),
+    [comparison, proposal, proposalMode, ltv, macro, riskTolerance],
   );
 
   const worthwhile = perTrack.filter((track) => track.worthwhile).length;
@@ -93,11 +102,12 @@ export function RefinancePage() {
           </div>
         )}
         {shows('tracks') && <TrackVerdicts verdicts={perTrack} />}
-        {shows('proposal') && <ProposalEditor proposal={proposal} />}
+        {shows('proposal') && <ProposalEditor proposal={proposal} optimal={optimal} />}
         {shows('results') &&
           (comparison ? (
             <>
               <RefinanceVerdict comparison={comparison} />
+              <MixExplainer request={explainRequest} />
               <RouteComparison comparison={comparison} />
               <RefinanceCharts comparison={comparison} ltv={ltv} />
             </>

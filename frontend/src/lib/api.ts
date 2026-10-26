@@ -18,6 +18,7 @@ import { compareBanks } from '../engine/banks';
 import { priceMix, yearlySummary, type MixResult } from '../engine/amortization';
 import { BASELINE_AS_OF, currentBaselineRates, rateFor } from '../engine/baseline';
 import { liveMarket } from '../engine/liveMarket';
+import type { ManualShares } from '../engine/manualMix';
 import { optimize as runOptimizer, type MixProposal as EngineProposal } from '../engine/optimizer';
 import { scoreOffer } from '../engine/opportunity';
 import { profileRisk, type BorrowerProfile } from '../engine/profile';
@@ -255,11 +256,12 @@ export async function optimize(
   profile: BorrowerProfileRequest,
   macro?: MacroRequest,
   percentile?: number,
+  manualShares?: ManualShares,
 ): Promise<OptimizationResponse> {
   const borrower = toBorrower(profile);
   const scenario = scenarioOf(macro);
   const risk = profileRisk(borrower);
-  const result = runOptimizer(borrower, risk, scenario, percentile ?? 0.5);
+  const result = runOptimizer(borrower, risk, scenario, percentile ?? 0.5, manualShares);
 
   const allocation = new Map<TrackType, number>();
   for (const track of result.recommended.allocations) {
@@ -267,7 +269,9 @@ export async function optimize(
   }
 
   return {
+    mode: result.mode,
     recommended: toProposalDto(result.recommended),
+    ...(result.engineOptimum ? { engineOptimum: toProposalDto(result.engineOptimum) } : {}),
     baskets: result.baskets.map(toProposalDto),
     alternatives: result.alternatives.map(toProposalDto),
     savings: result.savings.map((saving) => ({ ...saving })),

@@ -1,6 +1,7 @@
 import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { isUsable } from './src/engine/boiMarket';
+import { handleExplain } from './worker/explain';
 import { handleExtract } from './worker/extract';
 import { readMarket } from './worker/market';
 
@@ -30,7 +31,12 @@ function marketApi(): Plugin {
     put: async (key: Request, value: Response) => void memory.set(key.url, value),
   } as unknown as Cache;
   const extract: Connect.NextHandleFunction = (request, response, next) => {
-    if (!request.url?.startsWith('/api/extract')) {
+    const route = request.url?.startsWith('/api/extract')
+      ? handleExtract
+      : request.url?.startsWith('/api/explain')
+        ? handleExplain
+        : undefined;
+    if (!route) {
       next();
       return;
     }
@@ -43,7 +49,7 @@ function marketApi(): Plugin {
         headers: { 'content-type': 'application/json', origin: String(request.headers.origin ?? origin) },
         body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
       });
-      handleExtract(forwarded, { OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, OPENROUTER_MODEL: process.env.OPENROUTER_MODEL }, cache, fetch)
+      route(forwarded, { OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, OPENROUTER_MODEL: process.env.OPENROUTER_MODEL }, cache, fetch)
         .then(async (result) => {
           response.statusCode = result.status;
           response.setHeader('content-type', 'application/json; charset=utf-8');
