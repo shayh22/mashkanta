@@ -13,6 +13,8 @@ import type { LiveMarket } from '../engine/boiMarket';
 import { liveMarket } from '../engine/liveMarket';
 import { DEFAULT_PRIME } from '../engine/scenario';
 import { browserStorage, storageKey, uniqueId } from './persistence';
+import { useMarketVersion } from './marketVersion';
+import { ALL_PURPOSE_MARGIN } from '../engine/actionPlan';
 
 const newDebtId = () => uniqueId('d');
 
@@ -22,7 +24,7 @@ export function allPurposeRates(market?: LiveMarket): Pick<ConsolidationTerms, '
   // average margin, fixed as published. Seeded at August 2026 (about prime + 1.5, fixed 6.61%).
   const prime = market?.prime?.value ?? DEFAULT_PRIME;
   return {
-    variableRate: prime + (market?.allPurpose?.variableMarginOverPrime ?? 0.015),
+    variableRate: prime + (market?.allPurpose?.variableMarginOverPrime ?? ALL_PURPOSE_MARGIN.ceiling),
     fixedRate: market?.allPurpose?.fixedUnlinked ?? 0.0661,
   };
 }
@@ -112,6 +114,19 @@ interface ConsolidationState {
   reset: () => void;
 }
 
+/**
+ * Version 1 seeded the offered rates at the old prime (5.75%): 6.50% variable, 6.85% fixed.
+ * Untouched, they would never match a later default and so never follow the market; move them to
+ * today's defaults. Rates the borrower changed are kept.
+ */
+export function migrateConsolidation(persisted: unknown, version: number): unknown {
+  const state = persisted as { terms?: ConsolidationTerms } | undefined;
+  const terms = state?.terms;
+  const legacy =
+    terms && Math.abs(terms.variableRate - 0.065) < 1e-6 && Math.abs(terms.fixedRate - 0.0685) < 1e-6;
+  return version < 2 && legacy ? { ...state, terms: { ...terms, ...allPurposeRates() } } : persisted;
+}
+
 const INITIAL = {
   netIncome: 26_000,
   debts: DEFAULT_DEBTS,
@@ -167,7 +182,8 @@ export const useConsolidation = create<ConsolidationState>()(
     }),
     {
       name: storageKey('consolidation'),
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => migrateConsolidation(persisted, version) as ConsolidationState,
       storage: browserStorage,
       partialize: (state) => ({
         netIncome: state.netIncome,
@@ -186,8 +202,12 @@ export function useConsolidationAnalysis(): ConsolidationAnalysis {
   const debts = useConsolidation((state) => state.debts);
   const property = useConsolidation((state) => state.property);
   const terms = useConsolidation((state) => state.terms);
+  const marketVersion = useMarketVersion();
   return useMemo(
     () => analyseConsolidation({ netIncome, debts, property, terms }),
-    [netIncome, debts, property, terms],
+    // marketVersion is not read in the body: debts are measured against the live consumer-loan
+    // average, and this is how a change to it reaches the memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [netIncome, debts, property, terms, marketVersion],
   );
 }

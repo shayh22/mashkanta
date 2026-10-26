@@ -4,11 +4,11 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { ResponsiveChart } from '../charts/ResponsiveChart';
 import type { RefinanceComparison } from '../../engine/refinance';
 import { formatCompact, formatCurrency, formatSignedCurrency } from '../../lib/format';
 import { Card } from '../ui';
@@ -56,7 +56,7 @@ export function BreakevenChart({ comparison }: { comparison: RefinanceComparison
       subtitle="חיסכון מצטבר בהחזרים בניכוי עמלות הפירעון ועלויות המעבר. המקום שבו הקו חוצה את האפס הוא נקודת האיזון."
     >
       <div className="h-72 w-full text-ink-soft" dir="ltr" role="img" aria-label="גרף חיסכון מצטבר לאורך החודשים בשני מסלולי המיחזור">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveChart width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.12} vertical={false} />
             <XAxis
@@ -86,7 +86,7 @@ export function BreakevenChart({ comparison }: { comparison: RefinanceComparison
             <Line type="monotone" dataKey="internal" name="מיחזור פנימי" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="external" name="בנק מתחרה" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
           </LineChart>
-        </ResponsiveContainer>
+        </ResponsiveChart>
       </div>
       <p className="mt-2 text-xs text-ink-soft">
         עלות ביום המעבר: פנימי {formatCurrency(comparison.internal.upfrontCost)} · מתחרה{' '}
