@@ -345,3 +345,9 @@
   מיגרציה, פריים בטבלה, תאריך לא ידוע.
 - שער: 170/170 (+10) · lint 0 · typecheck 0 · build · e2e נקי.
 
+### 2026-10-26 — `feat/allow-cf-analytics` ✅ (לבקשת המשתמש: "Allow")
+
+- ה-CSP מתיר את ה-beacon של Cloudflare Web Analytics שמוזרק בדומיין `mashkanta.birkat-hanasi.com`:
+  `script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`. מדדי צפייה בלבד;
+  המסמכים עדיין לא יוצאים מהדפדפן.
+
