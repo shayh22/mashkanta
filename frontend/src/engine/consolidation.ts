@@ -297,7 +297,8 @@ const ils = (value: number) => `${Math.round(value).toLocaleString('he-IL')} ₪
 export function checkRegulation(input: ConsolidationInput, allocation: Allocation): RegulatoryCheck {
   const { netIncome, property } = input;
   const L = allocation.amount;
-  const kept = input.debts.filter((debt) => !debt.include);
+  // Same definition as analyseConsolidation: a debt is only consolidated if it has a balance to repay.
+  const kept = input.debts.filter((debt) => !debt.include || debt.balance <= 0);
   const F = kept.filter((debt) => !isShortTerm(debt)).reduce((sum, debt) => sum + debt.monthlyPayment, 0);
   const E = property.mortgageRemainingMonths > CONSOLIDATION_LIMITS.SHORT_TERM_MONTHS ? property.mortgagePayment : 0;
   const disposable = netIncome - F;

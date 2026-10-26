@@ -127,8 +127,6 @@ describe('optimizer', () => {
     expect(result.candidatesEvaluated).toBeGreaterThan(100);
     // Generous ceiling for CI; the console line below reports the real figure.
     expect(result.computeMillis).toBeLessThan(2_000);
-    console.log(
-      `    optimizer: ${result.computeMillis}ms for ${result.candidatesEvaluated} candidates`,
-    );
+    console.log(`    optimizer: ${result.computeMillis}ms for ${result.candidatesEvaluated} candidates`);
   });
 });

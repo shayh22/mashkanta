@@ -27,8 +27,7 @@ const REDACTION_LABELS: Record<string, string> = {
 export function StatementImporter() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const setTracks = useRefinance((state) => state.setTracks);
-  const setKeptIds = useRefinance((state) => state.setKeptIds);
+  const importTracks = useRefinance((state) => state.importTracks);
   const macro = useWizard((state) => state.macro);
   const setMacro = useWizard((state) => state.setMacro);
 
@@ -38,11 +37,10 @@ export function StatementImporter() {
       if (document.tracks.length === 0) {
         return;
       }
-      setKeptIds([]);
       if (document.kind === 'statement') {
-        setTracks(document.tracks.map(({ loanNumber: _loanNumber, ...track }) => track));
+        importTracks(document.tracks.map(({ loanNumber: _loanNumber, ...track }) => track));
       } else {
-        setTracks(
+        importTracks(
           document.tracks.map((track) => ({
             id: newTrackId(),
             type: track.track,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { consolidationPlan, negotiationTargets, planToText, refinancePlan, termForPayment } from './actionPlan';
+import {
+  consolidationPlan,
+  negotiationTargets,
+  planToText,
+  refinancePlan,
+  termForPayment,
+} from './actionPlan';
 import { rateFor } from './baseline';
 import { analyseConsolidation, type ConsolidationInput } from './consolidation';
 import { payment } from './math';
@@ -27,7 +33,14 @@ function refinanceFlow(existing: ExistingTrack[], noticeGiven: boolean, dayOfMon
 describe('refinance action plan', () => {
   const expensive: ExistingTrack[] = [
     { id: 'p', type: 'PRIME', balance: 500_000, annualRate: 0.0675, remainingMonths: 240, monthsElapsed: 30 },
-    { id: 'f', type: 'FIXED_LINKED', balance: 300_000, annualRate: 0.045, remainingMonths: 240, monthsElapsed: 32 },
+    {
+      id: 'f',
+      type: 'FIXED_LINKED',
+      balance: 300_000,
+      annualRate: 0.045,
+      remainingMonths: 240,
+      monthsElapsed: 32,
+    },
   ];
 
   it('recommends acting when the switch pays, and names the route', () => {
@@ -48,7 +61,14 @@ describe('refinance action plan', () => {
 
   it('advises against refinancing when nothing is saved', () => {
     const cheap: ExistingTrack[] = [
-      { id: 'f', type: 'FIXED_UNLINKED', balance: 400_000, annualRate: 0.04, remainingMonths: 200, monthsElapsed: 70 },
+      {
+        id: 'f',
+        type: 'FIXED_UNLINKED',
+        balance: 400_000,
+        annualRate: 0.04,
+        remainingMonths: 200,
+        monthsElapsed: 70,
+      },
     ];
     const { plan } = refinanceFlow(cheap, true);
     expect(plan.headline).toBe('לא למחזר כרגע.');
@@ -74,9 +94,36 @@ describe('refinance action plan', () => {
 const household: ConsolidationInput = {
   netIncome: 20_000,
   debts: [
-    { id: 'car', kind: 'CAR', label: 'רכב', balance: 160_000, annualRate: 0.09, monthlyPayment: 3_300, remainingMonths: 56, include: true },
-    { id: 'nb', kind: 'NON_BANK', label: 'חוץ-בנקאית', balance: 70_000, annualRate: 0.14, monthlyPayment: 1_900, remainingMonths: 44, include: false },
-    { id: 'short', kind: 'OTHER', label: 'קצרה', balance: 8_000, annualRate: 0.07, monthlyPayment: 700, remainingMonths: 12, include: false },
+    {
+      id: 'car',
+      kind: 'CAR',
+      label: 'רכב',
+      balance: 160_000,
+      annualRate: 0.09,
+      monthlyPayment: 3_300,
+      remainingMonths: 56,
+      include: true,
+    },
+    {
+      id: 'nb',
+      kind: 'NON_BANK',
+      label: 'חוץ-בנקאית',
+      balance: 70_000,
+      annualRate: 0.14,
+      monthlyPayment: 1_900,
+      remainingMonths: 44,
+      include: false,
+    },
+    {
+      id: 'short',
+      kind: 'OTHER',
+      label: 'קצרה',
+      balance: 8_000,
+      annualRate: 0.07,
+      monthlyPayment: 700,
+      remainingMonths: 12,
+      include: false,
+    },
   ],
   property: {
     value: 2_000_000,

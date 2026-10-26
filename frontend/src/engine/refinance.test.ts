@@ -205,3 +205,28 @@ describe('partial refinance', () => {
     });
   });
 });
+
+describe('manual proposals and eligibility loans', () => {
+  it('carries an eligibility loan over even when the hand-entered proposal leaves it out', () => {
+    const existing: ExistingTrack[] = [
+      { id: 'p', type: 'PRIME', balance: 300_000, annualRate: 0.06, remainingMonths: 240, monthsElapsed: 30 },
+      {
+        id: 'e',
+        type: 'ELIGIBILITY',
+        balance: 100_000,
+        annualRate: 0.03,
+        remainingMonths: 240,
+        monthsElapsed: 30,
+      },
+    ];
+    const manual: ProposedTrack[] = [
+      { id: 'p', type: 'PRIME', amount: 300_000, annualRate: 0.055, termMonths: 240 },
+    ];
+    const proposal = withKeptTracks(manual, existing, new Set());
+    expect(proposal.find((track) => track.id === 'e')).toMatchObject({ carriedOver: true, annualRate: 0.03 });
+    // The saving is the prime re-pricing only, not the whole eligibility payment.
+    const analysis = analyseRoute(existing, proposal, DEFAULT_ROUTES.INTERNAL, options);
+    const primeOnly = analyseRoute([existing[0]!], manual, DEFAULT_ROUTES.INTERNAL, options);
+    expect(analysis.monthlySaving).toBeCloseTo(primeOnly.monthlySaving, 6);
+  });
+});
