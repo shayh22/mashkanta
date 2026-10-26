@@ -67,14 +67,15 @@ export const AI_SCHEMAS: Record<AiDocumentKind, Record<string, unknown>> = {
   mortgage: {
     type: 'object',
     additionalProperties: false,
-    required: ['tracks'],
+    required: ['asOf', 'tracks'],
     properties: {
+      asOf: text,
       tracks: {
         type: 'array',
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['type', 'label', 'balance', 'annualRatePercent', 'remainingMonths', 'monthsElapsed', 'statedFee'],
+          required: ['type', 'label', 'balance', 'annualRatePercent', 'remainingMonths', 'monthsElapsed', 'startDate', 'statedFee'],
           properties: {
             type: { type: 'string', enum: TRACK_TYPES },
             label: text,
@@ -82,6 +83,7 @@ export const AI_SCHEMAS: Record<AiDocumentKind, Record<string, unknown>> = {
             annualRatePercent: number,
             remainingMonths: integer,
             monthsElapsed: integer,
+            startDate: text,
             statedFee: number,
           },
         },
@@ -130,7 +132,9 @@ remainingMonths = payments left (תשלומים שנותרו), or derive it only
   mortgage: `${COMMON}
 The document describes an existing mortgage. Return one entry per track (מסלול / תת-הלוואה):
 balance = outstanding balance including indexation; annualRatePercent = the current rate (for prime, prime plus margin);
-remainingMonths = payments left; monthsElapsed = months since the loan was taken, if printed;
+remainingMonths = payments left; monthsElapsed = months since the loan was taken, only if printed as a number;
+startDate = the date the loan or track was taken (תאריך ביצוע / העמדה / תחילת ההלוואה) as printed, written YYYY-MM or YYYY-MM-DD;
+asOf = the statement's own date, written YYYY-MM-DD;
 statedFee = the early repayment fee the bank states for that track, if printed. ${TRACK_GUIDE}`,
   offer: `${COMMON}
 The document is a mortgage offer or approval in principle (אישור עקרוני). Return the lender's name if printed,
@@ -198,9 +202,35 @@ function kindLabel(kind: DebtKind): string {
   }[kind];
 }
 
+/** `YYYY-MM` or `YYYY-MM-DD`, read as the first of the month when the day is missing. */
+function parseDate(value: unknown): { year: number; month: number } | undefined {
+  const match = typeof value === 'string' ? /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(value.trim()) : null;
+  if (!match) {
+    return undefined;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return year >= 1980 && year <= 2100 && month >= 1 && month <= 12 ? { year, month } : undefined;
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Whole months from a start date to the statement date, if both read and plausible. */
+function monthsSince(start: unknown, asOf: unknown): number | undefined {
+  const from = parseDate(start);
+  const to = parseDate(asOf);
+  if (!from || !to) {
+    return undefined;
+  }
+  const months = (to.year - from.year) * 12 + (to.month - from.month);
+  return months >= 0 && months <= 480 ? months : undefined;
+}
+
 export function toMortgageTracks(data: unknown, newId: () => string): AiResult<ExistingTrack> {
   const items: ExistingTrack[] = [];
   const warnings: string[] = [];
+  const statementDate = (data as Record<string, unknown> | null)?.asOf;
+  const asOf = parseDate(statementDate) ? statementDate : undefined;
   rowsOf(data, 'tracks').forEach((row, index) => {
     const type = TRACK_TYPES.includes(row.type as TrackType) ? (row.type as TrackType) : undefined;
     const annualRate = rateOf(row.annualRatePercent, 20);
@@ -208,17 +238,22 @@ export function toMortgageTracks(data: unknown, newId: () => string): AiResult<E
       warnings.push(`מסלול ${index + 1}: חסרים סוג, יתרה, ריבית או תקופה סבירים — לא יובא.`);
       return;
     }
+    // Seniority as printed, or worked out here from the dates the model copied — date arithmetic is
+    // done in code, never left to the model.
+    const elapsed = between(row.monthsElapsed, 0, 480)
+      ? Math.round(row.monthsElapsed as number)
+      : monthsSince(row.startDate, asOf ?? today());
     items.push({
       id: newId(),
       type,
       balance: row.balance as number,
       annualRate,
       remainingMonths: Math.round(row.remainingMonths as number),
-      monthsElapsed: between(row.monthsElapsed, 0, 480) ? Math.round(row.monthsElapsed as number) : 0,
+      monthsElapsed: elapsed ?? 0,
       ...(typeof row.label === 'string' && row.label.trim() ? { label: row.label.trim().slice(0, 40) } : {}),
       ...(between(row.statedFee, 0, 2_000_000) ? { statedFee: row.statedFee as number } : {}),
     });
-    if (!between(row.monthsElapsed, 0, 480)) {
+    if (elapsed === undefined) {
       warnings.push(`מסלול ${index + 1}: לא צוין ותק ההלוואה — הנחת ותק אפס (עמלה שמרנית); עדכנו ידנית.`);
     }
   });
