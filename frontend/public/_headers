@@ -4,6 +4,11 @@
 # On the Content-Security-Policy below: it is verified against the running app — charts render
 # and pdf.js starts its worker under it. 'unsafe-inline' appears in style-src only because
 # Recharts sets inline styles on the SVG it generates; no inline script is permitted.
+#
+# Cloudflare Web Analytics is enabled on the custom domain's zone and injects its beacon: the script
+# from static.cloudflareinsights.com, reporting to cloudflareinsights.com (or /cdn-cgi/rum on the same
+# origin, already covered by 'self'). It collects page-view metrics only; uploaded documents never
+# leave the browser regardless.
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -11,7 +16,7 @@
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cloudflareinsights.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 
 # Hashed asset filenames are immutable, so they can be cached forever.
 /assets/*
