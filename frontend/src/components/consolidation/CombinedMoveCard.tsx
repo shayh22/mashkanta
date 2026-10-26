@@ -1,43 +1,27 @@
-import { useMemo, useState } from 'react';
-import { analyseCombined, positionFromMix, type CombinedMove } from '../../engine/combined';
+import { positionFromMix, type CombinedMove } from '../../engine/combined';
 import type { ConsolidationAnalysis } from '../../engine/consolidation';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../../lib/format';
 import { useConsolidation } from '../../store/consolidationStore';
-import { useRefinanceAnalysis } from '../../store/refinanceStore';
+import { useCombinedMove, useCombinedSettings } from '../../store/combinedStore';
 import { Card, ScrollRegion, Toggle } from '../ui';
 
 const ROUTE_NAME = { INTERNAL: 'מיחזור פנימי', EXTERNAL: 'מעבר לבנק מתחרה' } as const;
 
 /**
- * Consolidating on its own against consolidating together with the refinance set up on the
- * refinance page. The mortgage figures for both columns come from that page, so the comparison
- * isolates what the refinance adds.
+ * Consolidating on its own against consolidating together with the refinance. The mortgage figures
+ * for both columns come from the refinance inputs, so the comparison isolates what the refinance adds.
  */
-export function CombinedMoveCard() {
-  const { comparison } = useRefinanceAnalysis();
-  const netIncome = useConsolidation((state) => state.netIncome);
-  const debts = useConsolidation((state) => state.debts);
+export function CombinedComparison() {
+  const { move } = useCombinedMove();
   const property = useConsolidation((state) => state.property);
-  const terms = useConsolidation((state) => state.terms);
   const setProperty = useConsolidation((state) => state.setProperty);
-  const [financeCosts, setFinanceCosts] = useState(true);
-
-  const move = useMemo(() => {
-    if (!comparison) {
-      return undefined;
-    }
-    const refinance = comparison.best === 'EXTERNAL' ? comparison.external : comparison.internal;
-    return analyseCombined({ netIncome, debts, property, terms }, refinance, {
-      financeUpfrontCosts: financeCosts,
-    });
-  }, [comparison, netIncome, debts, property, terms, financeCosts]);
+  const financeCosts = useCombinedSettings((state) => state.financeCosts);
+  const setFinanceCosts = useCombinedSettings((state) => state.setFinanceCosts);
 
   if (!move) {
     return (
-      <Card title="מהלך משולב: מיחזור + איחוד">
-        <p className="text-sm text-ink-soft">
-          הזינו או ייבאו את המשכנתא בעמוד "בדיקת כדאיות מיחזור" כדי לבחון מיחזור ואיחוד באותו מהלך.
-        </p>
+      <Card title="איחוד בלבד מול איחוד + מיחזור">
+        <p className="text-sm text-ink-soft">השלימו את נתוני המשכנתא (או ייבאו דוח מהבנק) כדי להשוות.</p>
       </Card>
     );
   }
@@ -59,22 +43,22 @@ export function CombinedMoveCard() {
 
   return (
     <Card
-      title="מהלך משולב: מיחזור + איחוד"
-      subtitle={`ההשוואה משתמשת במשכנתא מעמוד המיחזור (${ROUTE_NAME[move.refinance.route.kind]}). מיחזור משנה את ההחזר הקיים על הנכס (E) ואת חלק המשתנה — ולכן גם את מרווח האיחוד.`}
+      title="איחוד בלבד מול איחוד + מיחזור"
+      subtitle={`ההשוואה משתמשת במשכנתא מנתוני המיחזור (${ROUTE_NAME[move.refinance.route.kind]}). מיחזור משנה את ההחזר הקיים על הנכס (E) ואת חלק המשתנה — ולכן גם את מרווח האיחוד.`}
       action={
         outOfSync ? (
           <button type="button" className="btn-ghost" onClick={() => setProperty(current)}>
-            העתקת נתוני המשכנתא לעמוד זה
+            העתקת נתוני המשכנתא לעמוד האיחוד
           </button>
         ) : undefined
       }
     >
       {outOfSync && (
         <p className="mb-4 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-caution">
-          נתוני המשכנתא בעמוד זה (יתרה {formatCurrency(property.mortgageBalance)}, החזר{' '}
-          {formatCurrency(property.mortgagePayment)}) שונים מעמוד המיחזור (יתרה{' '}
+          נתוני המשכנתא בעמוד האיחוד (יתרה {formatCurrency(property.mortgageBalance)}, החזר{' '}
+          {formatCurrency(property.mortgagePayment)}) שונים מנתוני המיחזור (יתרה{' '}
           {formatCurrency(current.mortgageBalance)}, החזר {formatCurrency(current.mortgagePayment)}). ההשוואה
-          למטה משתמשת בנתוני עמוד המיחזור.
+          משתמשת בנתוני המיחזור.
         </p>
       )}
 
@@ -187,5 +171,22 @@ function Row({
         {pick(move.combined)}
       </td>
     </tr>
+  );
+}
+
+/** A pointer from the single-move pages to the combined one. */
+export function CombinedLinkCard() {
+  return (
+    <section className="card flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-ink">🔀 מיחזור ואיחוד באותו מהלך</h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          מיחזור המשכנתא משנה את מגבלות האיחוד (PTI ו-⅔ משתנה). ראו את שני המהלכים יחד, עם תוכנית פעולה אחת.
+        </p>
+      </div>
+      <a href="#/combined" className="btn-primary">
+        למהלך המשולב
+      </a>
+    </section>
   );
 }

@@ -1,11 +1,8 @@
 import type { TrackType } from '../lib/types';
 import { rateFor } from './baseline';
-import {
-  CONSOLIDATION_LIMITS,
-  DEBT_KIND_LABELS,
-  type ConsolidationAnalysis,
-} from './consolidation';
+import { CONSOLIDATION_LIMITS, DEBT_KIND_LABELS, type ConsolidationAnalysis } from './consolidation';
 import { payment as annuityPayment, monthlyRate } from './math';
+import type { CombinedMove } from './combined';
 import { VERDICT_LABELS, type RefinanceComparison, type RouteAnalysis } from './refinance';
 import { TRACKS } from './tracks';
 
@@ -120,7 +117,10 @@ export function refinancePlan(
       text: `${VERDICT_LABELS[best.verdict]} — ${routeName}.`,
       detail: `חיסכון של ${ils(best.monthlySaving)} בחודש, נקודת איזון בחודש ${best.breakevenMonth}, ערך נוכחי נקי ${ils(best.netPresentValue)}.`,
     });
-    if (other.netPresentValue > 0 && Math.abs(best.netPresentValue - other.netPresentValue) < best.upfrontCost) {
+    if (
+      other.netPresentValue > 0 &&
+      Math.abs(best.netPresentValue - other.netPresentValue) < best.upfrontCost
+    ) {
       decision.push({
         priority: 'MEDIUM',
         text: 'השתמשו בהצעת המתחרה כמנוף מול הבנק הנוכחי.',
@@ -146,7 +146,11 @@ export function refinancePlan(
     });
   }
   for (const quote of fees.tracks) {
-    if (quote.monthsToNextDiscount !== undefined && quote.monthsToNextDiscount <= 6 && quote.nextDiscount !== undefined) {
+    if (
+      quote.monthsToNextDiscount !== undefined &&
+      quote.monthsToNextDiscount <= 6 &&
+      quote.nextDiscount !== undefined
+    ) {
       const saving = quote.grossCapitalizationFee * (quote.nextDiscount - quote.seniorityDiscount);
       timing.push({
         priority: 'MEDIUM',
@@ -192,7 +196,12 @@ export function refinancePlan(
 }
 
 /** The term at which the new loan's payment fits a payment ceiling, or undefined if none does. */
-export function termForPayment(amount: number, annualRate: number, maxPayment: number, limit = 360): number | undefined {
+export function termForPayment(
+  amount: number,
+  annualRate: number,
+  maxPayment: number,
+  limit = 360,
+): number | undefined {
   const r = monthlyRate(annualRate);
   for (let n = 12; n <= limit; n += 12) {
     if (annuityPayment(amount, r, n) <= maxPayment) {
@@ -220,7 +229,9 @@ export function consolidationPlan(analysis: ConsolidationAnalysis, prime: number
   } else {
     status.push({
       priority: 'HIGH',
-      text: r.bankFeasible ? 'האיחוד בר-ביצוע — אפשר לפנות לבנק.' : 'מותר רגולטורית, אך מעל מדיניות 40% של רוב הבנקים.',
+      text: r.bankFeasible
+        ? 'האיחוד בר-ביצוע — אפשר לפנות לבנק.'
+        : 'מותר רגולטורית, אך מעל מדיניות 40% של רוב הבנקים.',
       detail: `חמצן תזרימי של ${ils(analysis.monthlyRelief)} בחודש; התייקרות כוללת של ${ils(analysis.extraLifetimeCost)} אם לא מקצרים.`,
     });
   }
@@ -259,7 +270,9 @@ export function consolidationPlan(analysis: ConsolidationAnalysis, prime: number
         detail: 'מחיר: עלות כוללת גבוהה יותר — השתמשו בסימולטור הקיצור החכם כדי לקזז אותה.',
       });
     }
-    const keptLong = analysis.kept.filter((debt) => debt.remainingMonths > CONSOLIDATION_LIMITS.SHORT_TERM_MONTHS);
+    const keptLong = analysis.kept.filter(
+      (debt) => debt.remainingMonths > CONSOLIDATION_LIMITS.SHORT_TERM_MONTHS,
+    );
     if (keptLong.length > 0) {
       pti.push({
         priority: 'MEDIUM',
@@ -314,6 +327,75 @@ export function consolidationPlan(analysis: ConsolidationAnalysis, prime: number
     sections,
     targets: [],
     generatedOn: today(),
+  };
+}
+
+/**
+ * The plan for refinancing and consolidating in one move: the bottom line of the two together,
+ * then the refinance and consolidation plans in that order — the refinance comes first because it
+ * sets the mortgage payment and variable share that the consolidation is tested against.
+ */
+export function combinedPlan(
+  move: CombinedMove,
+  comparison: RefinanceComparison,
+  proposal: readonly { type: TrackType; annualRate: number; termMonths: number }[],
+  ltv: number,
+  prime: number,
+  noticeGiven: boolean,
+): ActionPlan {
+  const relief = move.paymentToday - move.paymentAfter;
+  const before = move.consolidationOnly.regulation;
+  const after = move.combined.regulation;
+  const refinance = refinancePlan(comparison, proposal, ltv, prime, noticeGiven);
+  const consolidation = consolidationPlan(move.combined, prime);
+
+  const bottom: PlanItem[] = [
+    after.feasible
+      ? {
+          priority: 'HIGH',
+          text: `שני המהלכים יחד מורידים ${ils(relief)} מההחזר החודשי.`,
+          detail: `מ-${ils(move.paymentToday)} ל-${ils(move.paymentAfter)}; המיחזור לבדו תורם ${ils(move.extraReliefFromRefinance)} מתוכם.`,
+        }
+      : {
+          priority: 'HIGH',
+          text: 'גם אחרי המיחזור האיחוד אינו עומד בהוראה 329 כפי שהוגדר.',
+          detail: `ניתן לאחד עד ${ils(after.maxFeasibleLoan)}.`,
+        },
+    {
+      priority: 'MEDIUM',
+      text: 'קודם המיחזור, אחר כך האיחוד — באותה פנייה לבנק.',
+      detail: after.ptiExempt
+        ? 'ההלוואה לכל מטרה במסלול הפטור (עד 120,000 ₪), כך שה-PTI אינו נבחן.'
+        : `המשכנתא הממוחזרת מורידה את ה-PTI של האיחוד מ-${pct(before.pti, 1)} ל-${pct(after.pti, 1)}.`,
+    },
+  ];
+  if (move.cashUpfront > 0) {
+    bottom.push({
+      priority: 'MEDIUM',
+      text: `הכינו ${ils(move.cashUpfront)} במזומן לעמלות ולעלויות המעבר.`,
+      detail: 'אפשר במקום זאת לממן אותן מתוך ההלוואה לכל מטרה — במחיר החזר חודשי מעט גבוה יותר.',
+    });
+  }
+  if (move.extraCreditRoom > 1) {
+    bottom.push({
+      priority: 'LOW',
+      text: `המיחזור מגדיל את מרווח האיחוד ב-${ils(move.extraCreditRoom)}.`,
+    });
+  }
+
+  const prefixed = (prefix: string, plan: ActionPlan) =>
+    plan.sections.map((section) => ({ ...section, title: `${prefix} — ${section.title}` }));
+
+  return {
+    title: 'תוכנית פעולה — מיחזור ואיחוד במהלך אחד',
+    headline: bottom[0]!.text,
+    sections: [
+      { title: 'השורה התחתונה', items: bottom },
+      ...prefixed('מיחזור', refinance),
+      ...prefixed('איחוד', consolidation).filter((section) => !section.title.endsWith('השורה התחתונה')),
+    ],
+    targets: refinance.targets,
+    generatedOn: refinance.generatedOn,
   };
 }
 
