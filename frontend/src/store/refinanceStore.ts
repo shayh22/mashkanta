@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { scenarioOf } from '../lib/api';
+import { useMarketVersion } from './marketStore';
 import type { ExistingTrack } from '../engine/prepayment';
 import {
   compareRoutes,
@@ -236,6 +237,7 @@ export interface RefinanceView {
 export function useRefinanceAnalysis(): RefinanceView {
   const state = useRefinance();
   const macro = useWizard((wizard) => wizard.macro);
+  const marketVersion = useMarketVersion();
 
   return useMemo(() => {
     const balance = outstandingBalance(state.tracks);
@@ -260,6 +262,9 @@ export function useRefinanceAnalysis(): RefinanceView {
     const comparison = compareRoutes(state.tracks, proposal, state.routes, options);
     const perTrack = trackByTrack(state.tracks, state.percentile, options);
     return { ltv, balance, proposal, comparison, perTrack };
+    // marketVersion is not read in the body: the engine prices against the live market table, and
+    // this is how a change to that table reaches the memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.tracks,
     state.propertyValue,
@@ -272,5 +277,6 @@ export function useRefinanceAnalysis(): RefinanceView {
     state.noticeGiven,
     state.dayOfMonth,
     macro,
+    marketVersion,
   ]);
 }

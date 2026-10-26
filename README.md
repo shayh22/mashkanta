@@ -166,6 +166,10 @@ worst relative drift across all comparisons: 0.00002992%
 Lifetime cost matches to the shekel, and the optimizer selects the identical mix at every risk
 tolerance from 1 to 10.
 
+The check runs both engines at the Java seed (prime 5.75%). Since October 2026 the browser engine's
+own market table and default prime (4.75%) follow the Bank of Israel's August 2026 averages, so the
+two **intentionally diverge** in data while the parity check still pins the calculation logic.
+
 ### The calculation engine
 
 `AmortizationEngine` is pure and stateless: it takes a `TrackSpec` and a `MacroScenario` and returns
@@ -251,7 +255,30 @@ the CSP forbids inline ones), and printing always uses the light palette. Chart 
 for colour-vision-deficiency separation against both surfaces. The three modes form an ARIA tablist
 with right-to-left arrow-key handling.
 
+### Live market data
+
+The app reads the Bank of Israel's statistics service on every load, and again when the ⟳ button in
+the header is pressed: the Bank of Israel rate (prime = rate + 1.5), the 5-year inflation expectation
+and government yields, and the latest monthly averages on new housing loans and on all-purpose loans
+secured on a home. The service does not answer cross-origin browser requests, so a small Worker
+(`frontend/worker/index.ts`, the only server code, routed for `/api/*` only) fetches and parses the
+CSV files and caches the result at the edge for six hours. `npm run dev` / `vite preview` serve the
+same endpoint from a middleware (behind an HTTP proxy, start them with `NODE_USE_ENV_PROXY=1`).
+
+What changes when the figures arrive: the default prime and inflation, each track's rate distribution
+(re-centred on the published average, LTV steps and spread kept), the all-purpose loan rates offered
+in consolidation (only while they are still the previous defaults — rates typed in from a real offer
+are never overwritten), and the negotiation targets in the action plan. Every figure is range-checked;
+anything missing or implausible falls back to the seeded value below, and the header says which is in
+use. The last good set is cached in the browser so the app starts on it.
+
 ### Market baseline
+
+The browser build's table (`frontend/src/engine/baseline.ts`, `BASELINE_AS_OF`) is anchored to the
+Bank of Israel's average rates on new housing loans, dataset `BIR_MRTG_99` (SDMX API at
+`edge.boi.gov.il`), August 2026: each track's distribution is centred on the published average with
+its LTV spread kept. Prime-track rows move with the prime rate entered by the user. The Java backend's
+table below is the original seed.
 
 Seeded from the Bank of Israel monthly average rate table by LTV bucket, then blended with verified
 community observations that survive an outlier screen. Both the median and the top decile are shown:

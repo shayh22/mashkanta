@@ -1,9 +1,11 @@
 # Deployed as a Worker serving static assets — the shape Cloudflare's build pipeline uses when the
 # deploy command is `npx wrangler deploy`.
 #
-# There is deliberately no `main` entry point: the whole app is static, so no Worker script runs and
-# asset requests are served straight from Cloudflare's edge.
+# The app itself is static and asset requests are served straight from Cloudflare's edge. The one
+# exception is `/api/*`: the Worker in `worker/index.ts` reads live market figures from the Bank of
+# Israel, whose statistics service does not answer cross-origin browser requests.
 name = "mashkanta"
+main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 
 # Publish on <name>.<subdomain>.workers.dev. This is the documented default, but it is stated
@@ -16,3 +18,6 @@ directory = "./dist"
 # Unmatched paths render the SPA shell and let the client route them. This is the native mechanism,
 # used instead of a catch-all rule in _redirects so it cannot shadow real asset paths.
 not_found_handling = "single-page-application"
+binding = "ASSETS"
+# Only these paths run the Worker; everything else never touches it.
+run_worker_first = ["/api/*"]

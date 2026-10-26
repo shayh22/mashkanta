@@ -31,7 +31,7 @@ export interface MarketRate {
   readonly source: string;
 }
 
-const SOURCE = 'בנק ישראל — ריביות ממוצעות חודשיות';
+const SOURCE = 'בנק ישראל — ריביות ממוצעות בהלוואות לדיור, אוגוסט 2026';
 const SUBSIDISED = 'משרד הבינוי והשיכון — הלוואת זכאות';
 
 const rate = (
@@ -44,32 +44,41 @@ const rate = (
   source = SOURCE,
 ): MarketRate => ({ track, tier, bestRate, medianRate, worstRate, sampleSize, source });
 
+/** The month the seeded medians were calibrated to. */
+export const BASELINE_AS_OF = '2026-08';
+
 /**
- * Seed values reflecting the Bank of Israel monthly average table for the current period.
+ * Seed values calibrated to the Bank of Israel's average rates on new housing loans for August 2026
+ * (statistics service, dataflow BIR_MRTG_99, housing loans A2C): fixed unlinked 4.62%, fixed
+ * CPI-linked 3.29%, variable CPI-linked 1.64% benchmark + 1.55% margin = 3.19%, and unlinked
+ * variable at a 0.49% average margin over a benchmark that tracks prime. Each track's middle LTV
+ * bucket carries the published average; the buckets around it and the best/worst spread keep their
+ * earlier shape, since the series is not published by LTV. Variable unlinked (5-year, bond-anchored)
+ * has no separate series and keeps its earlier values.
  *
- * Prime figures are all-in (prime plus the typical negative bank margin): a well-negotiated deal
- * is around prime minus 0.7, while prime minus 0.2 is what an un-negotiated first offer looks like.
+ * Prime figures are all-in at {@link DEFAULT_PRIME} and move with prime (see {@link rateFor}):
+ * the market average is around prime + 0.5, a well-negotiated deal around prime + 0.2.
  */
 export const BASELINE_RATES: readonly MarketRate[] = [
-  rate('PRIME', 'UP_TO_45', 0.0475, 0.0505, 0.0545, 4200),
-  rate('PRIME', 'FROM_45_TO_60', 0.0485, 0.0515, 0.0555, 5100),
-  rate('PRIME', 'ABOVE_60', 0.0495, 0.0525, 0.0565, 6800),
+  rate('PRIME', 'UP_TO_45', 0.0484, 0.0514, 0.0554, 4200),
+  rate('PRIME', 'FROM_45_TO_60', 0.0494, 0.0524, 0.0564, 5100),
+  rate('PRIME', 'ABOVE_60', 0.0504, 0.0534, 0.0574, 6800),
 
-  rate('FIXED_UNLINKED', 'UP_TO_45', 0.0455, 0.0495, 0.054, 3900),
-  rate('FIXED_UNLINKED', 'FROM_45_TO_60', 0.047, 0.0512, 0.0558, 4700),
-  rate('FIXED_UNLINKED', 'ABOVE_60', 0.0488, 0.0532, 0.058, 6300),
+  rate('FIXED_UNLINKED', 'UP_TO_45', 0.0405, 0.0445, 0.049, 3900),
+  rate('FIXED_UNLINKED', 'FROM_45_TO_60', 0.042, 0.0462, 0.0508, 4700),
+  rate('FIXED_UNLINKED', 'ABOVE_60', 0.0438, 0.0482, 0.053, 6300),
 
-  rate('FIXED_LINKED', 'UP_TO_45', 0.0265, 0.03, 0.0345, 2600),
-  rate('FIXED_LINKED', 'FROM_45_TO_60', 0.0278, 0.0315, 0.036, 3100),
-  rate('FIXED_LINKED', 'ABOVE_60', 0.0295, 0.0335, 0.0382, 4100),
+  rate('FIXED_LINKED', 'UP_TO_45', 0.0279, 0.0314, 0.0359, 2600),
+  rate('FIXED_LINKED', 'FROM_45_TO_60', 0.0292, 0.0329, 0.0374, 3100),
+  rate('FIXED_LINKED', 'ABOVE_60', 0.0309, 0.0349, 0.0396, 4100),
 
   rate('VARIABLE_UNLINKED', 'UP_TO_45', 0.044, 0.0478, 0.052, 1800),
   rate('VARIABLE_UNLINKED', 'FROM_45_TO_60', 0.0452, 0.0492, 0.0536, 2200),
   rate('VARIABLE_UNLINKED', 'ABOVE_60', 0.0468, 0.051, 0.0556, 2900),
 
-  rate('VARIABLE_LINKED', 'UP_TO_45', 0.0215, 0.025, 0.0292, 1500),
-  rate('VARIABLE_LINKED', 'FROM_45_TO_60', 0.0228, 0.0265, 0.0308, 1900),
-  rate('VARIABLE_LINKED', 'ABOVE_60', 0.0244, 0.0284, 0.033, 2500),
+  rate('VARIABLE_LINKED', 'UP_TO_45', 0.0269, 0.0304, 0.0346, 1500),
+  rate('VARIABLE_LINKED', 'FROM_45_TO_60', 0.0282, 0.0319, 0.0362, 1900),
+  rate('VARIABLE_LINKED', 'ABOVE_60', 0.0298, 0.0338, 0.0384, 2500),
 
   rate('ELIGIBILITY', 'UP_TO_45', 0.03, 0.03, 0.03, 0, SUBSIDISED),
   rate('ELIGIBILITY', 'FROM_45_TO_60', 0.03, 0.03, 0.03, 0, SUBSIDISED),
@@ -79,6 +88,38 @@ export const BASELINE_RATES: readonly MarketRate[] = [
 const INDEX = new Map<string, MarketRate>(
   BASELINE_RATES.map((entry) => [`${entry.track}:${entry.tier}`, entry]),
 );
+
+/** The seeded median in the middle LTV bucket — the one calibrated to the published average. */
+export function seededAverage(track: TrackType): number {
+  return INDEX.get(`${track}:FROM_45_TO_60`)!.medianRate;
+}
+
+/**
+ * Per-track shifts that re-centre the seeded distributions on live published averages, with the
+ * source those averages came from. Empty until live data arrives; see `liveMarket.ts`.
+ */
+let marketShift: { shifts: Partial<Record<TrackType, number>>; source?: string } = { shifts: {} };
+
+export function setMarketShifts(shifts: Partial<Record<TrackType, number>>, source?: string): void {
+  marketShift = { shifts, source };
+}
+
+/** The table as currently priced: the seed, moved onto the live averages where they are known. */
+export function currentBaselineRates(): MarketRate[] {
+  return BASELINE_RATES.map((entry) => {
+    const shift = marketShift.shifts[entry.track];
+    if (shift === undefined) {
+      return { ...entry };
+    }
+    return {
+      ...entry,
+      bestRate: entry.bestRate + shift,
+      medianRate: entry.medianRate + shift,
+      worstRate: entry.worstRate + shift,
+      source: marketShift.source ?? entry.source,
+    };
+  });
+}
 
 /**
  * Fixed-rate tracks price the lender's duration risk, so a 30-year quote sits above a 15-year one.
@@ -105,7 +146,10 @@ export function rateFor(track: TrackType, ltv: number, termMonths: number, prime
   if (!base) {
     throw new Error(`no baseline rate for ${track}`);
   }
-  const adjustment = termPremium(track, termMonths) + (track === 'PRIME' ? prime - DEFAULT_PRIME : 0);
+  const adjustment =
+    termPremium(track, termMonths) +
+    (track === 'PRIME' ? prime - DEFAULT_PRIME : 0) +
+    (marketShift.shifts[track] ?? 0);
   if (adjustment === 0) {
     return base;
   }

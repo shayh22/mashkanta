@@ -34,7 +34,7 @@ describe('prime-relative market rates', () => {
       monthsElapsed: 70,
     };
     const [atDefault] = likeForLikeProposal([track], 0.4, 0.3);
-    const [atLower] = likeForLikeProposal([track], 0.4, 0.3, new Set(), 0.0475);
+    const [atLower] = likeForLikeProposal([track], 0.4, 0.3, new Set(), DEFAULT_PRIME - 0.01);
     expect(atLower!.annualRate).toBeCloseTo(atDefault!.annualRate - 0.01, 12);
   });
 });

@@ -16,7 +16,8 @@ import {
 } from '../engine/documents';
 import { compareBanks } from '../engine/banks';
 import { priceMix, yearlySummary, type MixResult } from '../engine/amortization';
-import { BASELINE_RATES, rateFor } from '../engine/baseline';
+import { BASELINE_AS_OF, currentBaselineRates, rateFor } from '../engine/baseline';
+import { liveMarket } from '../engine/liveMarket';
 import { optimize as runOptimizer, type MixProposal as EngineProposal } from '../engine/optimizer';
 import { scoreOffer } from '../engine/opportunity';
 import { profileRisk, type BorrowerProfile } from '../engine/profile';
@@ -66,26 +67,28 @@ export class ApiError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * The published economic anchors the app starts from.
- *
- * With no server there is nothing to synchronise them, so they are seeded constants and the UI
- * says so. A borrower can override both prime and inflation in the wizard.
+ * The published economic anchors the app starts from: the live Bank of Israel figures when they
+ * have been fetched (see `store/marketStore.ts`), otherwise the seeded constants. A borrower can
+ * override both prime and inflation in the wizard.
  */
 function currentAnchors(): MacroAnchors {
   const today = new Date();
   const lastCpi = new Date(today.getFullYear(), today.getMonth() - (today.getDate() >= 15 ? 0 : 1), 15);
   const nextCpi = new Date(lastCpi.getFullYear(), lastCpi.getMonth() + 1, 15);
   const iso = (date: Date) => date.toISOString().slice(0, 10);
+  const live = liveMarket();
 
   return {
-    prime: DEFAULT_PRIME,
-    cpiAnnual: DEFAULT_CPI,
-    bondYield5y: DEFAULT_ANCHOR,
-    linkedYield5y: 0.018,
-    primeUpdatedOn: iso(new Date(today.getFullYear(), today.getMonth() - 1, 1)),
-    cpiUpdatedOn: iso(lastCpi),
+    prime: live?.prime?.value ?? DEFAULT_PRIME,
+    cpiAnnual: live?.inflationExpectation?.value ?? DEFAULT_CPI,
+    bondYield5y: live?.bondYield5y?.value ?? DEFAULT_ANCHOR,
+    linkedYield5y: live?.linkedYield5y?.value ?? 0.018,
+    primeUpdatedOn: live?.prime?.since ?? BASELINE_AS_OF,
+    cpiUpdatedOn: live?.inflationExpectation?.asOf ?? iso(lastCpi),
     nextCpiOn: iso(nextCpi),
-    source: 'ערכי בסיס — בנק ישראל והלשכה המרכזית לסטטיסטיקה',
+    source: live
+      ? `בנק ישראל — נקרא ${new Date(live.fetchedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}`
+      : 'ערכי בסיס — בנק ישראל והלשכה המרכזית לסטטיסטיקה',
   };
 }
 
@@ -241,8 +244,8 @@ export async function fetchReference(): Promise<ReferenceResponse> {
 
 export async function fetchBaseline(): Promise<BaselineResponse> {
   return {
-    rates: BASELINE_RATES.map((entry) => ({ ...entry })),
-    lastRefreshed: new Date().toISOString().slice(0, 10),
+    rates: currentBaselineRates(),
+    lastRefreshed: liveMarket()?.fetchedAt.slice(0, 10) ?? BASELINE_AS_OF,
     anchors: currentAnchors(),
   };
 }

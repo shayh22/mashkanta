@@ -1,4 +1,5 @@
 import type { TrackType } from '../lib/types';
+import { liveMarket } from './liveMarket';
 import { rateFor } from './baseline';
 import { CONSOLIDATION_LIMITS, DEBT_KIND_LABELS, type ConsolidationAnalysis } from './consolidation';
 import { payment as annuityPayment, monthlyRate } from './math';
@@ -45,8 +46,17 @@ export interface ActionPlan {
   readonly generatedOn: string;
 }
 
-/** Typical margins over prime for an all-purpose loan secured on a home. */
-export const ALL_PURPOSE_MARGIN = { target: 0.004, ceiling: 0.009 } as const;
+/**
+ * Margins over prime for an all-purpose loan secured on a home: the ceiling is the market average
+ * (Bank of Israel, August 2026, about prime + 1.5), the target half a point under it.
+ */
+export const ALL_PURPOSE_MARGIN = { target: 0.01, ceiling: 0.015 } as const;
+
+/** {@link ALL_PURPOSE_MARGIN}, re-centred on the live published average when it is known. */
+export function allPurposeMargin(): { target: number; ceiling: number } {
+  const ceiling = liveMarket()?.allPurpose?.variableMarginOverPrime;
+  return ceiling === undefined ? ALL_PURPOSE_MARGIN : { target: Math.max(0, ceiling - 0.005), ceiling };
+}
 
 const ils = (value: number) => `${Math.round(value).toLocaleString('he-IL')} ₪`;
 const pct = (value: number, digits = 2) => `${(value * 100).toFixed(digits)}%`;
@@ -311,11 +321,12 @@ export function consolidationPlan(analysis: ConsolidationAnalysis, prime: number
     });
   }
   const margin = allocation.variableRate - prime;
+  const reference = allPurposeMargin();
   cost.push({
-    priority: margin > ALL_PURPOSE_MARGIN.ceiling ? 'HIGH' : 'MEDIUM',
-    text: `מרווח יעד בפריים: פריים + ${pct(ALL_PURPOSE_MARGIN.target)} (${pct(prime + ALL_PURPOSE_MARGIN.target)}).`,
+    priority: margin > reference.ceiling ? 'HIGH' : 'MEDIUM',
+    text: `מרווח יעד בפריים: פריים + ${pct(reference.target)} (${pct(prime + reference.target)}).`,
     detail:
-      margin > ALL_PURPOSE_MARGIN.ceiling
+      margin > reference.ceiling
         ? `ההצעה הנוכחית פריים + ${pct(margin)} — גבוהה מהמקובל להלוואה מובטחת בדירה.`
         : `ההצעה הנוכחית פריים + ${pct(margin)}.`,
   });
