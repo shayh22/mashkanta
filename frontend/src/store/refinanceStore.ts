@@ -121,7 +121,18 @@ export const useRefinance = create<RefinanceState>()(
         })),
       updateTrack: (id, patch) =>
         set((state) => ({
-          tracks: state.tracks.map((track) => (track.id === id ? { ...track, ...patch } : track)),
+          tracks: state.tracks.map((track) => {
+            if (track.id !== id) {
+              return track;
+            }
+            const updated = { ...track, ...patch };
+            // The bank's stated fee was for the track as it appeared on the statement; once the
+            // borrower changes what is being repaid, the fee falls back to the estimate.
+            const repriced = (['type', 'balance', 'annualRate', 'remainingMonths'] as const).some(
+              (key) => key in patch && patch[key] !== track[key],
+            );
+            return repriced ? { ...updated, statedFee: undefined } : updated;
+          }),
         })),
       removeTrack: (id) =>
         set((state) => ({

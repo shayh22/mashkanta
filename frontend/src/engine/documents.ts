@@ -1,5 +1,6 @@
 import { parseApproval, type ParsedApproval } from './approval';
-import { redact } from './redaction';
+import { redact, type RedactionResult } from './redaction';
+import { parseMortgageStatement, statementToTracks, type ParsedStatement, type StatementTrack } from './statement';
 
 /**
  * Client-side extraction of an approval-in-principle.
@@ -65,30 +66,30 @@ function isPdf(bytes: Uint8Array, file: File): boolean {
   return file.type.toLowerCase().includes('pdf') || file.name.toLowerCase().endsWith('.pdf');
 }
 
-export async function extractApproval(file: File, primeRate: number): Promise<DocumentExtraction> {
+/** Reads a file into text, ready for redaction. Shared by every document parser. */
+async function readDocumentText(file: File): Promise<{ text: string; pageCount: number; warnings: string[] }> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error('הקובץ גדול מ-10MB.');
   }
 
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-
-  let text: string;
-  let pageCount = 1;
   const warnings: string[] = [];
 
   if (isPdf(bytes, file)) {
     const extracted = await extractPdfText(buffer);
-    text = extracted.text;
-    pageCount = extracted.pageCount;
-    if (text.trim().length < TEXT_LAYER_THRESHOLD) {
+    if (extracted.text.trim().length < TEXT_LAYER_THRESHOLD) {
       warnings.push(
         'לא נמצאה שכבת טקסט במסמך. ככל הנראה מדובר בסריקה — נדרש קובץ PDF מקורי מהבנק.',
       );
     }
-  } else {
-    text = new TextDecoder('utf-8').decode(bytes);
+    return { text: extracted.text, pageCount: extracted.pageCount, warnings };
   }
+  return { text: new TextDecoder('utf-8').decode(bytes), pageCount: 1, warnings };
+}
+
+export async function extractApproval(file: File, primeRate: number): Promise<DocumentExtraction> {
+  const { text, pageCount, warnings } = await readDocumentText(file);
 
   // Redact before anything else touches the text.
   const sanitised = redact(text);
@@ -103,4 +104,45 @@ export async function extractApproval(file: File, primeRate: number): Promise<Do
     tracks: parsed.tracks,
     warnings: [...parsed.warnings, ...warnings],
   };
+}
+
+export type MortgageDocument =
+  | {
+      readonly kind: 'statement';
+      readonly statement: ParsedStatement;
+      readonly tracks: readonly StatementTrack[];
+      readonly redaction: Omit<RedactionResult, 'sanitizedText'>;
+      readonly pageCount: number;
+      readonly warnings: readonly string[];
+    }
+  | {
+      readonly kind: 'approval';
+      readonly tracks: ParsedApproval['tracks'];
+      readonly redaction: Omit<RedactionResult, 'sanitizedText'>;
+      readonly pageCount: number;
+      readonly warnings: readonly string[];
+    };
+
+/**
+ * Reads whatever mortgage document the borrower has: a mortgage details statement when it is one
+ * (exact balances, sub-loans, the bank's own fee), otherwise an approval-in-principle.
+ */
+export async function extractMortgageDocument(file: File, primeRate: number): Promise<MortgageDocument> {
+  const { text, pageCount, warnings } = await readDocumentText(file);
+  const { sanitizedText, ...redaction } = redact(text);
+
+  const statement = parseMortgageStatement(sanitizedText);
+  if (statement) {
+    return {
+      kind: 'statement',
+      statement,
+      tracks: statementToTracks(statement),
+      redaction,
+      pageCount,
+      warnings: [...statement.warnings, ...warnings],
+    };
+  }
+
+  const approval = parseApproval(sanitizedText, primeRate);
+  return { kind: 'approval', tracks: approval.tracks, redaction, pageCount, warnings: [...approval.warnings, ...warnings] };
 }

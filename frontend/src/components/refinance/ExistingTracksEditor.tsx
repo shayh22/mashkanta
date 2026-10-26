@@ -1,9 +1,8 @@
-import { useCallback } from 'react';
-import type { DocumentJob, TrackType } from '../../lib/types';
+import type { TrackType } from '../../lib/types';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import { TRACK_OPTIONS } from '../../lib/trackOptions';
-import { newTrackId, outstandingBalance, useRefinance } from '../../store/refinanceStore';
-import { ApprovalUploader } from '../ApprovalUploader';
+import { outstandingBalance, useRefinance } from '../../store/refinanceStore';
+import { StatementImporter } from './StatementImporter';
 import { ScrollRegion, Card, CurrencyField, NumberInput } from '../ui';
 
 /**
@@ -18,34 +17,14 @@ export function ExistingTracksEditor() {
     addTrack,
     updateTrack,
     removeTrack,
-    setTracks,
     keptIds,
     toggleKept,
   } = useRefinance();
   const balance = outstandingBalance(tracks);
 
-  const seedFromDocument = useCallback(
-    (job: DocumentJob) => {
-      const extracted = job.result?.tracks ?? [];
-      if (extracted.length === 0) {
-        return;
-      }
-      setTracks(
-        extracted.map((track) => ({
-          id: newTrackId(),
-          type: track.track,
-          balance: track.amount,
-          annualRate: track.annualRate,
-          remainingMonths: track.termMonths > 0 ? track.termMonths : 240,
-          monthsElapsed: 36,
-        })),
-      );
-    },
-    [setTracks],
-  );
-
   return (
     <div className="space-y-5">
+      <StatementImporter />
       <Card
         title="המשכנתא הקיימת"
         subtitle="הזינו את היתרות מתוך דוח יתרות לסילוק — סכום, ריבית נוכחית, יתרת תקופה וותק לכל מסלול."
@@ -112,6 +91,7 @@ export function ExistingTracksEditor() {
                           </option>
                         ))}
                       </select>
+                      {track.label && <span className="mt-1 block text-xs text-ink-soft">{track.label}</span>}
                     </td>
                     <td className="py-2 pe-2">
                       <NumberInput
@@ -177,20 +157,6 @@ export function ExistingTracksEditor() {
         )}
       </Card>
 
-      <details className="card group">
-        <summary className="cursor-pointer text-sm font-semibold text-ink">
-          ייבוא מסלולים ממסמך (אישור עקרוני או דוח יתרות)
-        </summary>
-        <div className="mt-4">
-          <ApprovalUploader
-            ltv={propertyValue > 0 ? balance / propertyValue : 0.5}
-            onExtracted={seedFromDocument}
-          />
-          <p className="hint">
-            הקובץ מעובד בדפדפן בלבד. אחרי הייבוא בדקו ועדכנו את הוותק — הוא אינו מופיע בדרך כלל במסמך.
-          </p>
-        </div>
-      </details>
     </div>
   );
 }
