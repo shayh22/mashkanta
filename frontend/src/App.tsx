@@ -4,6 +4,7 @@ import { ApiError, fetchBaseline, fetchReference, optimize } from './lib/api';
 import type { BorrowerProfileRequest, MacroRequest } from './lib/types';
 import { useTheme } from './lib/theme';
 import { useWizard } from './store/wizardStore';
+import type { ManualShares } from './engine/manualMix';
 import { useRefinance } from './store/refinanceStore';
 import { useConsolidation } from './store/consolidationStore';
 import { MortgageWizard } from './components/MortgageWizard';
@@ -52,7 +53,7 @@ function modeFromHash(): Mode {
 export default function App() {
   const [mode, setMode] = useState<Mode>(modeFromHash);
   const [view, setView] = useState<MortgageView>('wizard');
-  const { profile, macro, percentile, reset } = useWizard();
+  const { profile, macro, percentile, mixMode, manualShares, setMixMode, reset } = useWizard();
   const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
@@ -91,12 +92,22 @@ export default function App() {
   const baseline = useQuery({ queryKey: ['baseline'], queryFn: fetchBaseline, staleTime: 60 * 60 * 1000 });
 
   const optimization = useMutation({
-    mutationFn: (input: { profile: BorrowerProfileRequest; macro: MacroRequest; percentile: number }) =>
-      optimize(input.profile, input.macro, input.percentile),
+    mutationFn: (input: {
+      profile: BorrowerProfileRequest;
+      macro: MacroRequest;
+      percentile: number;
+      manualShares?: ManualShares;
+    }) => optimize(input.profile, input.macro, input.percentile, input.manualShares),
     onSuccess: () => setView('results'),
   });
 
-  const runOptimization = () => optimization.mutate({ profile, macro, percentile });
+  const runOptimization = () =>
+    optimization.mutate({ profile, macro, percentile, manualShares: mixMode === 'MANUAL' ? manualShares : undefined });
+  /** From a hand-built mix's results: switch to the engine's choice for the same inputs. */
+  const adoptEngineMix = () => {
+    setMixMode('AUTO');
+    optimization.mutate({ profile, macro, percentile });
+  };
 
   // Results priced on the previous market go stale when fresh figures arrive; re-run the same
   // inputs so the mix, the bank comparison and the baseline table agree. Only while they are on
@@ -165,6 +176,7 @@ export default function App() {
                   result={optimization.data}
                   baseline={baseline.data}
                   onEdit={() => setView('wizard')}
+                  onAdoptEngineMix={adoptEngineMix}
                 />
               )}
 

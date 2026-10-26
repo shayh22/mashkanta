@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AiDocumentKind } from '../engine/aiExtraction';
+import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
 
 /** Served by the Worker in production and by a Vite middleware in development. */
 const ENDPOINT = '/api/extract';
@@ -42,4 +43,28 @@ export async function extractWithAi(
     throw new Error(ERRORS[response.status] ?? `קריאת המסמך נכשלה (${response.status}).`);
   }
   return ((await response.json()) as { data: unknown }).data;
+}
+
+/** Asks for a plain-Hebrew explanation of a mix the engine has already priced. */
+export async function explainMix(request: ExplainRequest): Promise<MixExplanation> {
+  const response = await fetch('/api/explain', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת ההסברים לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'הסבר עם AI אינו מופעל כרגע.'
+          : `ההסבר לא התקבל (${response.status}). נסו שוב.`,
+    );
+  }
+  const explanation = toExplanation(((await response.json()) as { explanation?: unknown }).explanation);
+  if (!explanation) {
+    throw new Error('ההסבר שהתקבל לא תקין. נסו שוב.');
+  }
+  return explanation;
 }

@@ -1,6 +1,9 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
-import type { BaselineResponse, OptimizationResponse } from '../lib/types';
-import { formatCurrency, formatPercent, formatTerm } from '../lib/format';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import type { BaselineResponse, MixProposal, OptimizationResponse } from '../lib/types';
+import { formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../lib/format';
+import { MixExplainer } from '../components/MixExplainer';
+import { mortgageExplainRequest } from '../lib/explainRequest';
+import { useWizard } from '../store/wizardStore';
 import { AllocationTable, MixComparison } from '../components/MixComparison';
 import { BankComparison } from '../components/BankComparisonCard';
 import { CompliancePanel } from '../components/CompliancePanel';
@@ -38,10 +41,13 @@ export function ResultsDashboard({
   result,
   baseline,
   onEdit,
+  onAdoptEngineMix,
 }: {
   result: OptimizationResponse;
   baseline?: BaselineResponse;
   onEdit: () => void;
+  /** For a hand-built mix: re-run with the engine choosing. */
+  onAdoptEngineMix?: () => void;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [section, setSection] = usePageTab('mortgage', TABS);
@@ -53,7 +59,10 @@ export function ResultsDashboard({
   }, []);
   // Every section when printing, so a printed or saved report is complete.
   const shows = (id: Section) => printing || section === id;
-  const { recommended, riskProfile } = result;
+  const { recommended, riskProfile, engineOptimum } = result;
+  const manual = result.mode === 'MANUAL';
+  const profile = useWizard((state) => state.profile);
+  const explainRequest = useMemo(() => mortgageExplainRequest(result, profile), [result, profile]);
   const bestSaving = result.savings.reduce(
     (best, saving) => (saving.totalPaidSaving > best ? saving.totalPaidSaving : best),
     0,
@@ -77,8 +86,8 @@ export function ResultsDashboard({
       )}
 
       <Card
-        title="התמהיל המומלץ עבורכם"
-        subtitle={riskProfile.narrative}
+        title={manual ? 'התמהיל שבניתם' : 'התמהיל המומלץ עבורכם'}
+        subtitle={manual ? 'מתומחר בריביות השוק ונבדק מול הרגולציה ותרחישי הקיצון, כמו כל תמהיל אחר.' : riskProfile.narrative}
         action={
           <div className="no-print flex gap-2">
             <button type="button" className="btn-ghost" onClick={onEdit}>
@@ -113,18 +122,28 @@ export function ResultsDashboard({
             note={`על פני ${formatTerm(recommended.summary.termMonths)}`}
           />
         </dl>
+        {manual && engineOptimum && (
+          <EngineYardstick mine={recommended} engine={engineOptimum} onAdopt={onAdoptEngineMix} />
+        )}
         <p className="mt-4 text-xs text-ink-soft">
-          נבחנו {result.candidatesEvaluated.toLocaleString('he-IL')} תמהילים חוקיים בתוך{' '}
-          {result.computeMillis} מילישניות.
+          {manual ? 'לצורך ההשוואה המנוע בחן ' : 'נבחנו '}
+          {result.candidatesEvaluated.toLocaleString('he-IL')} תמהילים חוקיים בתוך {result.computeMillis} מילישניות.
         </p>
       </Card>
+
+      <MixExplainer request={explainRequest} />
 
       <PageTabs label="פירוט התוצאות" idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection} />
       <TabPanel idPrefix="mortgage" tabs={TABS} active={section} onSelect={setSection}>
         {shows('mix') && (
           <>
             <AllocationTable proposal={recommended} />
-            <MixComparison recommended={recommended} baskets={result.baskets} savings={result.savings} />
+            <MixComparison
+              recommended={recommended}
+              baskets={result.baskets}
+              savings={result.savings}
+              engineOptimum={engineOptimum}
+            />
           </>
         )}
 
@@ -193,6 +212,47 @@ export function ResultsDashboard({
 
       <ReportExportModal result={result} open={exportOpen} onClose={() => setExportOpen(false)} />
     </div>
+  );
+}
+
+/** A hand-built mix measured against what the engine would have chosen for the same borrower. */
+function EngineYardstick({
+  mine,
+  engine,
+  onAdopt,
+}: {
+  mine: MixProposal;
+  engine: MixProposal;
+  onAdopt?: () => void;
+}) {
+  const costGap = mine.summary.totalPaid - engine.summary.totalPaid;
+  const paymentGap = mine.summary.initialPayment - engine.summary.initialPayment;
+  const peakGap = mine.summary.maxPayment - engine.summary.maxPayment;
+  const close = Math.abs(costGap) < 1_000;
+
+  return (
+    <section
+      aria-label="השוואה לבחירת המנוע"
+      className={`mt-5 rounded-xl border p-4 text-sm ${close || costGap < 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/10'}`}
+    >
+      <p className="font-medium text-ink">
+        {close
+          ? '✓ התמהיל שלכם כמעט זהה בעלותו לבחירת המנוע.'
+          : costGap > 0
+            ? `המנוע מצא תמהיל זול ב-${formatCurrency(costGap)} לאורך כל התקופה.`
+            : `התמהיל שלכם זול ב-${formatCurrency(-costGap)} מבחירת המנוע — בדרך כלל במחיר של יותר תנודתיות או חריגה מההעדפות.`}
+      </p>
+      <p className="mt-1 text-xs text-ink-muted">
+        החזר ראשוני {formatSignedCurrency(paymentGap)} · החזר שיא {formatSignedCurrency(peakGap)} לעומת המנוע. בחירת
+        המנוע:{' '}
+        {engine.summary.allocations.map((allocation) => `${allocation.hebrewName} ${formatPercent(allocation.share, 0)}`).join(' · ')}
+      </p>
+      {onAdopt && !close && (
+        <button type="button" className="btn-ghost no-print mt-3" onClick={onAdopt}>
+          מעבר לתמהיל של המנוע
+        </button>
+      )}
+    </section>
   );
 }
 

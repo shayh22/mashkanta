@@ -2,8 +2,10 @@ import type { ProposedTrack, RouteKind } from '../../engine/refinance';
 import type { TrackType } from '../../lib/types';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { TRACK_LABEL, TRACK_OPTIONS } from '../../lib/trackOptions';
+import type { OptimalRefinance } from '../../engine/refinanceOptimal';
 import { useRefinance } from '../../store/refinanceStore';
-import { ScrollRegion, Card, NumberInput, RangeField, SegmentedControl, Toggle } from '../ui';
+import { useWizard } from '../../store/wizardStore';
+import { ScrollRegion, Card, CurrencyField, NumberInput, RangeField, SegmentedControl, Toggle } from '../ui';
 
 const ROUTE_TITLES: Record<RouteKind, { title: string; subtitle: string }> = {
   INTERNAL: { title: 'מיחזור פנימי', subtitle: 'באותו בנק — ללא עלויות מעבר' },
@@ -17,8 +19,11 @@ const COST_FIELDS: { key: 'fileOpening' | 'appraisal' | 'registration' | 'legal'
   { key: 'legal', label: 'ייעוץ / משפטי' },
 ];
 
-/** The replacement mortgage: a like-for-like re-pricing at the market, or a hand-built mix. */
-export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
+/**
+ * The replacement mortgage: a like-for-like re-pricing at the market, a new mix chosen by the
+ * engine, or a quote typed in by hand.
+ */
+export function ProposalEditor({ proposal, optimal }: { proposal: ProposedTrack[]; optimal?: OptimalRefinance }) {
   const state = useRefinance();
 
   return (
@@ -30,8 +35,9 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
         label="מקור ההצעה"
         value={state.proposalMode}
         options={[
-          { value: 'AUTO', title: 'אוטומטית לפי השוק', subtitle: 'אותו תמהיל, מחיר שוק' },
-          { value: 'MANUAL', title: 'הצעה שקיבלתי', subtitle: 'עריכה ידנית של המסלולים' },
+          { value: 'AUTO', title: 'אותו תמהיל', subtitle: 'אותם מסלולים, מחיר שוק' },
+          { value: 'OPTIMAL', title: 'תמהיל אופטימלי', subtitle: 'המנוע בוחר תמהיל חדש' },
+          { value: 'MANUAL', title: 'ידני / הצעה שקיבלתי', subtitle: 'עריכת המסלולים' },
         ]}
         onChange={(mode) =>
           // The manual table holds only what is being refinanced; kept tracks are added back by
@@ -43,8 +49,9 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
         }
       />
 
-      {state.proposalMode === 'AUTO' ? (
+      {state.proposalMode !== 'MANUAL' ? (
         <div className="mt-5 space-y-4">
+          {state.proposalMode === 'OPTIMAL' && <OptimalInputs optimal={optimal} />}
           <RangeField
             label="רמת המיקוח"
             value={state.percentile}
@@ -164,6 +171,72 @@ export function ProposalEditor({ proposal }: { proposal: ProposedTrack[] }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * What the engine needs beyond the mortgage to choose a mix: the household's income and its appetite
+ * for a moving payment. They are the same answers as in the new-mortgage wizard, shared.
+ */
+function OptimalInputs({ optimal }: { optimal?: OptimalRefinance }) {
+  const profile = useWizard((state) => state.profile);
+  const setProfile = useWizard((state) => state.setProfile);
+  const relaxed = optimal?.result.relaxedConstraints ?? [];
+
+  return (
+    <div className="card-muted space-y-4 !p-4">
+      <p className="text-xs text-ink-muted">
+        המנוע סורק את כל החלוקות החוקיות של {optimal ? formatCurrency(optimal.refinancedAmount) : 'הסכום הממוחזר'} ובוחר את
+        הזולה ביותר שעומדת ביחס ההחזר וביכולת הספיגה שלכם. מסלולים שמשאירים כמות שהם והלוואות זכאות לא משתנים.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <CurrencyField
+          label="הכנסה חודשית נטו"
+          value={profile.monthlyNetIncome}
+          min={5_000}
+          max={150_000}
+          step={500}
+          onChange={(value) => setProfile({ monthlyNetIncome: value })}
+        />
+        <CurrencyField
+          label="החזרי הלוואות אחרות"
+          value={profile.existingMonthlyObligations}
+          min={0}
+          max={40_000}
+          step={100}
+          onChange={(value) => setProfile({ existingMonthlyObligations: value })}
+        />
+        <RangeField
+          label="נכונות לסיכון"
+          value={profile.riskTolerance}
+          min={1}
+          max={10}
+          step={1}
+          display={`${profile.riskTolerance} / 10`}
+          onChange={(value) => setProfile({ riskTolerance: value })}
+        />
+        <CurrencyField
+          label="יכולת ספיגה חודשית"
+          hint="העלייה המרבית בהחזר שתוכלו לספוג בתרחיש קיצון."
+          value={profile.volatilityCapacity}
+          min={0}
+          max={10_000}
+          step={100}
+          onChange={(value) => setProfile({ volatilityCapacity: value })}
+        />
+      </div>
+      {relaxed.length > 0 && (
+        <p className="text-xs text-caution" role="alert">
+          ⚠️ לא נמצא תמהיל שעומד בכל האילוצים — המנוע ויתר על{' '}
+          {relaxed
+            .map((code) =>
+              code === 'VOLATILITY_CAPACITY' ? 'יכולת הספיגה' : code === 'PAYMENT_TO_INCOME' ? 'יחס ההחזר (40%)' : 'אילוצי המבנה',
+            )
+            .join(' ועל ')}
+          .
+        </p>
+      )}
+    </div>
   );
 }
 
