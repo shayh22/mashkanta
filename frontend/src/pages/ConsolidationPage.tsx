@@ -8,6 +8,7 @@ import {
 import { DebtsTable, HouseholdCard, TermsCard } from '../components/consolidation/ConsolidationInputs';
 import { useMemo } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
+import { CombinedMoveCard } from '../components/consolidation/CombinedMoveCard';
 import { consolidationPlan } from '../engine/actionPlan';
 import { scenarioOf } from '../lib/api';
 import { useConsolidationAnalysis } from '../store/consolidationStore';
@@ -49,6 +50,7 @@ export function ConsolidationPage() {
           <ShorteningSimulator analysis={analysis} />
         </div>
       </div>
+      <CombinedMoveCard />
       <ActionPlanReport plan={plan} />
     </div>
   );
