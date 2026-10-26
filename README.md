@@ -260,7 +260,8 @@ with right-to-left arrow-key handling.
 The app reads the Bank of Israel's statistics service on every load, and again when the ⟳ button in
 the header is pressed: the Bank of Israel rate (prime = rate + 1.5), the 5-year inflation expectation
 and government yields, and the latest monthly averages on new housing loans and on all-purpose loans
-secured on a home. The service does not answer cross-origin browser requests, so a small Worker
+secured on a home, and the average on unsecured consumer loans to households (`BIR`, item A2B1),
+which the consolidation screen and action plan measure each debt against. The service does not answer cross-origin browser requests, so a small Worker
 (`frontend/worker/index.ts`, the only server code, routed for `/api/*` only) fetches and parses the
 CSV files and caches the result at the edge for six hours. `npm run dev` / `vite preview` serve the
 same endpoint from a middleware (behind an HTTP proxy, start them with `NODE_USE_ENV_PROXY=1`).
@@ -268,7 +269,9 @@ same endpoint from a middleware (behind an HTTP proxy, start them with `NODE_USE
 What changes when the figures arrive: the default prime and inflation, each track's rate distribution
 (re-centred on the published average, LTV steps and spread kept), the all-purpose loan rates offered
 in consolidation (only while they are still the previous defaults — rates typed in from a real offer
-are never overwritten), and the negotiation targets in the action plan. Every figure is range-checked;
+are never overwritten), the negotiation targets in the action plan, and the consumer-loan benchmark. The Bank of Israel's
+open data has no per-bank rates, so the bank comparison prices each lender around the live average with
+an estimated offset, and says so. Every figure is range-checked;
 anything missing or implausible falls back to the seeded value below, and the header says which is in
 use. The last good set is cached in the browser so the app starts on it.
 

@@ -8,10 +8,13 @@ import {
   maxSecuredTotal,
   maxVariableForNewLoan,
   recommendDebt,
+  consumerLoanAverage,
+  CONSUMER_LOAN_AVERAGE_SEED,
   repayWithExtra,
   type ConsolidationInput,
   type ConsumerDebt,
 } from './consolidation';
+import { applyLiveMarket } from './liveMarket';
 import { payment } from './math';
 
 const debt = (patch: Partial<ConsumerDebt>): ConsumerDebt => ({
@@ -263,6 +266,28 @@ describe('debt recommendations', () => {
     expect(recommendDebt(debt({ remainingMonths: 40, annualRate: 0.1 }), 0.065).action).toBe('CONSOLIDATE');
     expect(recommendDebt(debt({ remainingMonths: 40, annualRate: 0.06 }), 0.065).action).toBe('KEEP');
     expect(CONSOLIDATION_LIMITS.SHORT_TERM_MONTHS).toBe(18);
+  });
+
+  it('flags loans priced a point or more above the consumer-loan average', () => {
+    const average = consumerLoanAverage().rate;
+    expect(recommendDebt(debt({ annualRate: average + 0.02 }), 0.065).aboveMarket).toBeCloseTo(0.02, 10);
+    expect(recommendDebt(debt({ annualRate: average + 0.005 }), 0.065).aboveMarket).toBeUndefined();
+    // Exactly a point above, as typed in percent (8.9% against 7.9%), counts.
+    expect(recommendDebt(debt({ annualRate: 0.089 }), 0.065).aboveMarket).toBeDefined();
+    // Overdrafts are a different product from installment loans.
+    expect(recommendDebt(debt({ kind: 'OVERDRAFT', annualRate: 0.14 }), 0.065).aboveMarket).toBeUndefined();
+  });
+
+  it('measures against the live average once it is known', () => {
+    const live = { fetchedAt: '2026-10-26T08:00:00Z', missing: [], consumerUnsecured: { value: 0.1, asOf: '2026-09' } };
+    try {
+      applyLiveMarket(live);
+      expect(consumerLoanAverage()).toEqual({ rate: 0.1, asOf: '2026-09' });
+      expect(recommendDebt(debt({ annualRate: 0.105 }), 0.065).aboveMarket).toBeUndefined();
+    } finally {
+      applyLiveMarket(undefined);
+    }
+    expect(consumerLoanAverage().rate).toBe(CONSUMER_LOAN_AVERAGE_SEED);
   });
 });
 

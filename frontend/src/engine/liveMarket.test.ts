@@ -3,12 +3,13 @@ import { allPurposeMargin, ALL_PURPOSE_MARGIN } from './actionPlan';
 import { currentBaselineRates, rateFor } from './baseline';
 import { marketFromBoi, type LiveMarket } from './boiMarket';
 import br from './__fixtures__/boi/br.csv?raw';
+import loans from './__fixtures__/boi/loans.csv?raw';
 import mortgages from './__fixtures__/boi/mortgages.csv?raw';
 import zcm from './__fixtures__/boi/zcm.csv?raw';
 import { applyLiveMarket, liveMarket, monthLabel, shiftsFor } from './liveMarket';
 
 const AUGUST = marketFromBoi(
-  { br, zcm, mortgages },
+  { br, zcm, mortgages, loans },
   new Date('2026-10-26T08:00:00Z'),
 );
 
