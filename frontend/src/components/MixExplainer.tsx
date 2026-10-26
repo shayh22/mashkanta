@@ -30,10 +30,7 @@ export function MixExplainer({ request }: { request?: ExplainRequest }) {
             <span aria-hidden>🤖 </span>
             {request.chosenBy === 'BORROWER' ? 'מה אומר התמהיל שבחרתם?' : 'למה דווקא התמהיל הזה?'}
           </h2>
-          <p className="mt-0.5 text-xs text-ink-soft">
-            הסבר במילים פשוטות, נכתב עם AI על בסיס החישובים של המחשבון. נשלחים רק נתוני התמהיל — סכומים, אחוזים
-            וריביות — בלי שם, הכנסה או פרטים מזהים.
-          </p>
+          <p className="mt-0.5 text-xs text-ink-soft">הסבר AI במילים פשוטות · נשלחים רק מספרי התמהיל, בלי פרטים מזהים</p>
         </div>
         {!explanation && (
           <button

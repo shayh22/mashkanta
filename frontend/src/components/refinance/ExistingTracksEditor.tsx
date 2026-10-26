@@ -27,7 +27,7 @@ export function ExistingTracksEditor() {
       <StatementImporter />
       <Card
         title="המשכנתא הקיימת"
-        subtitle="הזינו את היתרות מתוך דוח יתרות לסילוק — סכום, ריבית נוכחית, יתרת תקופה וותק לכל מסלול."
+        subtitle="מתוך דוח יתרות לסילוק"
         action={
           <button type="button" className="btn-ghost" onClick={addTrack}>
             הוספת מסלול
@@ -42,7 +42,7 @@ export function ExistingTracksEditor() {
             max={10_000_000}
             step={50_000}
             onChange={setPropertyValue}
-            hint={`שיעור מימון נוכחי: ${formatPercent(propertyValue > 0 ? balance / propertyValue : 0, 1)} — קובע את מדרגת הריבית בשוק`}
+            hint={`שיעור מימון נוכחי: ${formatPercent(propertyValue > 0 ? balance / propertyValue : 0, 1)} `}
           />
         </div>
 

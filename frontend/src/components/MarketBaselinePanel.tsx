@@ -89,8 +89,7 @@ export function MarketBaselinePanel({ baseline, highlightLtv }: { baseline: Base
         </table>
       </div>
       <p className="mt-3 text-xs text-ink-soft">
-        מקור: טבלת הריביות הממוצעות של בנק ישראל, משוקללת עם נתונים אנונימיים שנתרמו על ידי לווים.
-        השורה העליונה בכל תא היא הממוצע בשוק; השורה הירוקה היא מה שניתן להשיג במשא ומתן טוב.
+        למעלה: ממוצע השוק. בירוק: מה שאפשר להשיג במשא ומתן טוב.
       </p>
     </Card>
   );

@@ -40,7 +40,7 @@ export function ScenarioSimulator({
   return (
     <Card
       title="סימולטור תרחישים"
-      subtitle="כל תמהיל נבחן מול זעזועי ריבית ואינפלציה, ומול יכולת הספיגה שהצהרתם עליה."
+      term="stress"
       action={
         stress.anyBreach ? (
           <span className="badge-danger">חריגה מיכולת הספיגה</span>

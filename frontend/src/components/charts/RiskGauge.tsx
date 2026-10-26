@@ -63,7 +63,7 @@ export function RiskPanel({ indicators, title = 'מד יציבות תזרימי�
   return (
     <Card
       title={title}
-      subtitle="רמזור לפי ספי בנק ישראל: שיעור מימון, החזר מהכנסה וחשיפה לריבית משתנה ולמדד."
+      subtitle="לפי ספי בנק ישראל"
       action={
         <span className={LEVEL_BADGE[overall]}>
           <span aria-hidden>{LEVEL_ICON[overall]}</span> {RISK_LABELS[overall]}

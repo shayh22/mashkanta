@@ -87,14 +87,14 @@ export function ResultsDashboard({
 
       <Card
         title={manual ? 'התמהיל שבניתם' : 'התמהיל המומלץ עבורכם'}
-        subtitle={manual ? 'מתומחר בריביות השוק ונבדק מול הרגולציה ותרחישי הקיצון, כמו כל תמהיל אחר.' : riskProfile.narrative}
+        subtitle={manual ? undefined : riskProfile.narrative}
         action={
           <div className="no-print flex gap-2">
             <button type="button" className="btn-ghost" onClick={onEdit}>
-              עריכת הנתונים
+              עריכה
             </button>
             <button type="button" className="btn-primary" onClick={() => setExportOpen(true)}>
-              שיתוף וייצוא
+              שיתוף
             </button>
           </div>
         }
@@ -107,16 +107,18 @@ export function ResultsDashboard({
           />
           <Stat
             label="עלות כוללת"
+            term="totalCost"
             value={formatCurrency(recommended.summary.totalPaid)}
             note={`מתוכם ${formatCurrency(recommended.summary.totalCost)} ריבית והצמדה`}
           />
           <Stat
             label="ריבית כוללת מתואמת"
+            term="irr"
             value={formatPercent(recommended.summary.nominalIrr)}
             note={`ריאלית: ${formatPercent(recommended.summary.realIrr)}`}
           />
           <Stat
-            label="חיסכון מול הסל היקר ביותר"
+            label="חיסכון מול הסל היקר"
             value={formatCurrency(bestSaving)}
             tone={bestSaving > 0 ? 'positive' : 'neutral'}
             note={`על פני ${formatTerm(recommended.summary.termMonths)}`}
@@ -167,7 +169,6 @@ export function ResultsDashboard({
             {result.alternatives.length > 0 && (
               <Card
                 title="חלופות ששקלנו"
-                subtitle="תמהילים שונים מהותית מהמומלץ, אם תעדיפו איזון אחר בין עלות לתנודתיות."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   {result.alternatives.map((alternative) => (
@@ -205,10 +206,6 @@ export function ResultsDashboard({
         )}
       </TabPanel>
 
-      <p className="pb-8 text-center text-xs text-ink-soft">
-        המידע באתר הוא כלי השוואה עצמאי המבוסס על נתונים ציבוריים בלבד ואינו מהווה ייעוץ פיננסי,
-        ייעוץ משכנתאות או הצעה מחייבת מטעם גורם כלשהו.
-      </p>
 
       <ReportExportModal result={result} open={exportOpen} onClose={() => setExportOpen(false)} />
     </div>
@@ -272,7 +269,7 @@ function TermSensitivity({
   return (
     <Card
       title="השפעת התקופה"
-      subtitle="אותו תמהיל בדיוק, בתקופות שונות. קיצור התקופה מייקר את ההחזר החודשי ומוזיל דרמטית את העלות הכוללת."
+      subtitle="אותו תמהיל, תקופות שונות"
     >
       <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">

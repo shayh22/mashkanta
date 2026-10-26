@@ -16,7 +16,7 @@ export function BankComparison({ quotes }: { quotes: BankQuote[] }) {
   return (
     <Card
       title="השוואת בנקים"
-      subtitle="אותו תמהיל בדיוק, מתומחר סביב הממוצע העדכני של בנק ישראל עם הפרש משוער לכל בנק."
+      subtitle="אותו תמהיל בכל בנק · הערכה"
     >
       <ul className="space-y-3">
         {quotes.map((quote) => (
@@ -26,9 +26,7 @@ export function BankComparison({ quotes }: { quotes: BankQuote[] }) {
         ))}
       </ul>
       <p className="mt-4 text-xs text-ink-soft">
-        הממוצע הכללי מתעדכן מבנק ישראל; ההפרשים בין הבנקים הם הערכה בלבד — בנק ישראל אינו מפרסם ריביות
-        לפי בנק בנתונים הפתוחים שלו. אין זו הצעה מחייבת: הריבית בפועל נקבעת במשא ומתן ותלויה בפרופיל הלווה.
-        בקשו הצעה מכמה בנקים.
+        הממוצע מבנק ישראל; ההפרשים בין הבנקים הם הערכה. בקשו הצעה מכמה בנקים.
       </p>
     </Card>
   );

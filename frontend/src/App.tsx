@@ -4,6 +4,9 @@ import { ApiError, fetchBaseline, fetchReference, optimize } from './lib/api';
 import type { BorrowerProfileRequest, MacroRequest } from './lib/types';
 import { useTheme } from './lib/theme';
 import { useWizard } from './store/wizardStore';
+import { useGlossary } from './store/glossaryStore';
+import { GlossaryPanel, Term } from './components/Glossary';
+import { GLIDE_CLASS, useGlide } from './lib/glide';
 import type { ManualShares } from './engine/manualMix';
 import { useRefinance } from './store/refinanceStore';
 import { useConsolidation } from './store/consolidationStore';
@@ -32,16 +35,11 @@ const CombinedPage = lazy(() =>
 type Mode = 'mortgage' | 'refinance' | 'consolidation' | 'combined';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
-const MODES: { id: Mode; icon: string; title: string; subtitle: string }[] = [
-  { id: 'mortgage', icon: '🏠', title: 'משכנתא חדשה', subtitle: 'תמהיל אופטימלי והשוואת סלים אחידים' },
-  {
-    id: 'refinance',
-    icon: '🔄',
-    title: 'בדיקת כדאיות מיחזור',
-    subtitle: 'עמלות פירעון, נקודת איזון וחיסכון',
-  },
-  { id: 'consolidation', icon: '🧩', title: 'איחוד הלוואות', subtitle: 'הבראה תזרימית כנגד הנכס' },
-  { id: 'combined', icon: '🔀', title: 'מיחזור + איחוד', subtitle: 'שני המהלכים יחד, תוכנית אחת' },
+const MODES: { id: Mode; title: string }[] = [
+  { id: 'mortgage', title: 'משכנתא חדשה' },
+  { id: 'refinance', title: 'מיחזור' },
+  { id: 'consolidation', title: 'איחוד הלוואות' },
+  { id: 'combined', title: 'מיחזור + איחוד' },
 ];
 
 function modeFromHash(): Mode {
@@ -138,6 +136,7 @@ export default function App() {
         דילוג לתוכן
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
+      <GlossaryPanel />
       <ModeNav mode={mode} onSelect={navigate} />
       <SinceLastVisit />
 
@@ -230,24 +229,30 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
   }, []);
 
   return (
-    <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line/70 bg-surface/75 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+    <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-bold text-white shadow-glow">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-base font-bold text-on-brand">
             ₪
           </span>
-          <div>
-            <h1 className="text-sm font-bold text-ink">השוואת משכנתאות חכמה</h1>
-            <p className="hidden text-xs text-ink-soft sm:block">
-              מיחזור, איחוד הלוואות ותמהיל — על בסיס נתונים ציבוריים בלבד
-            </p>
-          </div>
+          <h1 className="truncate text-sm font-semibold text-ink">משכנתא חכמה</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <MarketStatus />
           <button
             type="button"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-surface text-base transition hover:bg-surface-muted"
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink-muted transition hover:bg-surface-muted hover:text-ink"
+            onClick={() => useGlossary.getState().show()}
+            aria-label="מילון מונחים"
+          >
+            <span aria-hidden>📖</span>
+            <span aria-hidden className="hidden sm:inline">
+              מילון
+            </span>
+          </button>
+          <button
+            type="button"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-base transition hover:bg-surface-muted"
             onClick={onToggleTheme}
             aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
             title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
@@ -265,7 +270,9 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
  * left arrow moves forward, which is where the next tab visually is.
  */
 function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => void }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const { items: refs, style: thumb } = useGlide<HTMLButtonElement>(
+    Math.max(0, MODES.findIndex((item) => item.id === mode)),
+  );
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const step = event.key === 'ArrowLeft' ? 1 : event.key === 'ArrowRight' ? -1 : 0;
@@ -288,8 +295,9 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
       <div
         role="tablist"
         aria-label="מצב עבודה"
-        className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4"
+        className="relative mx-auto grid w-full max-w-6xl grid-cols-2 gap-1 rounded-xl bg-surface-sunken p-1 sm:grid-cols-4"
       >
+        {thumb && <span aria-hidden className={`rounded-lg border border-line bg-surface shadow-card ${GLIDE_CLASS}`} style={thumb} />}
         {MODES.map((item, index) => {
           const selected = item.id === mode;
           return (
@@ -306,28 +314,11 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
               tabIndex={selected ? 0 : -1}
               onClick={() => onSelect(item.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`group flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition sm:flex-row sm:items-start sm:gap-3 sm:px-4 sm:text-start ${
-                selected
-                  ? 'border-brand-500/60 bg-surface shadow-glow ring-1 ring-brand-500/40'
-                  : 'border-line/80 bg-surface/60 hover:bg-surface hover:shadow-card'
+              className={`relative z-10 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                selected ? 'font-semibold text-ink' : 'font-medium text-ink-soft hover:text-ink'
               }`}
             >
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg transition ${
-                  selected ? 'bg-brand-50' : 'bg-surface-sunken group-hover:bg-brand-50'
-                }`}
-                aria-hidden
-              >
-                {item.icon}
-              </span>
-              <span>
-                <span
-                  className={`block text-xs font-semibold sm:text-sm ${selected ? 'text-brand-700' : 'text-ink'}`}
-                >
-                  {item.title}
-                </span>
-                <span className="hidden text-xs text-ink-soft sm:block">{item.subtitle}</span>
-              </span>
+              {item.title}
             </button>
           );
         })}
@@ -346,14 +337,14 @@ function MortgageSubNav({
   hasResults: boolean;
 }) {
   const items: { id: MortgageView; label: string; enabled: boolean }[] = [
-    { id: 'wizard', label: 'חישוב תמהיל', enabled: true },
+    { id: 'wizard', label: 'חישוב', enabled: true },
     { id: 'results', label: 'תוצאות', enabled: hasResults },
-    { id: 'upload', label: 'בדיקת הצעה שקיבלתי', enabled: true },
+    { id: 'upload', label: 'בדיקת הצעה', enabled: true },
   ];
   return (
     <div className="no-print mx-auto flex w-full max-w-6xl justify-center">
       <div
-        className="inline-flex rounded-xl border border-line/80 bg-surface-sunken/80 p-0.5"
+        className="inline-flex rounded-xl bg-surface-sunken p-1"
         role="group"
         aria-label="שלבי משכנתא חדשה"
       >
@@ -364,8 +355,8 @@ function MortgageSubNav({
             disabled={!item.enabled}
             aria-pressed={view === item.id}
             onClick={() => onSelect(item.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 ${
-              view === item.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-40 ${
+              view === item.id ? 'bg-surface text-ink shadow-card' : 'text-ink-soft hover:text-ink'
             }`}
           >
             {item.label}
@@ -378,11 +369,10 @@ function MortgageSubNav({
 
 function Footer({ onReset }: { onReset: () => void }) {
   return (
-    <footer className="no-print border-t border-line/70 bg-surface/60 px-4 py-6 backdrop-blur">
+    <footer className="no-print border-t border-line px-4 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-ink-soft">
-          נתוני הריביות מבוססים על פרסומי בנק ישראל, הלשכה המרכזית לסטטיסטיקה ותרומות אנונימיות של לווים.
-          הכללים הרגולטוריים לפי הוראה 329 בנוסחה מ-1.10.2026. אין באמור ייעוץ פיננסי.
+          נתוני בנק ישראל · כללי <Term id="directive329">הוראה 329</Term> (1.10.2026) · אינו ייעוץ פיננסי
         </p>
         <button type="button" className="text-xs font-medium text-brand-700" onClick={onReset}>
           איפוס הנתונים

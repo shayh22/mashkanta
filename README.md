@@ -259,8 +259,20 @@ exactly which line breaks it — that is the whole point of an independent compa
 Colours are CSS-variable tokens with a separately tuned dark palette; the theme follows the system
 until toggled, is applied before first paint by `public/theme-init.js` (an external script, because
 the CSP forbids inline ones), and printing always uses the light palette. Chart series were checked
-for colour-vision-deficiency separation against both surfaces. The three modes form an ARIA tablist
+for colour-vision-deficiency separation against both surfaces. The modes form an ARIA tablist
 with right-to-left arrow-key handling.
+
+**Visual language.** Quiet and monochrome: neutral greys, hairline borders, and one teal accent for the
+primary action and the figures that matter. Buttons have a 2px edge the face sinks into on press;
+segmented controls and tabs move one marker that glides to the selection. The patterns follow free
+(MIT) components from [Design for AI](https://design.yaps.ai) — Segmented Control, Underline Tabs,
+Press Depth Button and Tooltip Group — re-implemented in plain CSS transitions (`src/lib/glide.ts`)
+rather than adding their animation library, and adapted for right-to-left.
+
+**Glossary.** Screens keep copy to a line; hard terms point to `src/lib/glossary.ts` instead. A term is
+underlined in text, or a small "?" sits after a label; resting the pointer on it (400ms, then at once
+for neighbours), focusing it or tapping it shows the entry in place, and a click opens the searchable
+glossary panel at that entry (also reachable from the header).
 
 ### Live market data
 

@@ -88,7 +88,7 @@ export function DebtImporter() {
   return (
     <Card
       title="ייבוא הלוואות ממסמך"
-      subtitle="לוח סילוקין של הלוואה, או פירוט הלוואות מהבנק, מחברת האשראי או מגוף חוץ-בנקאי. הנתונים יוצגו לאישור לפני שיוזנו."
+      subtitle="לוח סילוקין או פירוט הלוואות"
       action={
         <button type="button" className="btn-ghost" onClick={() => inputRef.current?.click()} disabled={reading}>
           {reading ? 'קורא…' : 'בחירת מסמך'}

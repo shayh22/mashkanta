@@ -134,11 +134,13 @@ function ConsolidationSummary({
         },
         {
           label: 'חמצן תזרימי',
+          term: 'relief',
           value: formatSignedCurrency(analysis.monthlyRelief),
           tone: analysis.monthlyRelief > 0 ? 'positive' : 'negative',
         },
         {
-          label: 'PTI לפי 1.10.2026',
+          label: 'יחס החזר',
+          term: 'pti',
           value: r.ptiExempt ? 'פטור' : formatPercent(r.pti, 1),
           tone: r.bankFeasible ? undefined : 'negative',
         },

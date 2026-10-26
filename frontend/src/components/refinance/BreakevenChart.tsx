@@ -53,7 +53,7 @@ export function BreakevenChart({ comparison }: { comparison: RefinanceComparison
   return (
     <Card
       title="עקומת נקודת האיזון"
-      subtitle="חיסכון מצטבר בהחזרים בניכוי עמלות הפירעון ועלויות המעבר. המקום שבו הקו חוצה את האפס הוא נקודת האיזון."
+      term="breakeven"
     >
       <div className="h-72 w-full text-ink-soft" dir="ltr" role="img" aria-label="גרף חיסכון מצטבר לאורך החודשים בשני מסלולי המיחזור">
         <ResponsiveChart width="100%" height="100%">

@@ -19,7 +19,7 @@ const ACTION_BADGE = {
 export function HouseholdCard() {
   const { netIncome, property, setNetIncome, setProperty } = useConsolidation();
   return (
-    <Card title="משק הבית והנכס" subtitle="הכנסה נטו חודשית ומה שכבר רשום על הדירה.">
+    <Card title="משק הבית והנכס">
       <div className="grid gap-5 sm:grid-cols-2">
         <CurrencyField label="הכנסה נטו חודשית (N)" value={netIncome} min={5_000} max={80_000} step={500} onChange={setNetIncome} />
         <CurrencyField
@@ -53,7 +53,6 @@ export function HouseholdCard() {
           max={Math.max(property.mortgageBalance, 1)}
           step={10_000}
           onChange={(value) => setProperty({ mortgageVariableBalance: Math.min(value, property.mortgageBalance) })}
-          hint="משמש לבדיקת תקרת ⅔ משתנה על סך האשראי בנכס"
         />
         <CurrencyField
           label="הלוואות לכל מטרה קודמות על הנכס"
@@ -62,7 +61,6 @@ export function HouseholdCard() {
           max={1_000_000}
           step={5_000}
           onChange={(value) => setProperty({ priorAllPurposeBalance: value })}
-          hint="נספרות בפטור של 120,000 ₪ ובתקרת 200,000 ₪ מעל 50% מימון"
         />
         <RangeField
           label="יתרת תקופת המשכנתא"
@@ -72,7 +70,7 @@ export function HouseholdCard() {
           step={1}
           display={formatTerm(property.mortgageRemainingMonths)}
           onChange={(value) => setProperty({ mortgageRemainingMonths: value })}
-          hint="משכנתא שנותרו לה 18 חודשים או פחות אינה נספרת ב-PTI"
+          hint="עד 18 חודשים — לא נספרת"
         />
       </div>
     </Card>
@@ -88,7 +86,7 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
   return (
     <Card
       title="התחייבויות קיימות"
-      subtitle="סמנו אילו הלוואות לאחד. הלוואה שנותרו לה עד 18 חודשים אינה נספרת במגבלת ה-PTI."
+      subtitle="סמנו מה לאחד"
       action={
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-ghost" onClick={() => applyRecommendations(analysis.allocation.blendedRate)}>
@@ -118,7 +116,7 @@ export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
             {debts.map((debt) => {
               const item = advice.get(debt.id);
               return (
-                <tr key={debt.id} className={debt.include ? '' : 'opacity-75'}>
+                <tr key={debt.id} className={debt.include ? '' : 'opacity-90'}>
                   <td className="py-2 pe-2">
                     <input
                       type="checkbox"
@@ -227,7 +225,7 @@ export function TermsCard({ analysis }: { analysis: ConsolidationAnalysis }) {
   const { terms, setTerms } = useConsolidation();
   const { allocation } = analysis;
   return (
-    <Card title="תנאי ההלוואה לכל מטרה" subtitle="ריביות לדוגמה — עדכנו לפי ההצעה שקיבלתם.">
+    <Card title="תנאי ההלוואה לכל מטרה" subtitle="עדכנו לפי ההצעה שקיבלתם">
       <div className="grid gap-5 sm:grid-cols-2">
         <RangeField
           label="תקופה"

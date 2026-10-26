@@ -12,6 +12,7 @@ import { Card, CurrencyField, Field, ProgressSteps, RangeField, SegmentedControl
 import { DEFAULT_PRIME } from '../engine/scenario';
 import { checkManualMix } from '../engine/manualMix';
 import { ManualMixEditor } from './ManualMixEditor';
+import { Term } from './Glossary';
 
 const STEP_LABELS = ['נכס והלוואה', 'פרופיל לווה', 'סיכון ותמהיל'];
 
@@ -55,11 +56,11 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
           <>
             <Card
               title="הנכס וההלוואה"
-              subtitle="הזינו את שווי הנכס והסכום המבוקש. שיעור המימון מחושב בזמן אמת מול תקרת בנק ישראל."
             >
               <div className="space-y-5">
                 <SegmentedControl<BuyerSegment>
                   label="סיווג הרוכש"
+                  term="ltv"
                   value={profile.segment}
                   onChange={setSegment}
                   options={(Object.keys(SEGMENT_LABELS) as BuyerSegment[]).map((segment) => ({
@@ -102,7 +103,7 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
                   step={1}
                   display={formatTerm(profile.termMonths)}
                   onChange={(years) => setProfile({ termMonths: years * 12 })}
-                  hint="תקופה ארוכה מקטינה את ההחזר החודשי ומייקרת משמעותית את העלות הכוללת."
+                  hint="ארוכה = החזר נמוך, עלות גבוהה"
                 />
 
                 <LtvMeter ltv={metrics.ltv} maxLtv={SEGMENT_MAX_LTV[profile.segment]} equity={metrics.equity} />
@@ -116,12 +117,12 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
         {step === 2 && (
           <Card
             title="פרופיל הלווה"
-            subtitle="ההכנסה וההתחייבויות קובעות את יחס ההחזר, שהוא המגבלה הרגולטורית המחייבת ביותר."
+            term="pti"
           >
             <div className="space-y-5">
               <CurrencyField
                 label="הכנסה חודשית נטו של משק הבית"
-                hint="כולל הכנסת בן/בת הזוג ולווים נוספים."
+                hint="כולל בן/בת זוג"
                 value={profile.monthlyNetIncome}
                 min={5_000}
                 max={150_000}
@@ -131,7 +132,7 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
 
               <CurrencyField
                 label="החזרי הלוואות קיימים"
-                hint="נספרות הלוואות שנותרו להן יותר מ-18 חודשים."
+                hint="שנותרו להן יותר מ-18 חודשים"
                 value={profile.existingMonthlyObligations}
                 min={0}
                 max={40_000}
@@ -141,7 +142,7 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
 
               <CurrencyField
                 label="הלוואת זכאות ממשרד הבינוי והשיכון"
-                hint="אם קיימת זכאות — הסכום ננעל בתמהיל בריבית המפוקחת."
+                term="eligibility"
                 value={profile.eligibilityAmount}
                 min={0}
                 max={500_000}
@@ -162,7 +163,6 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
           <>
             <Card
               title="סיכון והעדפות"
-              subtitle="ככל שתסכימו לתנודתיות גבוהה יותר, כך המנוע יוכל להוזיל את העלות הכוללת."
             >
               <div className="space-y-6">
                 <RangeField
@@ -178,7 +178,7 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
 
                 <CurrencyField
                   label="יכולת ספיגה חודשית"
-                  hint="העלייה המרבית בהחזר החודשי שמשק הבית יכול לספוג בתרחיש קיצון."
+                  term="absorption"
                   value={profile.volatilityCapacity}
                   min={0}
                   max={10_000}
@@ -190,7 +190,7 @@ export function MortgageWizard({ anchors, onSubmit }: { anchors?: MacroAnchors; 
 
             <Card
               title="בחירת התמהיל"
-              subtitle="המנוע יכול לבחור עבורכם את החלוקה הזולה ביותר שעומדת באילוצים, או שתרכיבו אותה בעצמכם ותראו אותה מול הסלים ומול בחירת המנוע."
+              term="mix"
             >
               <div className="space-y-5">
                 <SegmentedControl
@@ -260,7 +260,10 @@ function LtvMeter({ ltv, maxLtv, equity }: { ltv: number; maxLtv: number; equity
   return (
     <div className="card-muted">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-ink-muted">שיעור מימון (LTV)</span>
+        <span className="flex items-center text-sm font-medium text-ink-muted">
+          שיעור מימון
+          <Term id="ltv" />
+        </span>
         <span className={`tabular text-lg font-semibold ${exceeded ? 'text-negative' : 'text-ink'}`}>
           {formatPercent(ltv, 1)}
         </span>
@@ -352,9 +355,7 @@ function PreferenceSliders({
   return (
     <div>
       <p className="label">העדפת תמהיל</p>
-      <p className="mb-3 text-xs text-ink-soft">
-        חלוקה מבוקשת בין המסלולים. המנוע מתייחס אליה כהעדפה — הרגולציה והתקציב גוברים עליה.
-      </p>
+      <p className="mb-3 text-xs text-ink-soft">העדפה בלבד — הרגולציה והתקציב קובעים.</p>
       <div className="space-y-4">
         <RangeField
           label="פריים"
@@ -450,7 +451,7 @@ function LiquidityTimeline() {
   return (
     <Card
       title="אירועי נזילות צפויים"
-      subtitle="סכומים שצפויים להיכנס בעתיד — קרן השתלמות, בונוס, ירושה או תמורת דירה קודמת."
+      subtitle="קרן השתלמות, בונוס, ירושה…"
     >
       {profile.liquidityEvents.length > 0 && (
         <ul className="mb-4 space-y-2">
@@ -514,7 +515,7 @@ function LiquidityTimeline() {
         </div>
       </div>
       <p className="hint">
-        סכום המיועד לפירעון מוקדם מזיז את התמהיל אל מסלולים ללא עמלת היוון, כדי שלא תשלמו קנס על הפירעון.
+        סכום לפירעון מוקדם מעביר חלק מהתמהיל למסלולים בלי <Term id="prepaymentFee">עמלת פירעון</Term>.
       </p>
     </Card>
   );

@@ -19,7 +19,7 @@ export function TrackVerdicts({ verdicts }: { verdicts: TrackVerdict[] }) {
   return (
     <Card
       title="כדאיות לפי מסלול"
-      subtitle="מיחזור כל מסלול בנפרד, באותו בנק ובאותם תנאים. מסלול שעמלתו גבוהה מהחיסכון — עדיף להשאיר."
+      subtitle="כל מסלול בנפרד, באותו בנק"
       action={
         <button
           type="button"
