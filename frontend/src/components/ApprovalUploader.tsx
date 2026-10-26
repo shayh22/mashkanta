@@ -122,7 +122,7 @@ export function ApprovalUploader({
   return (
     <Card
       title="העלאת אישור עקרוני"
-      subtitle="חילוץ אוטומטי של המסלולים והריביות מתוך האישור העקרוני האחיד."
+      term="approval"
     >
       <div
         onDragOver={(event) => {

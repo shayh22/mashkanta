@@ -1,6 +1,9 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { ComplianceLevel } from '../lib/types';
 import { formatCurrencyInput, parseCurrencyInput } from '../lib/format';
+import { GLIDE_CLASS, useGlide } from '../lib/glide';
+import type { TermId } from '../lib/glossary';
+import { Term } from './Glossary';
 
 /** A titled card, the layout unit the whole dashboard is built from. */
 export function Card({
@@ -9,19 +12,27 @@ export function Card({
   action,
   children,
   className = '',
+  term,
 }: {
   title?: string;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** A glossary entry that explains the card's subject, shown as a "?" after the title. */
+  term?: TermId;
 }) {
   return (
     <section className={`card ${className}`}>
       {(title || action) && (
         <header className="mb-4 flex items-start justify-between gap-4">
           <div>
-            {title && <h2 className="text-base font-semibold text-ink">{title}</h2>}
+            {title && (
+              <h2 className="text-base font-semibold text-ink">
+                {title}
+                {term && <Term id={term} />}
+              </h2>
+            )}
             {subtitle && <p className="mt-1 text-sm text-ink-soft">{subtitle}</p>}
           </div>
           {action}
@@ -38,17 +49,22 @@ export function Stat({
   value,
   note,
   tone = 'neutral',
+  term,
 }: {
   label: string;
   value: string;
   note?: string;
   tone?: 'neutral' | 'positive' | 'negative';
+  term?: TermId;
 }) {
   const toneClass =
     tone === 'positive' ? 'text-positive' : tone === 'negative' ? 'text-negative' : 'text-ink';
   return (
     <div>
-      <dt className="text-xs font-medium text-ink-soft">{label}</dt>
+      <dt className="flex items-center text-xs font-medium text-ink-soft">
+        {label}
+        {term && <Term id={term} />}
+      </dt>
       <dd className={`tabular mt-1 text-xl font-semibold ${toneClass}`}>{value}</dd>
       {note && <dd className="mt-0.5 text-xs text-ink-soft">{note}</dd>}
     </div>
@@ -69,18 +85,21 @@ export function Field({
   hintTone = 'muted',
   children,
   htmlFor,
+  term,
 }: {
   label: string;
   hint?: string;
   hintTone?: 'muted' | 'notice';
   children: ReactNode;
   htmlFor?: string;
+  term?: TermId;
 }) {
   return (
     <div>
-      <label className="label" htmlFor={htmlFor}>
-        {label}
-      </label>
+      <div className="label flex items-center">
+        <label htmlFor={htmlFor}>{label}</label>
+        {term && <Term id={term} />}
+      </div>
       {children}
       {hint && (
         <p className={hintTone === 'notice' ? 'hint font-medium text-caution' : 'hint'}>{hint}</p>
@@ -105,9 +124,11 @@ export function CurrencyField({
   onChange,
   invalid = false,
   notice = false,
+  term,
 }: {
   label: string;
   hint?: string;
+  term?: TermId;
   value: number;
   min: number;
   max: number;
@@ -120,7 +141,7 @@ export function CurrencyField({
 }) {
   const id = useId();
   return (
-    <Field label={label} hint={hint} hintTone={notice ? 'notice' : 'muted'} htmlFor={id}>
+    <Field label={label} hint={hint} hintTone={notice ? 'notice' : 'muted'} htmlFor={id} term={term}>
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           {/* The symbol sits at the visual right, matching he-IL currency order. The input runs
@@ -155,44 +176,61 @@ export function CurrencyField({
   );
 }
 
-/** A mutually exclusive choice rendered as a button group. */
+/**
+ * A mutually exclusive choice as one segmented pill: the selected option is lifted by a thumb that
+ * glides between options (after Segmented Control on design.yaps.ai, MIT). Only the selected
+ * option's subtitle shows, under the control — one line of explanation instead of one per option.
+ */
 export function SegmentedControl<T extends string>({
   label,
   value,
   options,
   onChange,
+  term,
 }: {
   label: string;
   value: T;
   options: { value: T; title: string; subtitle?: string }[];
   onChange: (value: T) => void;
+  term?: TermId;
 }) {
+  const active = Math.max(0, options.findIndex((option) => option.value === value));
+  const { items, style } = useGlide<HTMLButtonElement>(active);
+  const subtitle = options[active]?.subtitle;
+  const columns = options.length <= 3 ? 'grid-cols-[repeat(var(--n),minmax(0,1fr))]' : 'grid-cols-2 sm:grid-cols-[repeat(var(--n),minmax(0,1fr))]';
+
   return (
     <fieldset>
-      <legend className="label">{label}</legend>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {options.map((option) => {
-          const selected = option.value === value;
+      <legend className="label">
+        {label}
+        {term && <Term id={term} />}
+      </legend>
+      <div
+        className={`relative grid gap-1 rounded-xl bg-surface-sunken p-1 ${columns}`}
+        style={{ '--n': options.length } as CSSProperties}
+      >
+        {style && <span aria-hidden className={`rounded-lg border border-line bg-surface shadow-card ${GLIDE_CLASS}`} style={style} />}
+        {options.map((option, index) => {
+          const selected = index === active;
           return (
             <button
               key={option.value}
+              ref={(element) => {
+                items.current[index] = element;
+              }}
               type="button"
               onClick={() => onChange(option.value)}
               aria-pressed={selected}
-              className={`rounded-xl border px-3 py-2.5 text-start transition ${
-                selected
-                  ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                  : 'border-line-strong bg-surface hover:bg-surface-muted'
-              }`}
+              className={`relative z-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                selected ? 'text-ink' : 'text-ink-soft hover:text-ink'
+              } ${!style && selected ? 'bg-surface shadow-card' : ''}`}
             >
-              <span className="block text-sm font-semibold text-ink">{option.title}</span>
-              {option.subtitle && (
-                <span className="mt-0.5 block text-xs text-ink-soft">{option.subtitle}</span>
-              )}
+              {option.title}
             </button>
           );
         })}
       </div>
+      {subtitle && <p className="hint">{subtitle}</p>}
     </fieldset>
   );
 }
@@ -207,6 +245,7 @@ export function RangeField({
   step,
   display,
   onChange,
+  term,
 }: {
   label: string;
   hint?: string;
@@ -216,14 +255,18 @@ export function RangeField({
   step: number;
   display: string;
   onChange: (value: number) => void;
+  term?: TermId;
 }) {
   const id = useId();
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between">
-        <label className="text-sm font-medium text-ink-muted" htmlFor={id}>
-          {label}
-        </label>
+        <span className="flex items-center">
+          <label className="text-sm font-medium text-ink-muted" htmlFor={id}>
+            {label}
+          </label>
+          {term && <Term id={term} />}
+        </span>
         <span className="tabular text-sm font-semibold text-ink">{display}</span>
       </div>
       <input
@@ -267,10 +310,10 @@ export function ProgressSteps({
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
                   state === 'current'
-                    ? 'bg-brand-600 text-white'
+                    ? 'bg-brand-600 text-on-brand'
                     : state === 'done'
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-line text-ink-soft'
+                      ? 'bg-brand-100 text-brand-700'
+                      : 'bg-surface-sunken text-ink-soft'
                 }`}
               >
                 {state === 'done' ? '✓' : number}

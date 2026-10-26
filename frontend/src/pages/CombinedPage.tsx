@@ -78,12 +78,14 @@ export function CombinedPage() {
             },
             {
               label: 'חמצן תזרימי',
+              term: 'relief',
               value: formatSignedCurrency(move.paymentToday - move.paymentAfter),
               tone: move.paymentAfter < move.paymentToday ? 'positive' : 'negative',
               note: `מתוכם מהמיחזור: ${formatSignedCurrency(move.extraReliefFromRefinance)}`,
             },
             {
-              label: 'PTI לפי 1.10.2026',
+              label: 'יחס החזר',
+              term: 'pti',
               value: move.combined.regulation.ptiExempt ? 'פטור' : formatPercent(move.combined.regulation.pti, 1),
               note: `איחוד בלבד: ${
                 move.consolidationOnly.regulation.ptiExempt
@@ -107,7 +109,6 @@ export function CombinedPage() {
         {shows('inputs') && (
           <Card
             title="מיחזור ואיחוד באותו מהלך"
-            subtitle="מיחזור המשכנתא משנה את ההחזר הקיים על הנכס ואת חלק המשתנה — ולכן גם כמה מותר לאחד לפי הוראת בנק ישראל מ-1.10.2026. כאן רואים את שני המהלכים יחד."
           >
             <div className="grid gap-4 md:grid-cols-2">
               <section className="card-muted" aria-labelledby="combined-mortgage">
@@ -168,7 +169,6 @@ export function CombinedPage() {
             <div className="min-w-0">
               <WaterfallChart
                 title="מפל ההחזר החודשי — שני המהלכים"
-                subtitle="ההחזר היום, השינוי במשכנתא הממוחזרת, ההלוואות שנסגרות וההלוואה החדשה."
                 start={move.paymentToday}
                 steps={combinedSteps(move)}
                 endLabel="אחרי"

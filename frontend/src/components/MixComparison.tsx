@@ -4,7 +4,7 @@ import { Card, LevelBadge } from './ui';
 
 /** Palette per track, reused by the allocation bar and the legend so colour means one thing. */
 const TRACK_COLORS: Record<TrackType, string> = {
-  PRIME: '#4F46E5',
+  PRIME: '#6366F1',
   FIXED_UNLINKED: '#0EA5E9',
   FIXED_LINKED: '#10B981',
   VARIABLE_UNLINKED: '#F59E0B',
@@ -38,7 +38,7 @@ export function MixComparison({
   return (
     <Card
       title={manual ? 'התמהיל שלכם מול המנוע והסלים האחידים' : 'התמהיל המומלץ מול הסלים האחידים'}
-      subtitle="כל התמהילים מתומחרים באותן ריביות שוק ובאותה תקופה, כך שההשוואה בודדת את השפעת ההרכב בלבד."
+      term="baskets"
     >
       <div className="grid gap-4 lg:grid-cols-2">
         {all.map((proposal) => (
@@ -179,7 +179,7 @@ export function AllocationTable({ proposal }: { proposal: MixProposal }) {
   return (
     <Card
       title="פירוט המסלולים"
-      subtitle={`הרכב ${proposal.id === 'MANUAL' ? 'התמהיל שלכם' : 'התמהיל המומלץ'}, מסלול אחר מסלול`}
+
     >
       <div className="overflow-x-auto" role="region" aria-label="טבלה" tabIndex={0}>
         <table className="w-full text-sm">

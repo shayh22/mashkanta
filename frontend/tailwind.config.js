@@ -38,15 +38,21 @@ export default {
           50: token('brand-50'),
           100: token('brand-100'),
           200: token('brand-200'),
-          400: '#818CF8',
-          500: '#4F46E5',
-          600: '#4338CA',
+          400: token('brand-400'),
+          500: token('brand-500'),
+          600: token('brand-600'),
           700: token('brand-700'),
+          800: token('brand-800'),
         },
+        'on-brand': token('on-brand'),
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)',
-        glow: '0 8px 32px -8px rgb(79 70 229 / 0.35)',
+        // Quiet surfaces: a hairline does the work, the shadow only lifts a card off the canvas.
+        card: '0 1px 2px 0 rgb(0 0 0 / 0.04)',
+        glow: '0 1px 2px 0 rgb(0 0 0 / 0.06)',
+        // The pressed-key edge under a button; the face sinks into it on press.
+        edge: '0 2px 0 0 rgb(var(--brand-800))',
+        'edge-muted': '0 2px 0 0 rgb(var(--line-strong))',
       },
       keyframes: {
         'fade-up': {

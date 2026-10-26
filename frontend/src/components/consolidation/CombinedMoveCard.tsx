@@ -44,7 +44,7 @@ export function CombinedComparison() {
   return (
     <Card
       title="איחוד בלבד מול איחוד + מיחזור"
-      subtitle={`ההשוואה משתמשת במשכנתא מנתוני המיחזור (${ROUTE_NAME[move.refinance.route.kind]}). מיחזור משנה את ההחזר הקיים על הנכס (E) ואת חלק המשתנה — ולכן גם את מרווח האיחוד.`}
+      subtitle={`לפי המשכנתא בנתוני המיחזור (${ROUTE_NAME[move.refinance.route.kind]})`}
       action={
         outOfSync ? (
           <button type="button" className="btn-ghost" onClick={() => setProperty(current)}>

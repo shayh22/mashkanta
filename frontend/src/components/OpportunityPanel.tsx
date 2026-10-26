@@ -16,7 +16,7 @@ export function OpportunityPanel({ opportunity }: { opportunity: OpportunityRepo
   } as const;
 
   return (
-    <Card title="ניקוד ההצעה מול השוק" subtitle="השוואת הריביות שקיבלתם לחלוקת הריביות בפועל בשוק">
+    <Card title="ניקוד ההצעה מול השוק" subtitle="הריביות שקיבלתם מול השוק">
       <div className="flex flex-wrap items-center gap-5">
         <div
           className={`flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full bg-gradient-to-br text-white ${toneClasses[tone]}`}

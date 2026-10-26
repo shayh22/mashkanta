@@ -165,11 +165,13 @@ function RefinanceSummary({
         },
         {
           label: 'נקודת איזון',
+          term: 'breakeven',
           value: best.breakevenMonth > 0 ? `חודש ${best.breakevenMonth}` : 'לא מושגת',
           note: `עלות מעבר ${formatCurrency(best.upfrontCost)}`,
         },
         {
           label: 'ערך נוכחי נקי',
+          term: 'npv',
           value: formatSignedCurrency(best.netPresentValue),
           tone: best.netPresentValue > 0 ? 'positive' : 'negative',
         },

@@ -29,7 +29,6 @@ export function ProposalEditor({ proposal, optimal }: { proposal: ProposedTrack[
   return (
     <Card
       title="ההצעה החלופית"
-      subtitle="ברירת המחדל מתמחרת את אותם מסלולים ותקופות לפי ריביות השוק — כך רואים את שיפור המחיר בלבד."
     >
       <SegmentedControl
         label="מקור ההצעה"
@@ -68,7 +67,7 @@ export function ProposalEditor({ proposal, optimal }: { proposal: ProposedTrack[
                     : 'הצעה ראשונה ללא מיקוח'
             }
             onChange={state.setPercentile}
-            hint="ממקם את הריבית בהתפלגות ממוצעי בנק ישראל לפי מסלול ושיעור מימון."
+            term="negotiation"
           />
           <ul className="grid gap-2 sm:grid-cols-2">
             {proposal.map((track) => (
@@ -186,8 +185,8 @@ function OptimalInputs({ optimal }: { optimal?: OptimalRefinance }) {
   return (
     <div className="card-muted space-y-4 !p-4">
       <p className="text-xs text-ink-muted">
-        המנוע סורק את כל החלוקות החוקיות של {optimal ? formatCurrency(optimal.refinancedAmount) : 'הסכום הממוחזר'} ובוחר את
-        הזולה ביותר שעומדת ביחס ההחזר וביכולת הספיגה שלכם. מסלולים שמשאירים כמות שהם והלוואות זכאות לא משתנים.
+        המנוע בוחר את התמהיל הזול ביותר ל-{optimal ? formatCurrency(optimal.refinancedAmount) : 'סכום המיחזור'} שמתאים לנתונים
+        שלכם.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <CurrencyField
@@ -217,7 +216,7 @@ function OptimalInputs({ optimal }: { optimal?: OptimalRefinance }) {
         />
         <CurrencyField
           label="יכולת ספיגה חודשית"
-          hint="העלייה המרבית בהחזר שתוכלו לספוג בתרחיש קיצון."
+          term="absorption"
           value={profile.volatilityCapacity}
           min={0}
           max={10_000}
@@ -244,11 +243,11 @@ function OptimalInputs({ optimal }: { optimal?: OptimalRefinance }) {
 export function RefinanceSettings() {
   const state = useRefinance();
   return (
-    <Card title="מועד, הודעה ועלויות מעבר" subtitle="כל הסכומים ניתנים לעריכה; ברירות המחדל הן הערכה בלבד.">
+    <Card title="מועד, הודעה ועלויות מעבר" term="switchingCosts">
       <div className="grid gap-5 sm:grid-cols-2">
         <Toggle
           label="נמסרה הודעה מוקדמת (10–45 יום)"
-          hint="חוסכת עמלת אי-הודעה של 0.1% מהסכום הנפרע. במיחזור באותו בנק העמלה ממילא לא נגבית על הסכום שהבנק מלווה מחדש."
+          hint="חוסכת 0.1% עמלת אי-הודעה"
           checked={state.noticeGiven}
           onChange={state.setNoticeGiven}
         />

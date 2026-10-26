@@ -8,49 +8,59 @@
      chart series are re-validated against the dark surface. */
   :root {
     color-scheme: light;
-    --canvas: 244 246 251;
+    --canvas: 250 250 250;
     --surface: 255 255 255;
-    --surface-muted: 248 250 252;
-    --surface-sunken: 238 242 247;
-    --line: 226 232 240;
-    --line-strong: 203 213 225;
-    --ink: 15 23 42;
-    --ink-muted: 51 65 85;
-    --ink-soft: 92 107 130;
+    --surface-muted: 246 246 247;
+    --surface-sunken: 239 239 241;
+    --line: 229 229 232;
+    --line-strong: 212 212 216;
+    --ink: 9 9 11;
+    --ink-muted: 63 63 70;
+    --ink-soft: 92 92 100;
     --positive: 4 120 87;
     --negative: 190 18 60;
-    --caution: 180 83 9;
-    --brand-50: 238 242 255;
-    --brand-100: 224 231 255;
-    --brand-200: 199 210 254;
-    --brand-700: 55 48 163;
+    --caution: 146 64 14;
+    --brand-50: 240 253 250;
+    --brand-100: 204 251 241;
+    --brand-200: 153 246 228;
+    --brand-400: 45 212 191;
+    --brand-500: 13 148 136;
+    --brand-600: 15 118 110;
+    --brand-700: 17 94 89;
+    --brand-800: 19 78 74;
+    --on-brand: 255 255 255;
     /* Categorical chart series, validated for colour-vision deficiency against each surface. */
-    --chart-1: #4f46e5;
+    --chart-1: #0f766e;
     --chart-2: #d97706;
-    --chart-3: #0f8f68;
+    --chart-3: #6366f1;
   }
 
   .dark {
     color-scheme: dark;
-    --canvas: 8 11 20;
-    --surface: 17 22 36;
-    --surface-muted: 22 28 45;
-    --surface-sunken: 28 36 56;
-    --line: 41 51 74;
-    --line-strong: 66 79 107;
-    --ink: 241 245 249;
-    --ink-muted: 203 213 225;
-    --ink-soft: 148 163 184;
+    --canvas: 9 9 11;
+    --surface: 19 19 22;
+    --surface-muted: 26 26 30;
+    --surface-sunken: 34 34 39;
+    --line: 39 39 44;
+    --line-strong: 63 63 70;
+    --ink: 244 244 245;
+    --ink-muted: 212 212 216;
+    --ink-soft: 161 161 170;
     --positive: 52 211 153;
     --negative: 251 113 133;
     --caution: 251 191 36;
-    --brand-50: 30 27 75;
-    --brand-100: 49 46 129;
-    --brand-200: 67 56 202;
-    --brand-700: 199 210 254;
-    --chart-1: #7c83f0;
-    --chart-2: #c97a0a;
-    --chart-3: #199e70;
+    --brand-50: 4 47 46;
+    --brand-100: 17 70 66;
+    --brand-200: 19 94 88;
+    --brand-400: 94 234 212;
+    --brand-500: 45 212 191;
+    --brand-600: 45 212 191;
+    --brand-700: 153 246 228;
+    --brand-800: 13 148 136;
+    --on-brand: 4 47 46;
+    --chart-1: #2dd4bf;
+    --chart-2: #f59e0b;
+    --chart-3: #818cf8;
   }
 
   html {
@@ -60,12 +70,8 @@
   }
 
   body {
+    /* A plain canvas: one accent colour carries the emphasis, so nothing behind the cards competes. */
     @apply bg-canvas text-ink font-sans antialiased;
-    /* A soft brand glow behind the glass cards; fixed so it does not scroll away. */
-    background-image:
-      radial-gradient(60rem 30rem at 85% -10%, rgb(79 70 229 / 0.10), transparent 60%),
-      radial-gradient(40rem 24rem at 0% 0%, rgb(14 165 233 / 0.08), transparent 60%);
-    background-attachment: fixed;
   }
 
   /* Shekel amounts and rates line up column-wise only with tabular figures. */
@@ -86,10 +92,9 @@
 }
 
 @layer components {
-  /* Cards are frosted glass over the canvas glow: translucent enough to pick up its tint,
-     opaque enough that text contrast is measured against the surface colour. */
+  /* Cards are flat surfaces drawn by a hairline; spacing, not decoration, separates them. */
   .card {
-    @apply rounded-2xl border border-line/80 bg-surface/90 p-5 shadow-card backdrop-blur-xl;
+    @apply rounded-2xl border border-line bg-surface p-5 shadow-card;
   }
 
   .card-muted {
@@ -115,12 +120,17 @@
            font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
   }
 
+  /* Buttons with physical depth: a 2px edge under the face, which sinks into it on press. */
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-glow hover:bg-brand-500 active:bg-brand-600;
+    @apply btn bg-brand-600 text-on-brand shadow-edge hover:bg-brand-500
+           active:translate-y-[2px] active:shadow-none
+           disabled:translate-y-0 disabled:shadow-edge;
   }
 
   .btn-ghost {
-    @apply btn border border-line-strong bg-surface text-ink-muted hover:bg-surface-muted;
+    @apply btn border border-line-strong bg-surface text-ink shadow-edge-muted hover:bg-surface-muted
+           active:translate-y-[2px] active:shadow-none
+           disabled:translate-y-0 disabled:shadow-edge-muted;
   }
 
   .badge {
@@ -163,25 +173,30 @@ input[type='range']::-moz-range-thumb {
   /* Paper is white whatever theme is on screen. */
   html.dark {
     color-scheme: light;
-    --canvas: 244 246 251;
+    --canvas: 250 250 250;
     --surface: 255 255 255;
-    --surface-muted: 248 250 252;
-    --surface-sunken: 238 242 247;
-    --line: 226 232 240;
-    --line-strong: 203 213 225;
-    --ink: 15 23 42;
-    --ink-muted: 51 65 85;
-    --ink-soft: 92 107 130;
+    --surface-muted: 246 246 247;
+    --surface-sunken: 239 239 241;
+    --line: 229 229 232;
+    --line-strong: 212 212 216;
+    --ink: 9 9 11;
+    --ink-muted: 63 63 70;
+    --ink-soft: 92 92 100;
     --positive: 4 120 87;
     --negative: 190 18 60;
-    --caution: 180 83 9;
-    --brand-50: 238 242 255;
-    --brand-100: 224 231 255;
-    --brand-200: 199 210 254;
-    --brand-700: 55 48 163;
-    --chart-1: #4f46e5;
+    --caution: 146 64 14;
+    --brand-50: 240 253 250;
+    --brand-100: 204 251 241;
+    --brand-200: 153 246 228;
+    --brand-400: 45 212 191;
+    --brand-500: 13 148 136;
+    --brand-600: 15 118 110;
+    --brand-700: 17 94 89;
+    --brand-800: 19 78 74;
+    --on-brand: 255 255 255;
+    --chart-1: #0f766e;
     --chart-2: #d97706;
-    --chart-3: #0f8f68;
+    --chart-3: #6366f1;
   }
 
   body {
