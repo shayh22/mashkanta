@@ -11,7 +11,7 @@ import {
 import { ResponsiveChart } from './charts/ResponsiveChart';
 import type { StressMatrix } from '../lib/types';
 import { formatCompact, formatCurrency, formatSignedCurrency } from '../lib/format';
-import { Card } from './ui';
+import { Card, ScrollRegion } from './ui';
 
 /**
  * The what-if panel: every shock the mix was tested against, and whether it breaks the household.
@@ -113,7 +113,7 @@ export function ScenarioSimulator({
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <ScrollRegion label="טבלת תרחישי קיצון" className="mt-4">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-ink-soft">
@@ -136,7 +136,7 @@ export function ScenarioSimulator({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </Card>
   );
 }
