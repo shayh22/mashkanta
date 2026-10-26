@@ -17,6 +17,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '#/combined');
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
   useCombinedSettings.setState({ financeCosts: true });
@@ -33,26 +34,62 @@ function renderPage() {
 }
 
 describe('combined refinance and consolidation page', () => {
-  it('shows both moves together and one plan for them', () => {
+  it('keeps the result in view and shows each part of the move in its own tab', async () => {
+    const user = userEvent.setup();
     renderPage();
     const result = screen.getByRole('region', { name: 'תוצאת המהלך המשולב' });
-    expect(within(result).getByText('אחרי שני המהלכים')).toBeTruthy();
-    expect(screen.getByText('איחוד בלבד מול איחוד + מיחזור')).toBeTruthy();
-    expect(screen.getByText('תוכנית פעולה — מיחזור ואיחוד במהלך אחד')).toBeTruthy();
-    // Edit links lead back to the single-move inputs.
+    expect(within(result).getByText('החזר חודשי כולל')).toBeTruthy();
+    expect(within(result).getByText('חמצן תזרימי')).toBeTruthy();
+
+    // The inputs tab opens first; its edit links lead to the matching tab of each single move.
+    expect(screen.getByRole('tab', { name: /הנתונים/ }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getAllByRole('link', { name: 'עריכה' }).map((link) => link.getAttribute('href'))).toEqual([
-      '#/refinance',
-      '#/consolidation',
+      '#/refinance/data',
+      '#/consolidation/household',
     ]);
+
+    await user.click(screen.getByRole('tab', { name: /איחוד בלבד מול משולב/ }));
+    expect(screen.getByText('איחוד בלבד מול איחוד + מיחזור')).toBeTruthy();
+    expect(window.location.hash).toBe('#/combined/compare');
+
+    await user.click(screen.getByRole('button', { name: /הבא: תזרים וסיכון/ }));
+    expect(screen.getByRole('tab', { name: /תזרים וסיכון/ }).getAttribute('aria-selected')).toBe('true');
+
+    await user.click(screen.getByRole('tab', { name: /תוכנית פעולה/ }));
+    expect(screen.getByText('תוכנית פעולה — מיחזור ואיחוד במהלך אחד')).toBeTruthy();
   });
 
   it('switches between financing the refinance costs and paying them in cash', async () => {
     const user = userEvent.setup();
     renderPage();
+    await user.click(screen.getByRole('tab', { name: /איחוד בלבד מול משולב/ }));
     const toggle = screen.getByRole('switch', { name: /לממן את עמלות המיחזור/ });
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     await user.click(toggle);
     expect(useCombinedSettings.getState().financeCosts).toBe(false);
+    await user.click(screen.getByRole('tab', { name: /תוכנית פעולה/ }));
     expect(screen.getByText(/הכינו .* במזומן/)).toBeTruthy();
+  });
+
+  it('moves between section tabs with the arrow keys, right to left', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const first = screen.getByRole('tab', { name: /הנתונים/ });
+    first.focus();
+    await user.keyboard('{ArrowLeft}');
+    const second = screen.getByRole('tab', { name: /איחוד בלבד מול משולב/ });
+    expect(second.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(second);
+    await user.keyboard('{End}');
+    expect(screen.getByRole('tab', { name: /תוכנית פעולה/ }).getAttribute('aria-selected')).toBe('true');
+    // Only the selected tab is in the tab order.
+    expect(screen.getAllByRole('tab').filter((tab) => tab.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it('opens the section named in the link', () => {
+    window.history.replaceState(null, '', '#/combined/cashflow');
+    renderPage();
+    expect(screen.getByRole('tab', { name: /תזרים וסיכון/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('combined-tab-cashflow');
   });
 });
