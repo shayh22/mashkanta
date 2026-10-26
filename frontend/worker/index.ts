@@ -24,7 +24,7 @@ const EDGE_TTL_SECONDS = 6 * 60 * 60;
  * Part of the cache key. Bump it whenever the response gains or changes a field, or a deploy keeps
  * serving the previous shape from the edge for up to EDGE_TTL_SECONDS.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const MIN_FRESH_INTERVAL_MS = 60_000;
 
 const json = (body: unknown, status: number, cacheControl: string) =>

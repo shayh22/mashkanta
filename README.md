@@ -268,7 +268,8 @@ The app reads the Bank of Israel's statistics service on every load, and again w
 the header is pressed: the Bank of Israel rate (prime = rate + 1.5), the 5-year inflation expectation
 and government yields, and the latest monthly averages on new housing loans and on all-purpose loans
 secured on a home, and the average on unsecured consumer loans to households (`BIR`, item A2B1),
-which the consolidation screen and action plan measure each debt against. The service does not answer cross-origin browser requests, so a small Worker
+which the consolidation screen and action plan measure each debt against. Twelve months of the
+housing averages and of prime are kept as a history for the market-trends card on the refinance page. The service does not answer cross-origin browser requests, so a small Worker
 (`frontend/worker/index.ts`, the only server code, routed for `/api/*` only) fetches and parses the
 CSV files and caches the result at the edge for six hours. `npm run dev` / `vite preview` serve the
 same endpoint from a middleware (behind an HTTP proxy, start them with `NODE_USE_ENV_PROXY=1`).

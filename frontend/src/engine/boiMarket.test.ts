@@ -34,6 +34,27 @@ describe('Bank of Israel market data', () => {
     expect(isUsable(market)).toBe(true);
   });
 
+  it('reads the monthly history with prime at the end of each month', () => {
+    const { history } = marketFromBoi(FILES, NOW);
+
+    // Prime was 5.25% at the end of June, cut to 5.00% in July and 4.75% in September.
+    expect(history).toEqual([
+      { month: '2026-07', prime: 0.05, fixedUnlinked: 0.0463, fixedLinked: 0.0322, variableLinked: 0.0317 },
+      { month: '2026-08', prime: 0.05, fixedUnlinked: 0.0462, fixedLinked: 0.0329, variableLinked: 0.0319 },
+    ]);
+  });
+
+  it('leaves a gap where a series misses a month instead of borrowing a neighbour', () => {
+    const mortgages = FILES.mortgages
+      .split('\n')
+      .filter((line: string) => !(line.includes(',CPI,F,R,') && line.includes('2026-07')))
+      .join('\n');
+    const { history } = marketFromBoi({ ...FILES, mortgages }, NOW);
+
+    expect(history?.[0]).toMatchObject({ month: '2026-07', fixedLinked: undefined });
+    expect(history?.[1]?.fixedLinked).toBe(0.0329);
+  });
+
   it('degrades piece by piece when a file is missing', () => {
     const market = marketFromBoi({ br: FILES.br }, NOW);
 
@@ -76,9 +97,9 @@ describe('Bank of Israel market data', () => {
 
   it('asks for enough history to reach the latest monthly publication', () => {
     const sources = boiSources(NOW);
-    expect(sources.br).toContain('/BR/1.0?startperiod=2026-04-01&format=csv');
+    expect(sources.br).toContain('/BR/1.0?startperiod=2025-09-01&format=csv');
     expect(sources.zcm).toContain('/ZCM/1.0?startperiod=2026-06&format=csv');
-    expect(sources.mortgages).toContain('/BIR_MRTG_99/1.0?startperiod=2026-04&format=csv');
+    expect(sources.mortgages).toContain('/BIR_MRTG_99/1.0?startperiod=2025-09&format=csv');
     expect(sources.loans).toContain('/BIR/1.0?startperiod=2026-04&format=csv');
   });
 });

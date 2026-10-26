@@ -4,6 +4,7 @@ import { RefinanceResults } from '../components/refinance/RefinanceResults';
 import { TrackVerdicts } from '../components/refinance/TrackVerdicts';
 import { useMemo } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
+import { MarketTrends } from '../components/MarketTrends';
 import { CombinedLinkCard } from '../components/consolidation/CombinedMoveCard';
 import { Card } from '../components/ui';
 import { refinancePlan } from '../engine/actionPlan';
@@ -44,6 +45,7 @@ export function RefinancePage() {
               </p>
             </Card>
           )}
+          <MarketTrends />
         </div>
       </div>
       {plan && <ActionPlanReport plan={plan} />}
