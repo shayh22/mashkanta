@@ -398,9 +398,15 @@ two time series, which use the app's charting library, and follow light and dark
 after it ("your documents: two statements · mortgage ✓ · one loan · add") open the same four tiles:
 bank account, credit card, mortgage report and loans report. Statements are read here; a mortgage or
 loans report goes through the homeowner path's own readers (local parsing, AI only with consent), so
-the mortgage and the loans are entered once for the whole site. A loan from the report whose payment
-matches a repayment on the statements (within 3%) is the same loan: its balance, rate and months fill
-that loan's card (`store/journeyLoans.ts`); a report loan with no match is listed on its own.
+the mortgage and the loans are entered once for the whole site. Tapping a report's tile shows what the
+site holds — the mortgage's tracks, the loans — above the reader for a new report.
+
+**Each loan counted once** (`store/journeyLoans.ts`, `matchLoans`). A report loan is the same loan as a
+charge on the statements when the payments agree (within 5%, or 30 shekels) — whatever the charge is
+filed under, since a pension-fund loan is charged under the insurer's name; never the mortgage's
+repayment. That charge takes the report's balance, rate and months, and appears once. The household
+can link a report loan to another charge, or say it is paid from an account not uploaded; only then
+is it listed on its own.
 
 **Loans and the mortgage** (`components/money/Debts.tsx`, `engine/money/loanMoves.ts`). A step of
 its own: how much of the income goes to repayments, as one bar against the banks' usual 40% ceiling;
