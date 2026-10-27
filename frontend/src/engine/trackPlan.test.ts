@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { quotePrepayment, type ExistingTrack } from './prepayment';
 import { analyseRoute, DEFAULT_ROUTES, likeForLikeProposal, marketAverageFor } from './refinance';
 import { baselineScenario } from './scenario';
-import { analyseTrackPlan, isGoodRate, type TrackPlanOptions } from './trackPlan';
+import { analyseTrackPlan, clampTerm, isGoodRate, refinanceRate, type TrackPlanOptions } from './trackPlan';
 
 const options: TrackPlanOptions = {
   scenario: baselineScenario(),
@@ -33,9 +33,39 @@ describe('a plan track by track', () => {
 
   it('marks a track below today’s market as worth keeping', () => {
     const prime = options.scenario.primeAnnual;
-    expect(isGoodRate(tracks[2]!, options.ltv, prime)).toBe(true);
-    expect(isGoodRate(tracks[0]!, options.ltv, prime)).toBe(false);
+    expect(isGoodRate(tracks[2]!, options)).toBe(true);
+    expect(isGoodRate(tracks[0]!, options)).toBe(false);
     expect(tracks[2]!.annualRate).toBeLessThan(marketAverageFor(tracks[2]!, options.ltv, prime));
+  });
+
+  it('judges a good rate by the price this borrower would get, not by the average', () => {
+    const track = tracks[0]!;
+    const price = refinanceRate(track.type, track.remainingMonths, options);
+    const between = { ...track, annualRate: price - 0.003 };
+    expect(isGoodRate(between, options)).toBe(true);
+    // A bank discount on the new loan makes the same track worth refinancing after all.
+    expect(isGoodRate(between, { ...options, route: { ...options.route, rateDelta: -0.005 } })).toBe(false);
+  });
+
+  it("prices a refinanced track with the bank's discount, as a full refinance does", () => {
+    const action = { dear: { kind: 'REFINANCE', type: 'FIXED_UNLINKED', termMonths: 240 } } as const;
+    const discounted = { ...options, route: { ...options.route, rateDelta: -0.002 } };
+    const plain = analyseTrackPlan(tracks, action, options).proposal.find((track) => track.id === 'dear:new')!;
+    const better = analyseTrackPlan(tracks, action, discounted).proposal.find((track) => track.id === 'dear:new')!;
+    expect(better.annualRate).toBeCloseTo(plain.annualRate - 0.002, 9);
+    const alone = analyseRoute(
+      tracks,
+      likeForLikeProposal(tracks, options.ltv, 0.5, new Set(['prime', 'cheap']), options.scenario.primeAnnual),
+      discounted.route,
+      discounted,
+    );
+    expect(analyseTrackPlan(tracks, action, discounted).netPresentValue).toBeCloseTo(alone.netPresentValue, 0);
+  });
+
+  it('keeps every term within what can be priced', () => {
+    expect(clampTerm(5)).toBe(12);
+    expect(clampTerm(400)).toBe(360);
+    expect(clampTerm(264.4)).toBe(264);
   });
 
   it('refinancing one track matches refinancing that track alone, the others untouched', () => {
