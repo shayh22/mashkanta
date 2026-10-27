@@ -253,6 +253,19 @@ export function outstandingBalance(tracks: readonly ExistingTrack[]): number {
   return tracks.reduce((sum, track) => sum + Math.max(0, track.balance), 0);
 }
 
+/** True while the mortgage is still the illustrative one the app starts with, not the borrower's own. */
+export function isSampleTracks(tracks: readonly ExistingTrack[]): boolean {
+  return (
+    tracks.length === DEFAULT_TRACKS.length &&
+    tracks.every(
+      (track, index) =>
+        track.type === DEFAULT_TRACKS[index]!.type &&
+        track.balance === DEFAULT_TRACKS[index]!.balance &&
+        track.annualRate === DEFAULT_TRACKS[index]!.annualRate,
+    )
+  );
+}
+
 /** True when every track has the numbers the engine needs. */
 export function tracksValid(tracks: readonly ExistingTrack[]): boolean {
   return (

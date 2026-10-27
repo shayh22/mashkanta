@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements';
 import { MoneyPage } from '../../pages/MoneyPage';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { useRefinance } from '../../store/refinanceStore';
 
 beforeAll(() => {
   // Recharts measures its container; jsdom has no ResizeObserver.
@@ -28,7 +29,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
-  useMoney.setState({ files: [], reading: false, notes: {} });
+  useMoney.setState({ files: [], reading: false, notes: {}, loans: {}, refinance: false });
+  useRefinance.getState().reset();
   useMoneyCategories.setState({ explanations: {} });
 });
 afterEach(() => {
@@ -103,7 +105,7 @@ describe('my money, step by step', () => {
     expect(screen.getByText(/לא נשלחים לשום מקום/)).toBeTruthy();
   });
 
-  it('walks the five screens: in and out, where it goes, where to save, the summary', async () => {
+  it('walks the screens: in and out, where it goes, loans and mortgage, where to save, the summary', async () => {
     serve(false);
     const user = userEvent.setup();
     renderPage();
@@ -120,6 +122,12 @@ describe('my money, step by step', () => {
     expect(window.location.hash).toBe('#/money/spending');
     expect(screen.getByRole('img', { name: /חלוקת ההוצאות לפי קטגוריה/ })).toBeTruthy();
     expect(row('משכנתא')).toHaveLength(1);
+
+    await next(user);
+    expect(window.location.hash).toBe('#/money/debts');
+    expect(screen.getByRole('heading', { name: /בחודש הולכים להחזרים/ })).toBeTruthy();
+    // The mortgage in the homeowner path is still the illustrative one: asked for, not priced.
+    expect(screen.getByRole('link', { name: 'להזנת המשכנתא' }).getAttribute('href')).toBe('#/own');
 
     await next(user);
     expect(window.location.hash).toBe('#/money/savings');
@@ -197,6 +205,7 @@ describe('my money, step by step', () => {
     await next(user);
     await next(user);
     await next(user);
+    await next(user);
     const advisor = await screen.findByRole('region', { name: 'היועץ' });
     expect(within(advisor).getByText(/ו-1 ההערות שכתבתם/)).toBeTruthy();
     await user.type(within(advisor).getByRole('textbox', { name: /מה חשוב לכם/ }), 'לצאת מהמינוס');
@@ -231,10 +240,59 @@ describe('my money, step by step', () => {
     });
     expect(within(card).getByText(/הוסברו 1 מתוך/)).toBeTruthy();
     await next(user);
+    await next(user);
     const ideas = screen.getByRole('list', { name: 'רעיונות לחיסכון' });
     expect(within(ideas).getByText('מה שסימנתם לביטול')).toBeTruthy();
     expect(within(ideas).getByText('הלוואות')).toBeTruthy();
     await next(user);
     expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText('לבטל את מה שסימנתם')).toBeTruthy();
+  });
+
+  it('turns a loan into a balloon: what it frees a month, and what it costs at the end', async () => {
+    serve(false);
+    useMoneyCategories.setState({ explanations: { 'חנות הדוגמאות': { category: 'LOANS', note: 'הלוואה מהפנסיה' } } });
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user, [bankFile(), cardFile()]);
+    await user.click(screen.getByRole('button', { name: 'שלב 4: הלוואות ומשכנתא' }));
+    const loan = within(screen.getByRole('list', { name: 'ההלוואות' })).getAllByRole('listitem')[0]!;
+    expect(within(loan).getByText(/מה היתרה|את היתרה, הריבית/)).toBeTruthy();
+    const fill = async (name: string, value: string) => {
+      const input = within(loan).getByRole('spinbutton', { name });
+      await user.clear(input);
+      await user.type(input, value);
+      await user.tab();
+    };
+    await fill('יתרה של חנות הדוגמאות', '20000');
+    await fill('ריבית של חנות הדוגמאות', '6');
+    await fill('חודשים שנותרו בחנות הדוגמאות', '36');
+    await user.click(within(loan).getByRole('radio', { name: /בלון/ }));
+    // 667 a month by the statements; a balloon pays the interest only: 20,000 × 6% / 12 = 100.
+    expect(within(loan).getByText(/בסוף:.*20,000/)).toBeTruthy();
+    expect(within(loan).getByText(/בסיכום: .*567.* פחות בחודש/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
+    const decisions = screen.getByRole('list', { name: 'החלטות' });
+    expect(within(decisions).getByText('חנות הדוגמאות: בלון')).toBeTruthy();
+    expect(within(decisions).getByText(/בסוף התקופה 20,000 ₪ בבת אחת/)).toBeTruthy();
+    expect(screen.getByRole('img', { name: /החזרי הלוואות ומשכנתא/ })).toBeTruthy();
+  });
+
+  it("offers the engine's refinance once the household's own mortgage is in", async () => {
+    serve(false);
+    useRefinance.getState().setTracks([
+      { id: 'a', type: 'FIXED_UNLINKED', balance: 500_000, annualRate: 0.068, remainingMonths: 240, monthsElapsed: 60 },
+      { id: 'b', type: 'PRIME', balance: 300_000, annualRate: 0.0625, remainingMonths: 240, monthsElapsed: 60 },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user);
+    await user.click(screen.getByRole('button', { name: 'שלב 4: הלוואות ומשכנתא' }));
+    expect(screen.queryByRole('link', { name: 'להזנת המשכנתא' })).toBeNull();
+    const include = await screen.findByRole('checkbox', { name: /לכלול את המיחזור בסיכום/ });
+    await user.click(include);
+    expect(useMoney.getState().refinance).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
+    expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText('מיחזור המשכנתא לתמהיל של המנוע')).toBeTruthy();
   });
 });

@@ -1,22 +1,24 @@
+import { DebtsStep } from '../components/money/Debts';
 import { FilesStep } from '../components/money/FilesStep';
 import { FlowStep, SavingsStep, SpendingStep, SummaryStep } from '../components/money/Steps';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
 import { useMoney, useMonthlyPicture } from '../store/moneyStore';
 
-type StepId = 'files' | 'flow' | 'spending' | 'savings' | 'summary';
+type StepId = 'files' | 'flow' | 'spending' | 'debts' | 'savings' | 'summary';
 
 const STEPS: PageTab<StepId>[] = [
   { id: 'files', label: 'הקבצים' },
   { id: 'flow', label: 'נכנס ויוצא' },
   { id: 'spending', label: 'לאן הולך הכסף' },
+  { id: 'debts', label: 'הלוואות ומשכנתא' },
   { id: 'savings', label: 'איפה לחסוך' },
   { id: 'summary', label: 'הסיכום' },
 ];
 
 /**
  * "My money": the household's bank and card statements, read in the browser, walked through one
- * screen at a time — the files, what comes in and goes out, where it goes, where to save, and the
- * decisions. Every screen has one headline, one chart and a box to tell the AI what it misses.
+ * screen at a time — the files, what comes in and goes out, where it goes, the loans and the
+ * mortgage, where to save, and the decisions. Every screen has one headline, one chart and a box to tell the AI what it misses.
  */
 export function MoneyPage() {
   const [step, setStep] = usePageTab('money', STEPS);
@@ -40,6 +42,7 @@ export function MoneyPage() {
         <>
           {current === 'flow' && <FlowStep picture={picture} />}
           {current === 'spending' && <SpendingStep picture={picture} />}
+          {current === 'debts' && <DebtsStep picture={picture} />}
           {current === 'savings' && <SavingsStep picture={picture} onExplain={() => go('spending')} />}
           {current === 'summary' && <SummaryStep picture={picture} />}
           <nav className="no-print flex items-center justify-between gap-3 pt-2" aria-label="מעבר בין שלבים">
@@ -69,7 +72,7 @@ function JourneyProgress({ current, ready, onSelect }: { current: number; ready:
       <p className="text-sm text-ink-soft sm:hidden">
         שלב {current + 1} מתוך {STEPS.length} · <span className="font-semibold text-ink">{STEPS[current]!.label}</span>
       </p>
-      <ol className="grid grid-cols-5 gap-1.5">
+      <ol className="grid grid-cols-6 gap-1.5">
         {STEPS.map((item, index) => (
           <li key={item.id}>
             <button
