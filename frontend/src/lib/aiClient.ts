@@ -3,6 +3,7 @@ import type { AiDocumentKind } from '../engine/aiExtraction';
 import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
 import { toAdvice, type Advice, type AdviceRequest } from '../engine/money/adviceRequest';
 import { toCategories, type AiCategory } from '../engine/money/categorizeRequest';
+import { toConsultAnswer, type ConsultAnswer, type ConsultRequest } from '../engine/money/consultRequest';
 import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
 /** Served by the Worker in production and by a Vite middleware in development. */
@@ -142,4 +143,28 @@ export async function adviseHousehold(request: AdviceRequest): Promise<Advice> {
     throw new Error('התוכנית שהתקבלה לא תקינה. נסו שוב.');
   }
   return advice;
+}
+
+/** A short answer about one screen of the household journey, from its totals and the household's words. */
+export async function consultStep(request: ConsultRequest): Promise<ConsultAnswer> {
+  const response = await fetch('/api/consult', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'AI אינו מופעל כרגע.'
+          : `לא התקבלה תשובה (${response.status}). נסו שוב.`,
+    );
+  }
+  const answer = toConsultAnswer(((await response.json()) as { answer?: unknown }).answer);
+  if (!answer) {
+    throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
+  }
+  return answer;
 }

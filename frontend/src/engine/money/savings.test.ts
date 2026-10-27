@@ -32,6 +32,7 @@ function picture(lines: CategoryLine[], extra: Partial<MonthlyPicture> = {}): Mo
     byMonth: [],
     replacedCardCharges: 0,
     undetailedCards: [],
+    balances: [],
     ...extra,
   };
 }
