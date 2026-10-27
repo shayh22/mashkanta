@@ -1,4 +1,4 @@
-// End-to-end smoke check: every screen of both paths with every folded section open, desktop and phone, light and dark.
+// End-to-end smoke check: every screen of all three paths with every folded section open, desktop and phone, light and dark.
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
@@ -22,7 +22,18 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 /** Every screen of both paths. Each opens every folded section, so all of it is checked. */
-const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results'];
+const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-result'];
+
+/** An invented bank statement, in the layout Israeli banks export, for the household picture. */
+const SAMPLE_BANK = [
+  'תאריך,יום ערך,תיאור התנועה,זכות/חובה ₪, יתרה ₪',
+  ...['06', '05', '04'].flatMap((month) => [
+    `"28/${month}/26","28/${month}/26","משכורת חברת דוגמה","15,000","2,000"`,
+    `"15/${month}/26","15/${month}/26","חיוב לכרטיס ויזה 1111","-900","-13,000"`,
+    `"10/${month}/26","10/${month}/26","בנק-משכ חיוב","-5,000","-12,100"`,
+    `"02/${month}/26","02/${month}/26","כספומט בנק דוגמה","-400","-7,100"`,
+  ]),
+].join('\n');
 const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, height: 780 } };
 
 const browser = await playwright.chromium.launch();
@@ -86,6 +97,18 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
       if (screen.startsWith('buy')) {
         await page.goto(`${base}/#/buy`);
       }
+      if (screen.startsWith('money')) {
+        await page.goto(`${base}/#/money`);
+      }
+      if (screen === 'money-result') {
+        await page
+          .getByLabel('בחירת קבצי עו״ש או כרטיס אשראי')
+          .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_BANK) });
+        await page.getByRole('button', { name: /לתמונה החודשית/ }).click();
+        await page.getByRole('region', { name: 'התמונה החודשית' }).waitFor({ timeout: 15_000 });
+        // The categories fold with <details>; open them so their pickers are checked too.
+        await page.locator('main details').evaluateAll((all) => all.forEach((details) => (details.open = true)));
+      }
       if (screen === 'buy-results') {
         // Walk the wizard to the optimizer's results, the heaviest page in the app.
         await page.getByRole('button', { name: 'המשך' }).click();
@@ -135,4 +158,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('smoke: every screen of both paths, all sections open, clean on desktop and phone, light and dark');
+console.log('smoke: every screen of all three paths, all sections open, clean on desktop and phone, light and dark');

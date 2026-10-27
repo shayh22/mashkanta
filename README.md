@@ -383,6 +383,34 @@ else becomes *keep*. The actions land in the playground, where the engine prices
 answer is never shown as a figure. Same origin only, a goal of at most 400 characters, 20 requests an
 hour per visitor, no-retention providers.
 
+## My money: the household's month from its statements
+
+A third path, **"הכסף שלי"** (`#/money`), is for the household rather than the mortgage. The
+borrower uploads the current-account export from their bank and the transaction export from their
+card company (Excel or CSV), and gets one monthly picture: what comes in, what goes out and on what.
+
+- **Read in the browser, kept in memory.** `engine/money/sheets.ts` reads CSV (UTF-8 or Windows-1255)
+  and .xlsx with no library: an .xlsx file is a zip of XML parts, inflated with the browser's own
+  `DecompressionStream`. Nothing is sent anywhere and nothing is saved; closing the page clears it.
+- **Any layout.** `statementImport.ts` finds the header row by the column names Israeli banks and card
+  companies use (date, description, a signed amount or debit and credit columns, balance, card, kind
+  of deal), skipping titles above it and totals below. A card statement's purchases become money out.
+- **No purchase counted twice.** A card's purchases appear on the card statement and again as charges
+  on the bank account (a monthly bill, or one charge per purchase for a debit card). When a card's
+  detail is uploaded, the bank's charges for it are left out; a card paid from the account without
+  its detail shows as "card without detail".
+- **Whole months only.** Averages are over the months every statement covers whole, so a month with
+  the bank but not the card is never half counted (`picture.ts`).
+- **Categories by rules** (`categories.ts`): an ordered list of patterns on what statements print —
+  chains, utilities, insurers, fees, cash, transfers. Money that is not income (a savings fund cashed,
+  a loan taken) is kept apart from income and named. The overdraft is read from the balance column:
+  how many months dipped below zero, the lowest point, and the interest it cost.
+- **The borrower corrects, AI helps.** Any business can be moved to another category; the choice is
+  remembered by business name in the browser. When AI is on, "מיינו עם AI" sends the names of the
+  businesses left in "other" — names only, no amounts, dates or accounts — to `/api/categorize`
+  (`worker/categorize.ts`), which returns one category each from a fixed list; the borrower's own
+  choices always win. Same protections as the other AI endpoints.
+
 ## Reading unfamiliar documents with AI
 
 Known formats — the Hapoalim mortgage details statement and the standard approval-in-principle — are
