@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AiDocumentKind } from '../engine/aiExtraction';
 import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
+import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
 /** Served by the Worker in production and by a Vite middleware in development. */
 const ENDPOINT = '/api/extract';
@@ -67,4 +68,28 @@ export async function explainMix(request: ExplainRequest): Promise<MixExplanatio
     throw new Error('ההסבר שהתקבל לא תקין. נסו שוב.');
   }
   return explanation;
+}
+
+/** Asks for a track-by-track plan for the borrower's goal; the engine prices whatever comes back. */
+export async function proposePlan(request: PlanRequest): Promise<PlanAnswer> {
+  const response = await fetch('/api/plan', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'AI אינו מופעל כרגע.'
+          : `לא התקבלה הצעה (${response.status}). נסו שוב.`,
+    );
+  }
+  const answer = toPlanAnswer(((await response.json()) as { plan?: unknown }).plan, request.tracks);
+  if (!answer) {
+    throw new Error('ההצעה שהתקבלה לא תקינה. נסו שוב.');
+  }
+  return answer;
 }

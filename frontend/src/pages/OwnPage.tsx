@@ -5,6 +5,7 @@ import { MixExplainer } from '../components/MixExplainer';
 import { DebtsTable, TermsCard } from '../components/consolidation/ConsolidationInputs';
 import { DebtImporter } from '../components/consolidation/DebtImporter';
 import { ConsolidationLoanCard, RecommendedMix } from '../components/own/RecommendedMix';
+import { TrackPlayground } from '../components/own/TrackPlayground';
 import { SummaryBar, type SummaryTone } from '../components/SummaryBar';
 import { ExistingTracksEditor } from '../components/refinance/ExistingTracksEditor';
 import { ProposalEditor, RefinanceSettings } from '../components/refinance/ProposalEditor';
@@ -25,6 +26,7 @@ import { useCombinedMove } from '../store/combinedStore';
 import { useConsolidation, useConsolidationAnalysis } from '../store/consolidationStore';
 import { useFlow, useHasDebts } from '../store/flowStore';
 import { newTrackId, tracksValid, useRefinance } from '../store/refinanceStore';
+import { useTrackPlan } from '../store/trackPlanStore';
 import { useVisits } from '../store/visitStore';
 import { useWizard } from '../store/wizardStore';
 
@@ -266,6 +268,7 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
     [importOffer],
   );
   const mode = useRefinance((state) => state.proposalMode);
+  const trackPlan = useTrackPlan();
   const noticeGiven = useRefinance((state) => state.noticeGiven);
   const riskTolerance = useWizard((state) => state.profile.riskTolerance);
   const macro = useWizard((state) => state.macro);
@@ -320,6 +323,13 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
     );
   }
   const route = bestRoute(comparison);
+  const trackPlanSummary = !trackPlan.result
+    ? undefined
+    : trackPlan.result.unchanged
+      ? trackPlan.goodRate.size > 0
+        ? `${trackPlan.goodRate.size === 1 ? 'מסלול אחד' : `${trackPlan.goodRate.size} מסלולים`} בריבית טובה — כדאי לשמור`
+        : 'לשמור מסלולים, למחזר חלק או לפרוע מחסכונות'
+      : `ערך נוכחי ${formatSignedCurrency(trackPlan.result.netPresentValue)} · החזר ${formatCurrency(trackPlan.result.proposedPayment)}`;
   const today = consolidating ? move!.paymentToday : route.currentPayment;
   const after = consolidating ? move!.paymentAfter : route.proposedPayment;
   const relief = today - after;
@@ -391,6 +401,9 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
       />
       {consolidating && <ConsolidationLoanCard analysis={move!.combined} />}
       <MixExplainer request={explainRequest} />
+      <Disclosure id="own-tracks" title="משחק במסלולים — במקום מיחזור מלא" summary={trackPlanSummary} printable={false}>
+        <TrackPlayground fullRefinance={mode === 'OPTIMAL' ? route : engine} />
+      </Disclosure>
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-ink-soft">פרטים נוספים</h2>
         {plan && (
