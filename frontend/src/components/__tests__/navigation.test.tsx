@@ -23,7 +23,7 @@ describe('mode navigation', () => {
   it('offers the three paths as a tablist with one selected, focusable tab', () => {
     renderApp();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['יש לי משכנתא', 'קונים דירה', 'הכסף שלי']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['יש לי משכנתא', 'קונים דירה', 'תוכנית הבראה']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false']);
     expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
   });

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements';
 import { MoneyPage } from '../../pages/MoneyPage';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { useConsolidation } from '../../store/consolidationStore';
 import { useRefinance } from '../../store/refinanceStore';
 
 beforeAll(() => {
@@ -31,6 +32,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
   useMoney.setState({ files: [], reading: false, notes: {}, loans: {}, refinance: false });
   useRefinance.getState().reset();
+  useConsolidation.getState().reset();
   useMoneyCategories.setState({ explanations: {} });
 });
 afterEach(() => {
@@ -294,5 +296,49 @@ describe('my money, step by step', () => {
     expect(useMoney.getState().refinance).toBe(true);
     await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
     expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText('מיחזור המשכנתא לתמהיל של המנוע')).toBeTruthy();
+  });
+
+  it('keeps every kind of document a tap away on every step', async () => {
+    serve(false);
+    const user = userEvent.setup();
+    renderPage();
+    // The first screen: the plan's name and the four kinds of document.
+    expect(screen.getByRole('heading', { name: 'תוכנית הבראה' })).toBeTruthy();
+    for (const name of [/חשבון עו״ש/, /כרטיס אשראי/, /דוח משכנתא/, /דוח הלוואות/]) {
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+    }
+    await upload(user);
+    const bar = screen.getByRole('region', { name: 'המסמכים שלכם' });
+    expect(within(bar).getByText(/דף חשבון אחד/)).toBeTruthy();
+    await user.click(within(bar).getByRole('button', { name: /הוספה/ }));
+    await user.click(within(bar).getByRole('button', { name: /דוח משכנתא/ }));
+    // The homeowner path's own reader: the mortgage is entered once for the whole site.
+    expect(within(bar).getByRole('button', { name: /דוח משכנתא/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(bar).getByLabelText(/דוח המשכנתא|קובץ|מסמך/)).toBeTruthy();
+  });
+
+  it("fills a loan's terms from the loans report, and lists a report loan the statements do not show", async () => {
+    serve(false);
+    useMoneyCategories.setState({ explanations: { 'חנות הדוגמאות': { category: 'LOANS' } } });
+    useConsolidation.setState({
+      debts: [
+        { id: 'r1', kind: 'OTHER', label: 'הלוואה מהפנסיה', balance: 20_000, annualRate: 0.05, monthlyPayment: 670, remainingMonths: 30, include: true },
+        { id: 'r2', kind: 'CAR', label: 'הלוואת רכב', balance: 40_000, annualRate: 0.07, monthlyPayment: 1_100, remainingMonths: 40, include: true },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user, [bankFile(), cardFile()]);
+    await user.click(screen.getByRole('button', { name: 'שלב 4: הלוואות ומשכנתא' }));
+    const loans = [...screen.getByRole('list', { name: 'ההלוואות' }).children] as HTMLElement[];
+    expect(loans).toHaveLength(2);
+    // 667 a month on the statements ≈ 670 in the report: the same loan, its terms from the report.
+    expect(within(loans[0]!).getByText(/הפרטים מהדוח/)).toBeTruthy();
+    expect((within(loans[0]!).getByRole('spinbutton', { name: 'יתרה של חנות הדוגמאות' }) as HTMLInputElement).value).toMatch(/20,?000/);
+    expect(within(loans[1]!).getByText('הלוואת רכב')).toBeTruthy();
+    expect(within(loans[1]!).getByText(/לפי הדוח/)).toBeTruthy();
+    await user.click(within(loans[1]!).getByRole('radio', { name: /לפרוס/ }));
+    await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
+    expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText(/הלוואת רכב: פריסה ל-/)).toBeTruthy();
   });
 });
