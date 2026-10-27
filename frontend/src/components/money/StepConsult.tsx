@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MAX_QUESTION_LENGTH, type ConsultFact, type ConsultRequest, type ConsultStep } from '../../engine/money/consultRequest';
 import { consultStep, useAiEnabled } from '../../lib/aiClient';
+import { useIsPhone } from '../../lib/viewport';
 import { useMoney } from '../../store/moneyStore';
 
 const PLACEHOLDERS: Record<ConsultStep, string> = {
@@ -23,6 +24,8 @@ export function StepConsult({ step, facts }: { step: ConsultStep; facts: readonl
   const setNote = useMoney((state) => state.setNote);
   const consult = useMutation({ mutationFn: (request: ConsultRequest) => consultStep(request) });
   const { reset } = consult;
+  const phone = useIsPhone();
+  const [opened, setOpened] = useState(false);
   const factsKey = JSON.stringify(facts);
   // New figures on the screen make an earlier answer about them stale.
   useEffect(() => reset(), [factsKey, reset]);
@@ -32,6 +35,22 @@ export function StepConsult({ step, facts }: { step: ConsultStep; facts: readonl
   }
   const request: ConsultRequest = { step, question: note.trim(), facts };
   const answer = consult.data;
+  // On a phone, one line until it is wanted; open once anything is written or answered.
+  if (phone && !opened && !note && !answer && !consult.isPending) {
+    return (
+      <button
+        type="button"
+        aria-expanded={false}
+        onClick={() => setOpened(true)}
+        className="no-print flex w-full items-center gap-2 rounded-2xl border border-brand-500/30 bg-brand-50/40 px-4 py-3 text-start text-sm font-semibold text-ink"
+      >
+        <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] text-on-brand">
+          AI
+        </span>
+        יש משהו שהמספרים לא מספרים?
+      </button>
+    );
+  }
   return (
     <section className="no-print rounded-2xl border border-brand-500/30 bg-brand-50/40 p-4" aria-label="ספרו ל-AI">
       <label htmlFor={`consult-${step}`} className="flex items-center gap-2 text-sm font-semibold text-ink">

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { MoreDetails } from '../components/MoreDetails';
 import { ActionPlanReport } from '../components/ActionPlanReport';
 import { Disclosure } from '../components/Disclosure';
 import { MixExplainer } from '../components/MixExplainer';
@@ -404,8 +405,7 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
       <Disclosure id="own-tracks" title="משחק במסלולים — במקום מיחזור מלא" summary={trackPlanSummary} printable={false}>
         <TrackPlayground plan={trackPlan} fullRefinance={mode === 'OPTIMAL' ? route : engine} />
       </Disclosure>
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink-soft">פרטים נוספים</h2>
+      <MoreDetails>
         {plan && (
           <Disclosure title="מה עושים עכשיו — תוכנית פעולה" summary={plan.headline}>
             <ActionPlanReport plan={plan} />
@@ -464,7 +464,7 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
             <MarketTrends />
           </Charts>
         </Disclosure>
-      </div>
+      </MoreDetails>
 
       <div className="no-print">
         <button type="button" className="btn-ghost" onClick={onBack}>

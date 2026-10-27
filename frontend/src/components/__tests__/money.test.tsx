@@ -381,4 +381,35 @@ describe('my money, step by step', () => {
     const loans = screen.getByRole('region', { name: 'ההלוואות שנקראו' });
     expect(within(loans).getByText('הלוואת רכב')).toBeTruthy();
   });
+
+  it('on a phone, folds what is secondary — the AI box, the categories, each saving idea — into a line each', async () => {
+    serve(true, { '/api/consult': { answer: { answer: 'תשובה', points: [] } } });
+    const realMatchMedia = window.matchMedia;
+    vi.stubGlobal('matchMedia', (query: string) =>
+      query.includes('max-width')
+        ? { matches: true, addEventListener() {}, removeEventListener() {} }
+        : (realMatchMedia?.(query) ?? { matches: false, addEventListener() {}, removeEventListener() {} }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user);
+    // The AI box: one line until it is wanted.
+    const ask = await screen.findByRole('button', { name: /יש משהו שהמספרים לא מספרים/ });
+    expect(screen.queryByRole('region', { name: 'ספרו ל-AI' })).toBeNull();
+    await user.click(ask);
+    expect(screen.getByRole('region', { name: 'ספרו ל-AI' })).toBeTruthy();
+
+    await next(user);
+    const categories = screen.getByRole('button', { name: /לאן הולך הכסף.*קטגוריות/ });
+    expect(categories.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('list', { name: 'קטגוריות' })).toBeNull();
+    await user.click(categories);
+    expect(screen.getByRole('list', { name: 'קטגוריות' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'שלב 5: איפה לחסוך' }));
+    const overdraft = screen.getByRole('button', { name: /לצאת מהמינוס/ });
+    expect(screen.queryByText(/הלוואה בריבית נמוכה/)).toBeNull();
+    await user.click(overdraft);
+    expect(screen.getByText(/הלוואה בריבית נמוכה/)).toBeTruthy();
+  });
 });
