@@ -8,6 +8,7 @@ import type { Transaction } from './statementImport';
 
 export type CategoryId =
   | 'HOUSING_LOANS'
+  | 'LOANS'
   | 'HOME_BILLS'
   | 'TELECOM'
   | 'INSURANCE'
@@ -32,7 +33,8 @@ export type CategoryId =
   | 'CARD_PAYMENT';
 
 export const CATEGORY_LABELS: Record<CategoryId, string> = {
-  HOUSING_LOANS: 'משכנתא והלוואות',
+  HOUSING_LOANS: 'משכנתא',
+  LOANS: 'הלוואות',
   HOME_BILLS: 'בית: ארנונה, מים, גז, ועד',
   TELECOM: 'תקשורת וטלוויזיה',
   INSURANCE: 'ביטוחים',
@@ -60,6 +62,7 @@ export const CATEGORY_LABELS: Record<CategoryId, string> = {
 /** Paid every month whatever happens: the floor of the budget. */
 export const FIXED_CATEGORIES: ReadonlySet<CategoryId> = new Set([
   'HOUSING_LOANS',
+  'LOANS',
   'HOME_BILLS',
   'TELECOM',
   'INSURANCE',
@@ -74,7 +77,8 @@ type Rule = readonly [CategoryId, RegExp];
 const SPENDING: readonly Rule[] = [
   ['FEES', /ריבית|עמלה|עמלת|דמי כרטיס|דמי ניהול|דמי חבר|מס\s*במקור|יתרת זכות/],
   ['CASH', /כספומט|משיכת מזומן|משיכה מכספומט|מזומן/],
-  ['HOUSING_LOANS', /משכנתא|משכ(?![א-ת])|הלוואה|הלוואות/],
+  ['HOUSING_LOANS', /משכנתא|משכ(?![א-ת])/],
+  ['LOANS', /הלוואה|הלוואות|פירעון/],
   ['DONATIONS', /צדקה|תרומ|עמותת|ע"ר|חל"צ/],
   ['TELECOM', /רמי לוי תקשורת|הוט|\bhot\b|סלקום|פרטנר|פלאפון|בזק|גולן טלקום|\byes\b|012|019|אקספון/i],
   ['HOME_BILLS', /פז גז|סופרגז|אמישראגז|(?<![א-ת])גז(?![א-ת])|עיריית|עירית|מועצה|ארנונה|ועד בית|לוועד בית|חשמל|תאגיד|מעיינות|(?<![א-ת])מי\s|(?<![א-ת])מים(?![א-ת])/],

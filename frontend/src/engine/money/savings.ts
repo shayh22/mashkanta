@@ -1,4 +1,5 @@
 import type { CategoryId } from './categories';
+import type { Explanations } from './explanations';
 import type { CategoryLine, MonthlyPicture, Payee } from './picture';
 
 /**
@@ -8,7 +9,17 @@ import type { CategoryLine, MonthlyPicture, Payee } from './picture';
  * otherwise the idea says what to check, without a guess.
  */
 
-export type SavingKind = 'OVERDRAFT' | 'FEES' | 'RISING' | 'RECURRING' | 'INSURANCE' | 'CASH' | 'MORTGAGE';
+export type SavingKind =
+  | 'CANCEL'
+  | 'REDUCE'
+  | 'OVERDRAFT'
+  | 'LOANS'
+  | 'FEES'
+  | 'RISING'
+  | 'RECURRING'
+  | 'INSURANCE'
+  | 'CASH'
+  | 'MORTGAGE';
 
 export interface SavingIdea {
   readonly kind: SavingKind;
@@ -40,7 +51,7 @@ const FEE = /עמלה|עמלת|דמי כרטיס|דמי ניהול|דמי חבר
  * A subscription or standing order: marked so on the card statement, or charged once a month in
  * every month counted. A shop visited every week is neither.
  */
-export function recurringPayees(picture: MonthlyPicture): Payee[] {
+export function recurringPayees(picture: MonthlyPicture, explanations: Explanations = {}): Payee[] {
   const months = picture.months.length;
   if (months < 2 || picture.partial) {
     return [];
@@ -49,15 +60,49 @@ export function recurringPayees(picture: MonthlyPicture): Payee[] {
     .filter((line) => RECURRING_CATEGORIES.has(line.id))
     .flatMap((line) => line.payees)
     .filter((payee) => payee.months === months && payee.monthly >= 5 && (payee.standing || payee.count <= months + 1))
+    // What the household already called a must, or is cancelling, is not "to review".
+    .filter((payee) => !explanations[payee.description]?.flexibility)
     .sort((a, b) => b.monthly - a.monthly);
 }
 
 const lineOf = (picture: MonthlyPicture, id: CategoryId): CategoryLine | undefined =>
   picture.spendingLines.find((line) => line.id === id);
 
-export function savingIdeas(picture: MonthlyPicture): SavingIdea[] {
+/** Every spending payee the household marked with this flexibility, dearest first. */
+function marked(picture: MonthlyPicture, explanations: Explanations, flexibility: 'CANCEL' | 'REDUCE'): Payee[] {
+  return picture.spendingLines
+    .flatMap((line) => line.payees)
+    .filter((payee) => explanations[payee.description]?.flexibility === flexibility && payee.monthly > 0)
+    .sort((a, b) => b.monthly - a.monthly);
+}
+
+const sumOf = (payees: readonly Payee[]) => payees.reduce((sum, payee) => sum + payee.monthly, 0);
+const shekels = (value: number) => Math.round(value).toLocaleString('he-IL');
+
+export function savingIdeas(picture: MonthlyPicture, explanations: Explanations = {}): SavingIdea[] {
   const ideas: SavingIdea[] = [];
   const { overdraft } = picture;
+
+  // The household's own word comes first: what they said they can do without.
+  const cancel = marked(picture, explanations, 'CANCEL');
+  if (cancel.length > 0) {
+    ideas.push({
+      kind: 'CANCEL',
+      title: 'מה שסימנתם לביטול',
+      detail: 'ביטול שלהם מפנה את הסכום הזה כל חודש.',
+      monthly: sumOf(cancel),
+      items: cancel,
+    });
+  }
+  const reduce = marked(picture, explanations, 'REDUCE');
+  if (reduce.length > 0) {
+    ideas.push({
+      kind: 'REDUCE',
+      title: 'מה שסימנתם שאפשר לצמצם',
+      detail: `${shekels(sumOf(reduce))} ₪ בחודש. היועץ למטה יכול לבנות להם יעדים.`,
+      items: reduce,
+    });
+  }
 
   if (overdraft && overdraft.monthsBelow > 0) {
     ideas.push({
@@ -68,6 +113,17 @@ export function savingIdeas(picture: MonthlyPicture): SavingIdea[] {
         `(${overdraft.lowestDate.slice(8, 10)}.${overdraft.lowestDate.slice(5, 7)}). ` +
         'הלוואה בריבית נמוכה או סגירה מחיסכון עולים פחות מריבית המינוס, ומשחררים את המסגרת.',
       ...(overdraft.interestMonthly >= 1 ? { monthly: overdraft.interestMonthly } : {}),
+      action: { label: 'לבדוק איחוד הלוואות', href: '#/own' },
+    });
+  }
+
+  const loans = lineOf(picture, 'LOANS');
+  if (loans && loans.monthly >= 300) {
+    ideas.push({
+      kind: 'LOANS',
+      title: 'הלוואות',
+      detail: `${shekels(loans.monthly)} ₪ בחודש בהחזרי הלוואות. איחוד להלוואה אחת בריבית נמוכה, או פירעון מוקדם של היקרה, יכולים להוריד את ההחזר.`,
+      items: loans.payees,
       action: { label: 'לבדוק איחוד הלוואות', href: '#/own' },
     });
   }
@@ -85,7 +141,7 @@ export function savingIdeas(picture: MonthlyPicture): SavingIdea[] {
   }
 
   for (const line of picture.spendingLines) {
-    if (line.rising && line.id !== 'CARD_UNDETAILED' && line.id !== 'HOUSING_LOANS' && line.id !== 'CASH') {
+    if (line.rising && !['CARD_UNDETAILED', 'HOUSING_LOANS', 'LOANS', 'CASH'].includes(line.id)) {
       ideas.push({
         kind: 'RISING',
         title: `${line.label}: בחודש האחרון מעל הרגיל`,
@@ -96,7 +152,7 @@ export function savingIdeas(picture: MonthlyPicture): SavingIdea[] {
     }
   }
 
-  const recurring = recurringPayees(picture);
+  const recurring = recurringPayees(picture, explanations);
   if (recurring.length > 0) {
     const total = recurring.reduce((sum, payee) => sum + payee.monthly, 0);
     ideas.push({

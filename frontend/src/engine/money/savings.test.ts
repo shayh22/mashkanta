@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORY_LABELS, type CategoryId } from './categories';
 import type { CategoryLine, MonthlyPicture, Payee } from './picture';
+import type { Explanations } from './explanations';
 import { knownSaving, recurringPayees, savingIdeas } from './savings';
 
 const payee = (description: string, monthly: number, extra: Partial<Payee> = {}): Payee => ({
@@ -94,5 +95,30 @@ describe('where to save', () => {
       }),
     );
     expect(knownSaving(ideas)).toBeCloseTo(30, 6);
+  });
+
+  it("puts the household's own word first: what it marked to cancel is a saving, what to cut is a list", () => {
+    const p = picture([
+      line('SUBSCRIPTIONS', [payee('סטרימינג דוגמה', 60), payee('ענן דוגמה', 30)]),
+      line('DINING', [payee('מסעדה דוגמה', 500)]),
+    ]);
+    const explanations: Explanations = {
+      'סטרימינג דוגמה': { flexibility: 'CANCEL' },
+      'מסעדה דוגמה': { flexibility: 'REDUCE', note: 'ארוחות עבודה' },
+      'ענן דוגמה': { flexibility: 'MUST' },
+    };
+    const ideas = savingIdeas(p, explanations);
+    expect(ideas[0]).toMatchObject({ kind: 'CANCEL', monthly: 60 });
+    expect(ideas[1]).toMatchObject({ kind: 'REDUCE' });
+    expect(ideas[1]!.monthly).toBeUndefined();
+    // Explained charges are no longer "to review".
+    expect(recurringPayees(p, explanations)).toEqual([]);
+    expect(recurringPayees(p).map((item) => item.description)).toEqual(['סטרימינג דוגמה', 'ענן דוגמה']);
+  });
+
+  it('points loans, apart from the mortgage, to consolidation', () => {
+    const ideas = savingIdeas(picture([line('LOANS', [payee('הלוואה מהפנסיה', 3_200)]), line('HOUSING_LOANS', [payee('משכנתא', 5_000)])]));
+    expect(ideas.find((idea) => idea.kind === 'LOANS')).toMatchObject({ action: { href: '#/own' } });
+    expect(ideas.find((idea) => idea.kind === 'MORTGAGE')!.detail).toContain('5,000');
   });
 });

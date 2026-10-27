@@ -1,4 +1,5 @@
 import { CATEGORY_LABELS, type CategoryId } from './categories';
+import type { Explanations } from './explanations';
 import type { MonthlyPicture } from './picture';
 import { savingIdeas, type SavingKind } from './savings';
 
@@ -15,6 +16,7 @@ const MAX_STEPS = 5;
 
 export const ADVICE_CATEGORIES = [
   'HOUSING_LOANS',
+  'LOANS',
   'HOME_BILLS',
   'TELECOM',
   'INSURANCE',
@@ -35,7 +37,27 @@ export const ADVICE_CATEGORIES = [
 
 type AdviceCategory = (typeof ADVICE_CATEGORIES)[number];
 
-const IDEA_KINDS: readonly SavingKind[] = ['OVERDRAFT', 'FEES', 'RISING', 'RECURRING', 'INSURANCE', 'CASH', 'MORTGAGE'];
+const IDEA_KINDS: readonly SavingKind[] = [
+  'CANCEL',
+  'REDUCE',
+  'OVERDRAFT',
+  'LOANS',
+  'FEES',
+  'RISING',
+  'RECURRING',
+  'INSURANCE',
+  'CASH',
+  'MORTGAGE',
+];
+
+export interface AdviceCategoryTotal {
+  readonly id: AdviceCategory;
+  readonly monthly: number;
+  /** Of it, what the household marked a must, could cut, could cancel — amounts only, never the notes. */
+  readonly must: number;
+  readonly reduce: number;
+  readonly cancel: number;
+}
 
 export interface AdviceRequest {
   readonly goal: string;
@@ -46,7 +68,7 @@ export interface AdviceRequest {
   readonly oneOff: number;
   readonly months: number;
   readonly overdraft: { readonly monthsBelow: number; readonly lowest: number; readonly interestMonthly: number } | null;
-  readonly categories: readonly { readonly id: AdviceCategory; readonly monthly: number }[];
+  readonly categories: readonly AdviceCategoryTotal[];
   readonly ideas: readonly { readonly kind: SavingKind; readonly monthly: number | null }[];
 }
 
@@ -93,7 +115,8 @@ export const ADVICE_SCHEMA = {
 export const ADVICE_INSTRUCTIONS = `You are a careful household budget advisor in Israel. You receive a household's monthly picture from its bank and card statements — average income, spending by category, the fixed part, one-off money that came in, the overdraft, and saving ideas already found — and the household's goal in their own words (Hebrew).
 
 Return up to ${MAX_STEPS} steps, most urgent first. A usual order: stop paying overdraft interest; build an emergency cushion of about three months of fixed spending; clear expensive debt; then the goal. Follow the household's goal where it is reasonable.
-A step may set a monthly spending target for one category: give category (one of ${ADVICE_CATEGORIES.join(', ')}) and targetMonthly in ILS, below that category's current average. Keep targets realistic: no more than about a third off a variable category; fixed categories (mortgage, insurance, bills, telecom) only by renegotiating or switching, and say so. Leave category and targetMonthly null for a step that is not a spending target.
+A step may set a monthly spending target for one category: give category (one of ${ADVICE_CATEGORIES.join(', ')}) and targetMonthly in ILS, below that category's current average.
+Each category also says how much of it the household marked as a must, as possible to cut, and as possible to cancel. Never set a target below the must part; start with what they marked to cancel, then what they marked to cut. Keep targets realistic: no more than about a third off a variable category; fixed categories (mortgage, insurance, bills, telecom) only by renegotiating or switching, and say so. Leave category and targetMonthly null for a step that is not a spending target.
 Category names in Hebrew: ${ADVICE_CATEGORIES.map((id) => `${id} = ${CATEGORY_LABELS[id]}`).join('; ')}.
 
 Write in Hebrew, addressed to the household in the plural (אתם), plainly and briefly: title up to 8 words, detail one or two sentences. summary: one or two sentences on the plan. cautions: up to two short sentences, or none. Do not recommend specific investment products, banks or companies, and do not state figures you were not given — the app computes what the targets free up. If the goal is not about the household's money, say so in summary and return no steps. Return only the JSON the schema asks for.`;
@@ -107,7 +130,7 @@ const cleanText = (value: unknown, max: number) =>
     : '';
 
 /** The request a picture makes, with the household's goal. */
-export function adviceRequestOf(picture: MonthlyPicture, goal: string): AdviceRequest {
+export function adviceRequestOf(picture: MonthlyPicture, goal: string, explanations: Explanations = {}): AdviceRequest {
   const round = (value: number) => Math.round(value);
   const { overdraft } = picture;
   return {
@@ -123,8 +146,16 @@ export function adviceRequestOf(picture: MonthlyPicture, goal: string): AdviceRe
         : null,
     categories: picture.spendingLines
       .filter((line): line is typeof line & { id: AdviceCategory } => (ADVICE_CATEGORIES as readonly string[]).includes(line.id))
-      .map((line) => ({ id: line.id, monthly: round(line.monthly) })),
-    ideas: savingIdeas(picture).map((idea) => ({ kind: idea.kind, monthly: idea.monthly === undefined ? null : round(idea.monthly) })),
+      .map((line) => {
+        const part = (flexibility: string) =>
+          round(
+            line.payees
+              .filter((payee) => explanations[payee.description]?.flexibility === flexibility)
+              .reduce((sum, payee) => sum + Math.max(0, payee.monthly), 0),
+          );
+        return { id: line.id, monthly: round(line.monthly), must: part('MUST'), reduce: part('REDUCE'), cancel: part('CANCEL') };
+      }),
+    ideas: savingIdeas(picture, explanations).map((idea) => ({ kind: idea.kind, monthly: idea.monthly === undefined ? null : round(idea.monthly) })),
   };
 }
 
@@ -160,7 +191,15 @@ export function validateAdviceRequest(body: unknown): AdviceRequest | string {
   if (
     !categories ||
     categories.length > ADVICE_CATEGORIES.length ||
-    categories.some((c) => !c || !(ADVICE_CATEGORIES as readonly unknown[]).includes(c.id) || !finite(c.monthly, -1e6, 1e7))
+    categories.some(
+      (c) =>
+        !c ||
+        !(ADVICE_CATEGORIES as readonly unknown[]).includes(c.id) ||
+        !finite(c.monthly, -1e6, 1e7) ||
+        !finite(c.must, 0, 1e7) ||
+        !finite(c.reduce, 0, 1e7) ||
+        !finite(c.cancel, 0, 1e7),
+    )
   ) {
     return 'bad categories';
   }
@@ -186,30 +225,37 @@ export function validateAdviceRequest(body: unknown): AdviceRequest | string {
           interestMonthly: overdraft.interestMonthly as number,
         }
       : null,
-    categories: categories.map((c) => ({ id: c.id as AdviceCategory, monthly: c.monthly as number })),
+    categories: categories.map((c) => ({
+      id: c.id as AdviceCategory,
+      monthly: c.monthly as number,
+      must: c.must as number,
+      reduce: c.reduce as number,
+      cancel: c.cancel as number,
+    })),
     ideas: ideas.map((i) => ({ kind: i.kind as SavingKind, monthly: i.monthly as number | null })),
   };
 }
 
 /**
  * The answer held to the request: at most five steps; a target only for a category the household
- * has, and only below what it spends there now — otherwise the step stays, without a target.
+ * has, below what it spends there now and not below what it called a must — otherwise the step
+ * stays, without a target.
  */
 export function toAdvice(data: unknown, request: AdviceRequest): Advice | null {
   const record = data as Record<string, unknown> | null;
   if (!record || typeof record !== 'object' || !Array.isArray(record.steps)) {
     return null;
   }
-  const current = new Map(request.categories.map((category) => [category.id as string, category.monthly]));
+  const byId = new Map(request.categories.map((category) => [category.id as string, category]));
   const steps: AdviceStep[] = [];
   for (const raw of (record.steps as Record<string, unknown>[]).slice(0, MAX_STEPS)) {
     const title = cleanText(raw?.title, 80);
     if (!title) {
       continue;
     }
-    const spent = typeof raw.category === 'string' ? current.get(raw.category) : undefined;
+    const category = typeof raw.category === 'string' ? byId.get(raw.category) : undefined;
     const target =
-      spent !== undefined && finite(raw.targetMonthly, 0, spent - 1)
+      category && finite(raw.targetMonthly, category.must, category.monthly - 1)
         ? { category: raw.category as AdviceCategory, monthly: Math.round(raw.targetMonthly) }
         : undefined;
     steps.push({ title, detail: cleanText(raw.detail, 300), ...(target ? { target } : {}) });
