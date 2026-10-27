@@ -58,9 +58,23 @@ export interface TrackPlanResult {
 /** The action a track takes when the plan says nothing about it. */
 export const KEEP: TrackAction = { kind: 'KEEP' };
 
-/** A track below today's average for its kind and term: cheaper than anything a refinance can buy. */
-export function isGoodRate(track: ExistingTrack, ltv: number, prime: number): boolean {
-  return track.type !== 'ELIGIBILITY' && track.annualRate < marketAverageFor(track, ltv, prime) - 0.001;
+/** Terms a new track can take; whatever the engine prices is what the borrower is shown. */
+export function clampTerm(months: number): number {
+  return Math.round(Math.min(360, Math.max(12, months)));
+}
+
+/** The rate a track refinanced today gets: the market at the borrower's percentile, with the bank's own discount. */
+export function refinanceRate(type: TrackType, termMonths: number, options: TrackPlanOptions): number {
+  const market = atPercentile(rateFor(type, options.ltv, clampTerm(termMonths), options.scenario.primeAnnual), options.percentile);
+  return Math.max(0, market + options.route.rateDelta);
+}
+
+/**
+ * A track cheaper than refinancing it into the same kind and term would be: nothing a refinance buys
+ * beats it. Priced exactly as a refinance in the plan is, so the mark and the advice cannot disagree.
+ */
+export function isGoodRate(track: ExistingTrack, options: TrackPlanOptions): boolean {
+  return track.type !== 'ELIGIBILITY' && track.annualRate < refinanceRate(track.type, track.remainingMonths, options) - 0.001;
 }
 
 /** The part of a track repaid early, as a track of its own, so the fee is priced on that part only. */
@@ -110,8 +124,8 @@ export function analyseTrackPlan(
     const kind = track.type === 'ELIGIBILITY' && action.kind === 'REFINANCE' ? 'KEEP' : action.kind;
 
     if (kind === 'REFINANCE' && action.kind === 'REFINANCE') {
-      const termMonths = Math.round(Math.min(360, Math.max(12, action.termMonths)));
-      const annualRate = atPercentile(rateFor(action.type, options.ltv, termMonths, scenario.primeAnnual), options.percentile);
+      const termMonths = clampTerm(action.termMonths);
+      const annualRate = refinanceRate(action.type, termMonths, options);
       proposal.push({ id: `${track.id}:new`, type: action.type, amount: track.balance, annualRate, termMonths });
       specs.push(trackFromRate(action.type, track.balance, termMonths, annualRate, scenario));
       refinanced.push(track);

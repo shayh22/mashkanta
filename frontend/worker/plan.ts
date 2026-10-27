@@ -1,4 +1,4 @@
-import { PLAN_INSTRUCTIONS, PLAN_SCHEMA, toPlanAnswer, validatePlanRequest, type PlanAnswer } from '../src/engine/planRequest';
+import { PLAN_INSTRUCTIONS, PLAN_SCHEMA, toPlanAnswer, validatePlanRequest } from '../src/engine/planRequest';
 import { completeJson, json, overLimit, refuse, type OpenRouterEnv } from './openrouter';
 
 /**
@@ -41,17 +41,8 @@ export async function handlePlan(request: Request, env: OpenRouterEnv, cache: Ca
   if (result instanceof Response) {
     return result;
   }
-  const plan = toPlanAnswer(result.data, parsed.tracks);
-  return plan ? json({ model: result.model, plan: { ...plan, actions: toActionList(plan) } }, 200) : json({ error: 'unreadable answer' }, 502);
-}
-
-/** Back to the schema's list shape, so the browser reads the same answer whichever side clamped it. */
-function toActionList(plan: PlanAnswer) {
-  return Object.entries(plan.actions).map(([index, action]) => ({
-    index: Number(index),
-    action: action.kind,
-    newType: action.kind === 'REFINANCE' ? action.type : null,
-    termYears: action.kind === 'REFINANCE' ? action.termMonths / 12 : null,
-    prepayAmount: action.kind === 'PREPAY' ? action.amount : null,
-  }));
+  // The browser holds the answer to the tracks before using it; here it only has to be a plan.
+  return toPlanAnswer(result.data, parsed.tracks)
+    ? json({ model: result.model, plan: result.data }, 200)
+    : json({ error: 'unreadable answer' }, 502);
 }
