@@ -30,7 +30,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
-  useMoney.setState({ files: [], reading: false, notes: {}, loans: {}, refinance: false });
+  useMoney.setState({ files: [], reading: false, notes: {}, loans: {}, loanLinks: {}, refinance: false });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
   useMoneyCategories.setState({ explanations: {} });
@@ -340,5 +340,45 @@ describe('my money, step by step', () => {
     await user.click(within(loans[1]!).getByRole('radio', { name: /לפרוס/ }));
     await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
     expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText(/הלוואת רכב: פריסה ל-/)).toBeTruthy();
+  });
+
+  it('counts a report loan once: linked to its charge, or on its own when paid elsewhere', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [{ id: 'r1', kind: 'OTHER', label: 'הלוואה מהפנסיה', balance: 20_000, annualRate: 0.05, monthlyPayment: 690, remainingMonths: 30, include: true }],
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user, [bankFile(), cardFile()]);
+    await user.click(screen.getByRole('button', { name: 'שלב 4: הלוואות ומשכנתא' }));
+    let cards = [...screen.getByRole('list', { name: 'ההלוואות' }).children] as HTMLElement[];
+    // Found under "other" by its payment: one card, the statements' charge with the report's terms.
+    expect(cards).toHaveLength(1);
+    const link = within(cards[0]!).getByRole('combobox', { name: 'איפה ההחזר של הלוואה מהפנסיה בדפי החשבון' }) as HTMLSelectElement;
+    expect(link.value).toBe('חנות הדוגמאות');
+    await user.selectOptions(link, 'NONE');
+    cards = [...screen.getByRole('list', { name: 'ההלוואות' }).children] as HTMLElement[];
+    expect(cards).toHaveLength(1);
+    expect(within(cards[0]!).getByText(/לפי הדוח/)).toBeTruthy();
+  });
+
+  it('shows the mortgage and the loans the site holds, a tap away in the documents', async () => {
+    serve(false);
+    useRefinance.getState().setTracks([
+      { id: 'a', type: 'FIXED_UNLINKED', balance: 500_000, annualRate: 0.068, remainingMonths: 240, monthsElapsed: 60 },
+      { id: 'b', type: 'PRIME', balance: 300_000, annualRate: 0.0625, remainingMonths: 240, monthsElapsed: 60 },
+    ]);
+    useConsolidation.setState({
+      debts: [{ id: 'r1', kind: 'CAR', label: 'הלוואת רכב', balance: 40_000, annualRate: 0.07, monthlyPayment: 1_100, remainingMonths: 40, include: true }],
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /דוח משכנתא/ }));
+    const mortgage = screen.getByRole('region', { name: 'המשכנתא שנקראה' });
+    expect(within(mortgage).getByText(/2 מסלולים/)).toBeTruthy();
+    expect(within(mortgage).getAllByRole('row')).toHaveLength(3);
+    await user.click(screen.getByRole('button', { name: /דוח הלוואות/ }));
+    const loans = screen.getByRole('region', { name: 'ההלוואות שנקראו' });
+    expect(within(loans).getByText('הלוואת רכב')).toBeTruthy();
   });
 });
