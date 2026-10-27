@@ -22,14 +22,16 @@ import { useMarket } from './store/marketStore';
 // The homeowner's path carries the charting library; loading it on demand keeps it off a visit
 // that only buys.
 const OwnPage = lazy(() => import('./pages/OwnPage').then((module) => ({ default: module.OwnPage })));
+const MoneyPage = lazy(() => import('./pages/MoneyPage').then((module) => ({ default: module.MoneyPage })));
 
-/** The three jobs the platform does. Each is addressable by URL hash so it can be linked to. */
-type Mode = 'own' | 'buy';
+/** The jobs the platform does. Each is addressable by URL hash so it can be linked to. */
+type Mode = 'own' | 'buy' | 'money';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; title: string }[] = [
   { id: 'own', title: 'יש לי משכנתא' },
   { id: 'buy', title: 'קונים דירה' },
+  { id: 'money', title: 'הכסף שלי' },
 ];
 
 /** Links from before the two paths: the three homeowner modes are one path now. */
@@ -222,6 +224,18 @@ export default function App() {
               <OwnPage />
             </Suspense>
           )}
+
+          {mode === 'money' && (
+            <Suspense
+              fallback={
+                <div className="mx-auto w-full max-w-3xl">
+                  <LoadingCard message="טוען…" />
+                </div>
+              }
+            >
+              <MoneyPage />
+            </Suspense>
+          )}
         </div>
       </main>
 
@@ -313,7 +327,7 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
       <div
         role="tablist"
         aria-label="מצב עבודה"
-        className="relative mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-xl bg-surface-sunken p-1"
+        className="relative mx-auto grid w-full max-w-lg grid-cols-3 gap-1 rounded-xl bg-surface-sunken p-1"
       >
         {thumb && <span aria-hidden className={`rounded-lg border border-line bg-surface shadow-card ${GLIDE_CLASS}`} style={thumb} />}
         {MODES.map((item, index) => {
@@ -332,7 +346,7 @@ function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => voi
               tabIndex={selected ? 0 : -1}
               onClick={() => onSelect(item.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`relative z-10 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              className={`relative z-10 rounded-lg px-2 py-2.5 text-sm transition-colors ${
                 selected ? 'font-semibold text-ink' : 'font-medium text-ink-soft hover:text-ink'
               }`}
             >

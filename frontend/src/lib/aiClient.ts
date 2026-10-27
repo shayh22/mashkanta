@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AiDocumentKind } from '../engine/aiExtraction';
 import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
+import { toCategories, type AiCategory } from '../engine/money/categorizeRequest';
 import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
 /** Served by the Worker in production and by a Vite middleware in development. */
@@ -92,4 +93,28 @@ export async function proposePlan(request: PlanRequest): Promise<PlanAnswer> {
     throw new Error('ההצעה שהתקבלה לא תקינה. נסו שוב.');
   }
   return answer;
+}
+
+/** A category for each business name the rules did not know; names only are sent. */
+export async function categorizePayees(payees: readonly string[]): Promise<Record<string, AiCategory>> {
+  const response = await fetch('/api/categorize', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ payees }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'AI אינו מופעל כרגע.'
+          : `המיון לא הצליח (${response.status}). נסו שוב.`,
+    );
+  }
+  const categories = toCategories(((await response.json()) as { categories?: unknown }).categories, payees);
+  if (!categories) {
+    throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
+  }
+  return categories;
 }
