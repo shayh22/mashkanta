@@ -245,22 +245,25 @@ function OwnHousehold({ withDebts }: { withDebts: boolean }) {
 
 function ResultScreen({ onBack }: { onBack: () => void }) {
   const { comparison, proposal, ltv, perTrack, optimal, move, engine } = useCombinedMove();
-  const tracks = useRefinance((state) => state.tracks);
   const setProposalMode = useRefinance((state) => state.setProposalMode);
   const importOffer = useRefinance((state) => state.importOffer);
+  const manualSource = useRefinance((state) => state.manualSource);
   const [offering, setOffering] = useState(false);
-  const [offerRead, setOfferRead] = useState<number>();
-  // Stable, because the uploader reports a finished document from an effect that depends on it.
+  const [offerRead, setOfferRead] = useState<{ count: number } | { none: true }>();
+  // Stable, because the uploader reports a finished document from an effect that depends on it; the
+  // mortgage is read when the report arrives, so later edits never re-import the same offer.
   const onOfferRead = useCallback(
     (job: DocumentJob) => {
-      const read = offerToProposal(job.result?.tracks ?? [], tracks, newTrackId);
-      if (read.length > 0) {
-        importOffer(read);
-        setOfferRead(read.length);
-        requestAnimationFrame(() => document.getElementById('recommended-mix')?.scrollIntoView?.({ behavior: 'smooth' }));
+      const read = offerToProposal(job.result?.tracks ?? [], useRefinance.getState().tracks, newTrackId);
+      if (read.length === 0) {
+        setOfferRead({ none: true });
+        return;
       }
+      importOffer(read);
+      setOfferRead({ count: read.length });
+      requestAnimationFrame(() => document.getElementById('recommended-mix')?.scrollIntoView?.({ behavior: 'smooth' }));
     },
-    [tracks, importOffer],
+    [importOffer],
   );
   const mode = useRefinance((state) => state.proposalMode);
   const noticeGiven = useRefinance((state) => state.noticeGiven);
@@ -380,6 +383,7 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
         proposal={proposal}
         route={route}
         mode={mode}
+        source={manualSource}
         onChange={openEditor}
         onOffer={openOffer}
         engine={engine}
@@ -396,15 +400,21 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
         )}
         <Disclosure
           id="own-offer"
+          printable={false}
           title="השוואה להצעה מהבנק"
           summary="העלו את הצעת המיחזור (PDF או צילום) — נשווה אותה לתמהיל שהמנוע בוחר"
           open={offering}
           onToggle={setOffering}
         >
-          <ApprovalUploader ltv={ltv} onExtracted={onOfferRead} />
-          {offerRead !== undefined && (
+          <ApprovalUploader title="הצעת המיחזור מהבנק" onExtracted={onOfferRead} />
+          {offerRead && 'none' in offerRead && (
+            <p className="text-sm text-caution" role="status">
+              לא נמצאו בהצעה מסלולים חדשים לבדיקה. אפשר להזין אותם ב"שינוי התמהיל".
+            </p>
+          )}
+          {offerRead && 'count' in offerRead && mode === 'MANUAL' && manualSource === 'OFFER' && (
             <p className="text-sm text-positive" role="status">
-              ✓ נקראו {offerRead} מסלולים מההצעה — היא מוצגת למעלה, מול בחירת המנוע.
+              ✓ נקראו {offerRead.count} מסלולים מההצעה — היא מוצגת למעלה, מול בחירת המנוע.
             </p>
           )}
         </Disclosure>

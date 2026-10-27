@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OwnPage } from '../../pages/OwnPage';
@@ -116,7 +116,7 @@ describe("the homeowner's path", () => {
     ]);
     renderPage();
     const yardstick = screen.getByRole('group', { name: 'מול בחירת המנוע' });
-    expect(within(yardstick).getByText(/התמהיל שהמנוע בוחר חוסך/)).toBeTruthy();
+    expect(within(yardstick).getByText(/התמהיל שהמנוע בוחר שווה .* יותר, בערך נוכחי/)).toBeTruthy();
     await user.click(within(yardstick).getByRole('button', { name: 'מעבר לבחירת המנוע' }));
     expect(useRefinance.getState().proposalMode).toBe('OPTIMAL');
     expect(screen.queryByRole('group', { name: 'מול בחירת המנוע' })).toBeNull();
@@ -181,5 +181,59 @@ describe("the homeowner's path", () => {
     expect(within(result).getByText(/שני המהלכים מורידים .* בחודש/)).toBeTruthy();
     expect(within(result).getByText('נקודת איזון (מיחזור)')).toBeTruthy();
     expect(useVisits.getState().visited).toEqual(['refinance', 'consolidation']);
+  });
+
+  const uploadOffer = async (user: ReturnType<typeof userEvent.setup>, lines: string[]) => {
+    await user.click(screen.getByRole('button', { name: 'יש לי הצעה מהבנק' }));
+    const input = document.querySelector<HTMLInputElement>('#own-offer input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File([lines.join('\n')], 'offer.txt', { type: 'text/plain' })] } });
+  };
+
+  it('warns, instead of comparing, when the offer does not add up to what is owed', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    renderPage();
+    // 800,000 of the 1,060,000 owed: a track the reader missed must not pass for a cheaper offer.
+    await uploadOffer(user, ['פריים מינוס 0.6 · 400,000 ₪ · 264 חודשים', 'קבועה לא צמודה 4.40% 400,000 ₪ 264 חודשים']);
+    const card = await screen.findByRole('region', { name: /ההצעה שקיבלתם/ }, { timeout: 5_000 });
+    expect(within(card).getByRole('alert').textContent).toContain('ייתכן שמסלול לא נקרא');
+    expect(within(card).queryByRole('group', { name: 'מול בחירת המנוע' })).toBeNull();
+  });
+
+  it('does not import the same offer again after the borrower moves on', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    renderPage();
+    await uploadOffer(user, ['פריים מינוס 0.6 · 500,000 ₪ · 264 חודשים', 'קבועה לא צמודה 5.90% 560,000 ₪ 264 חודשים']);
+    await screen.findByText(/נקראו 2 מסלולים/, {}, { timeout: 5_000 });
+    act(() => useRefinance.getState().setProposalMode('OPTIMAL'));
+    const first = useRefinance.getState().tracks[0]!;
+    act(() => useRefinance.getState().updateTrack(first.id, { monthsElapsed: first.monthsElapsed + 1 }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(useRefinance.getState().proposalMode).toBe('OPTIMAL');
+    expect(screen.queryByText(/נקראו 2 מסלולים/)).toBeNull();
+  });
+
+  it('says so when an offer holds nothing new to compare', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    const { tracks } = useRefinance.getState();
+    useRefinance.getState().setTracks([
+      ...tracks,
+      { id: 'elig', type: 'ELIGIBILITY', balance: 100_000, annualRate: 0.03, remainingMonths: 240, monthsElapsed: 30 },
+    ]);
+    renderPage();
+    await uploadOffer(user, ['הלוואת זכאות 3.00% 100,000 ₪ 240 חודשים']);
+    expect(await screen.findByText(/לא נמצאו בהצעה מסלולים חדשים/, {}, { timeout: 5_000 })).toBeTruthy();
+    expect(useRefinance.getState().proposalMode).toBe('OPTIMAL');
+  });
+
+  it('names a typed mix as the borrower\'s own, not as an offer they received', () => {
+    window.history.replaceState(null, '', '#/own/result');
+    useRefinance.getState().setProposalMode('MANUAL', [
+      { id: 'a', type: 'FIXED_UNLINKED', amount: 1_060_000, annualRate: 0.05, termMonths: 264 },
+    ]);
+    renderPage();
+    expect(screen.getByRole('region', { name: /התמהיל שבניתם/ })).toBeTruthy();
   });
 });

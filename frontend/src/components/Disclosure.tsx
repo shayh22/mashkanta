@@ -12,9 +12,12 @@ export function Disclosure({
   open: controlledOpen,
   onToggle,
   id,
+  printable = true,
   children,
 }: {
   title: string;
+  /** False for sections that are tools rather than findings (an upload box), left out of print. */
+  printable?: boolean;
   summary?: string;
   /** Controlled from outside, for a button elsewhere that opens this section. */
   open?: boolean;
@@ -24,7 +27,7 @@ export function Disclosure({
 }) {
   const [ownOpen, setOwnOpen] = useState(false);
   const printing = usePrinting();
-  const open = printing || (controlledOpen ?? ownOpen);
+  const open = (printing && printable) || (controlledOpen ?? ownOpen);
   const panelId = useId();
 
   const toggle = () => {
@@ -36,7 +39,7 @@ export function Disclosure({
   };
 
   return (
-    <section id={id} className="rounded-2xl border border-line bg-surface">
+    <section id={id} className={`rounded-2xl border border-line bg-surface ${printable ? '' : 'no-print'}`}>
       <h3>
         <button
           type="button"

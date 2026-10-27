@@ -58,7 +58,7 @@ export function OfferReview() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5">
-      <ApprovalUploader ltv={profile.loanAmount / profile.propertyValue} onExtracted={seedFromDocument} />
+      <ApprovalUploader onExtracted={seedFromDocument} />
 
       <Card
         title="ההצעה שקיבלתם"
