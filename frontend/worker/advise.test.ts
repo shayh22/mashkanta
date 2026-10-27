@@ -22,6 +22,7 @@ const REQUEST: AdviceRequest = {
   overdraft: null,
   categories: [{ id: 'DINING', monthly: 900, must: 0, reduce: 300, cancel: 0 }],
   ideas: [],
+  notes: [],
 };
 const ANSWER = {
   summary: 'מצמצמים מסעדות',

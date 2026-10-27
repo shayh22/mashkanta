@@ -74,6 +74,8 @@ export interface MonthlyPicture {
   readonly replacedCardCharges: number;
   /** Cards paid from the bank account whose detail was not uploaded. */
   readonly undetailedCards: readonly string[];
+  /** The account's balance at the end of each day with a line, over the months counted; one account only. */
+  readonly balances: readonly { readonly date: string; readonly balance: number }[];
 }
 
 interface Classified extends Transaction {
@@ -244,7 +246,31 @@ export function monthlyPicture(statements: readonly Statement[], overrides: Cate
     ),
     replacedCardCharges,
     undetailedCards: [...undetailed].sort(),
+    balances: balancesOf(statements, months),
   };
+}
+
+/**
+ * The day's closing balance, from a bank statement's balance column: the last line of each day.
+ * Exports list newest first or oldest first; either way the file's order within a day is kept.
+ * With two accounts there is no single balance, so nothing.
+ */
+export function balancesOf(statements: readonly Statement[], months: readonly string[]): { date: string; balance: number }[] {
+  const banks = statements.filter((statement) => statement.source === 'BANK' && statement.transactions.some((t) => t.balance !== undefined));
+  if (banks.length !== 1) {
+    return [];
+  }
+  const lines = banks[0]!.transactions.filter((t) => t.balance !== undefined);
+  const newestFirst = lines.length > 1 && lines[0]!.date > lines[lines.length - 1]!.date;
+  const ordered = newestFirst ? [...lines].reverse() : lines;
+  const closing = new Map<string, number>();
+  for (const line of ordered) {
+    closing.set(line.date, line.balance!);
+  }
+  return [...closing.entries()]
+    .filter(([date]) => months.includes(monthOf(date)))
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([date, balance]) => ({ date, balance }));
 }
 
 function overdraftOf(

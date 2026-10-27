@@ -385,6 +385,25 @@ hour per visitor, no-retention providers.
 
 ## My money: the household's month from its statements
 
+**One screen at a time.** The path is a journey of five steps with a progress bar: the files; what
+comes in and goes out (a monthly bar chart of income against spending with the net as a line, and
+the account balance day by day from the statement's balance column, the overdraft shaded); where
+the money goes (a 10×10 waffle — each cell one shekel in a hundred — the "what is this?" card and the
+categories); where to save (each category as one bar split into must / could cut / could cancel /
+not yet explained, and the saving ideas); and the summary (the decisions to tick, a slope chart from
+today to after, what each decision frees, and the advisor). The charts are plain elements except the
+two time series, which use the app's charting library, and follow light and dark.
+
+**Tell the AI on every screen** (`engine/money/consultRequest.ts`, `/api/consult`). Each step has a
+box for what the numbers do not show ("August had a bonus", "the insurer charge is a pension loan")
+or a question, answered about that screen. What is sent is the screen's totals under fixed labels —
+category names and amounts, never a business name, a date or an account — and the words typed; it
+can be inspected first. What was written on each screen is kept (in memory) and handed to the
+advisor in the summary. The summary's decisions (`engine/money/decisions.ts`) count each shekel once:
+where the advisor set a target for a category, its cancellations and return-to-average are not added
+on top.
+
+
 A third path, **"הכסף שלי"** (`#/money`), is for the household rather than the mortgage. The
 borrower uploads the current-account export from their bank and the transaction export from their
 card company (Excel or CSV), and gets one monthly picture: what comes in, what goes out and on what.

@@ -13,6 +13,7 @@ import { savingIdeas, type SavingKind } from './savings';
 
 export const MAX_GOAL_LENGTH = 400;
 const MAX_STEPS = 5;
+const MAX_NOTES = 5;
 
 export const ADVICE_CATEGORIES = [
   'HOUSING_LOANS',
@@ -70,6 +71,8 @@ export interface AdviceRequest {
   readonly overdraft: { readonly monthsBelow: number; readonly lowest: number; readonly interestMonthly: number } | null;
   readonly categories: readonly AdviceCategoryTotal[];
   readonly ideas: readonly { readonly kind: SavingKind; readonly monthly: number | null }[];
+  /** What the household wrote on the screens before, in its own words. */
+  readonly notes: readonly string[];
 }
 
 export interface AdviceStep {
@@ -116,6 +119,7 @@ export const ADVICE_INSTRUCTIONS = `You are a careful household budget advisor i
 
 Return up to ${MAX_STEPS} steps, most urgent first. A usual order: stop paying overdraft interest; build an emergency cushion of about three months of fixed spending; clear expensive debt; then the goal. Follow the household's goal where it is reasonable.
 A step may set a monthly spending target for one category: give category (one of ${ADVICE_CATEGORIES.join(', ')}) and targetMonthly in ILS, below that category's current average.
+notes are what the household wrote on earlier screens, in their own words: take them into account.
 Each category also says how much of it the household marked as a must, as possible to cut, and as possible to cancel. Never set a target below the must part; start with what they marked to cancel, then what they marked to cut. Keep targets realistic: no more than about a third off a variable category; fixed categories (mortgage, insurance, bills, telecom) only by renegotiating or switching, and say so. Leave category and targetMonthly null for a step that is not a spending target.
 Category names in Hebrew: ${ADVICE_CATEGORIES.map((id) => `${id} = ${CATEGORY_LABELS[id]}`).join('; ')}.
 
@@ -130,7 +134,12 @@ const cleanText = (value: unknown, max: number) =>
     : '';
 
 /** The request a picture makes, with the household's goal. */
-export function adviceRequestOf(picture: MonthlyPicture, goal: string, explanations: Explanations = {}): AdviceRequest {
+export function adviceRequestOf(
+  picture: MonthlyPicture,
+  goal: string,
+  explanations: Explanations = {},
+  notes: readonly string[] = [],
+): AdviceRequest {
   const round = (value: number) => Math.round(value);
   const { overdraft } = picture;
   return {
@@ -156,6 +165,7 @@ export function adviceRequestOf(picture: MonthlyPicture, goal: string, explanati
         return { id: line.id, monthly: round(line.monthly), must: part('MUST'), reduce: part('REDUCE'), cancel: part('CANCEL') };
       }),
     ideas: savingIdeas(picture, explanations).map((idea) => ({ kind: idea.kind, monthly: idea.monthly === undefined ? null : round(idea.monthly) })),
+    notes: notes.map((note) => cleanText(note, MAX_GOAL_LENGTH)).filter((note) => note.length >= 3).slice(0, MAX_NOTES),
   };
 }
 
@@ -211,6 +221,10 @@ export function validateAdviceRequest(body: unknown): AdviceRequest | string {
   ) {
     return 'bad ideas';
   }
+  const notes = Array.isArray(record.notes) ? record.notes.map((note) => cleanText(note, MAX_GOAL_LENGTH + 1)) : null;
+  if (!notes || notes.length > MAX_NOTES || notes.some((note) => note.length === 0 || note.length > MAX_GOAL_LENGTH)) {
+    return 'bad notes';
+  }
   return {
     goal,
     income: record.income as number,
@@ -233,6 +247,7 @@ export function validateAdviceRequest(body: unknown): AdviceRequest | string {
       cancel: c.cancel as number,
     })),
     ideas: ideas.map((i) => ({ kind: i.kind as SavingKind, monthly: i.monthly as number | null })),
+    notes,
   };
 }
 

@@ -22,6 +22,7 @@ const REQUEST: AdviceRequest = {
     { kind: 'OVERDRAFT', monthly: 40 },
     { kind: 'RECURRING', monthly: null },
   ],
+  notes: ['הבונוס באוגוסט חד-פעמי'],
 };
 
 describe('the advisor request', () => {
