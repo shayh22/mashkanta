@@ -1,8 +1,6 @@
 import {
-  explainVerdict,
   VERDICT_LABELS,
   type RefinanceComparison,
-  type RefinanceVerdict,
   type RouteAnalysis,
 } from '../../engine/refinance';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../../lib/format';
@@ -17,39 +15,8 @@ import { TRACKS } from '../../engine/tracks';
 import type { TrackType } from '../../lib/types';
 import type { WaterfallStep } from '../../lib/waterfall';
 
-const VERDICT_STYLE: Record<RefinanceVerdict, { box: string; icon: string }> = {
-  IMMEDIATE: { box: 'border-emerald-500/30 bg-emerald-500/10 text-positive', icon: '✓' },
-  LONG_TERM: { box: 'border-amber-500/30 bg-amber-500/10 text-caution', icon: '!' },
-  NOT_WORTHWHILE: { box: 'border-rose-500/30 bg-rose-500/10 text-negative', icon: '✕' },
-};
-
-
 function months(value: number): string {
   return value === 0 ? 'לא מושגת' : `חודש ${value}`;
-}
-
-/** The verdict and its reasoning, at the head of the results. */
-export function RefinanceVerdict({ comparison }: { comparison: RefinanceComparison }) {
-  const best = bestRoute(comparison);
-  const style = VERDICT_STYLE[best.verdict];
-  return (
-    <section
-      className={`animate-fade-up rounded-2xl border p-5 ${style.box}`}
-      aria-live="polite"
-      aria-label="המלצת מיחזור"
-    >
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface/70 text-lg font-bold" aria-hidden>
-          {style.icon}
-        </span>
-        <div>
-          <p className="text-xs font-medium">הדרך המשתלמת יותר: {ROUTE_NAME[comparison.best]}</p>
-          <h2 className="text-lg font-bold">{VERDICT_LABELS[best.verdict]}</h2>
-          <p className="mt-1 text-sm">{explainVerdict(best)}</p>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 /** Refinancing at the current bank against moving to a competitor, figure by figure. */

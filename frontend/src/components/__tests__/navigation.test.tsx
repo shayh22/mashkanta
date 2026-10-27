@@ -47,6 +47,7 @@ describe('mode navigation', () => {
     ['#/consolidation', 'יש לי משכנתא', '#/own'],
     ['#/combined/plan', 'יש לי משכנתא', '#/own'],
     ['#/mortgage', 'קונים דירה', '#/buy'],
+    ['#/constructor', 'יש לי משכנתא', '#/constructor'],
   ])('sends an old link %s to the path that replaced it', (hash, tab, now) => {
     window.history.replaceState(null, '', `/${hash}`);
     renderApp();

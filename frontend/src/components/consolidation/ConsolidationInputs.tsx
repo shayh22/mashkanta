@@ -15,68 +15,6 @@ const ACTION_BADGE = {
   OPTIONAL: { className: 'badge-warn', label: 'לשיקולכם' },
 } as const;
 
-/** Income and what is already secured on the home. */
-export function HouseholdCard() {
-  const { netIncome, property, setNetIncome, setProperty } = useConsolidation();
-  return (
-    <Card title="משק הבית והנכס">
-      <div className="grid gap-5 sm:grid-cols-2">
-        <CurrencyField label="הכנסה נטו חודשית (N)" value={netIncome} min={5_000} max={80_000} step={500} onChange={setNetIncome} />
-        <CurrencyField
-          label="שווי הנכס"
-          value={property.value}
-          min={300_000}
-          max={10_000_000}
-          step={50_000}
-          onChange={(value) => setProperty({ value })}
-        />
-        <CurrencyField
-          label="יתרת המשכנתא"
-          value={property.mortgageBalance}
-          min={0}
-          max={5_000_000}
-          step={10_000}
-          onChange={(value) => setProperty({ mortgageBalance: value })}
-        />
-        <CurrencyField
-          label="החזר המשכנתא החודשי (E)"
-          value={property.mortgagePayment}
-          min={0}
-          max={30_000}
-          step={100}
-          onChange={(value) => setProperty({ mortgagePayment: value })}
-        />
-        <CurrencyField
-          label="מתוכה בריבית משתנה (פריים / משתנה)"
-          value={property.mortgageVariableBalance}
-          min={0}
-          max={Math.max(property.mortgageBalance, 1)}
-          step={10_000}
-          onChange={(value) => setProperty({ mortgageVariableBalance: Math.min(value, property.mortgageBalance) })}
-        />
-        <CurrencyField
-          label="הלוואות לכל מטרה קודמות על הנכס"
-          value={property.priorAllPurposeBalance}
-          min={0}
-          max={1_000_000}
-          step={5_000}
-          onChange={(value) => setProperty({ priorAllPurposeBalance: value })}
-        />
-        <RangeField
-          label="יתרת תקופת המשכנתא"
-          value={property.mortgageRemainingMonths}
-          min={1}
-          max={360}
-          step={1}
-          display={formatTerm(property.mortgageRemainingMonths)}
-          onChange={(value) => setProperty({ mortgageRemainingMonths: value })}
-          hint="עד 18 חודשים — לא נספרת"
-        />
-      </div>
-    </Card>
-  );
-}
-
 /** The household's other debts, with the engine's advice beside each one. */
 export function DebtsTable({ analysis }: { analysis: ConsolidationAnalysis }) {
   const { debts, addDebt, updateDebt, removeDebt, applyRecommendations } = useConsolidation();

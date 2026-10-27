@@ -1,3 +1,5 @@
+import type { TrackType } from './types';
+
 /**
  * The glossary: every term a borrower may not know, in one or two plain sentences. Screens keep
  * their own copy short and point here instead — a term is underlined where it appears, hovering
@@ -187,3 +189,13 @@ export const GLOSSARY = {
 export type TermId = keyof typeof GLOSSARY;
 
 export const TERM_IDS = Object.keys(GLOSSARY) as TermId[];
+
+/** The glossary entry behind each track's name. */
+export const TRACK_TERMS: Record<TrackType, TermId> = {
+  PRIME: 'prime',
+  FIXED_UNLINKED: 'fixedUnlinked',
+  FIXED_LINKED: 'fixedLinked',
+  VARIABLE_UNLINKED: 'variableUnlinked',
+  VARIABLE_LINKED: 'variableLinked',
+  ELIGIBILITY: 'eligibility',
+};
