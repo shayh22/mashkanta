@@ -6,6 +6,7 @@ import type { MonthlyPicture } from '../../engine/money/picture';
 import { knownSaving, savingIdeas } from '../../engine/money/savings';
 import { formatCurrency, formatSignedCurrency } from '../../lib/format';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { planOf, useJourneyLoans } from '../../store/journeyLoans';
 import { useMortgageMove } from '../../store/mortgageMove';
 import { SummaryBar } from '../SummaryBar';
 import { Card } from '../ui';
@@ -158,11 +159,11 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
   const plans = useMoney((state) => state.loans);
   const refinance = useMoney((state) => state.refinance);
   const { route } = useMortgageMove();
-  const loanLine = picture.spendingLines.find((line) => line.id === 'LOANS');
+  const loans = useJourneyLoans(picture);
   // The moves chosen on the loans screen, each with what it costs as well as what it frees.
   const debtMoves = [
     ...(refinance ? [mortgageDecision(route)] : []),
-    ...(loanLine?.payees ?? []).map((payee) => loanDecision(payee.description, payee.monthly, plans[payee.description])),
+    ...loans.map((loan) => loanDecision(loan.name, loan.monthly, planOf(loan, plans))),
   ].filter((decision): decision is Decision => !!decision);
   const decisions = [...debtMoves, ...decisionsOf(picture, explanations, targets)];
   const [unchosen, setUnchosen] = useState<ReadonlySet<string>>(new Set());
@@ -170,7 +171,7 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
   const freed = freedBy(decisions, chosen);
   const debtFreed = freedBy(debtMoves, chosen);
   const repayments =
-    (picture.spendingLines.find((line) => line.id === 'HOUSING_LOANS')?.monthly ?? 0) + (loanLine?.monthly ?? 0);
+    (picture.spendingLines.find((line) => line.id === 'HOUSING_LOANS')?.monthly ?? 0) + loans.reduce((sum, loan) => sum + loan.monthly, 0);
   const before = net(picture);
   const after = before + freed;
   const toggle = (key: string) =>

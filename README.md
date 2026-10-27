@@ -383,7 +383,7 @@ else becomes *keep*. The actions land in the playground, where the engine prices
 answer is never shown as a figure. Same origin only, a goal of at most 400 characters, 20 requests an
 hour per visitor, no-retention providers.
 
-## My money: the household's month from its statements
+## The recovery plan ("תוכנית הבראה"): the household's month from its statements
 
 **One screen at a time.** The path is a journey of six steps with a progress bar: the files; what
 comes in and goes out (a monthly bar chart of income against spending with the net as a line, and
@@ -393,6 +393,14 @@ categories); loans and the mortgage (below); where to save (each category as one
 not yet explained, and the saving ideas); and the summary (the decisions to tick, a slope chart from
 today to after, what each decision frees, and the advisor). The charts are plain elements except the
 two time series, which use the app's charting library, and follow light and dark.
+
+**Every document, from every step.** The first screen and a one-line bar at the top of every step
+after it ("your documents: two statements · mortgage ✓ · one loan · add") open the same four tiles:
+bank account, credit card, mortgage report and loans report. Statements are read here; a mortgage or
+loans report goes through the homeowner path's own readers (local parsing, AI only with consent), so
+the mortgage and the loans are entered once for the whole site. A loan from the report whose payment
+matches a repayment on the statements (within 3%) is the same loan: its balance, rate and months fill
+that loan's card (`store/journeyLoans.ts`); a report loan with no match is listed on its own.
 
 **Loans and the mortgage** (`components/money/Debts.tsx`, `engine/money/loanMoves.ts`). A step of
 its own: how much of the income goes to repayments, as one bar against the banks' usual 40% ceiling;
@@ -414,7 +422,7 @@ where the advisor set a target for a category, its cancellations and return-to-a
 on top.
 
 
-A third path, **"הכסף שלי"** (`#/money`), is for the household rather than the mortgage. The
+A third path, **"תוכנית הבראה"** — the recovery plan, "oxygen for the cash flow, step by step" (`#/money`) — is for the household rather than the mortgage. The
 borrower uploads the current-account export from their bank and the transaction export from their
 card company (Excel or CSV), and gets one monthly picture: what comes in, what goes out and on what.
 

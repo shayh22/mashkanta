@@ -31,7 +31,7 @@ type MortgageView = 'wizard' | 'results' | 'upload';
 const MODES: { id: Mode; title: string }[] = [
   { id: 'own', title: 'יש לי משכנתא' },
   { id: 'buy', title: 'קונים דירה' },
-  { id: 'money', title: 'הכסף שלי' },
+  { id: 'money', title: 'תוכנית הבראה' },
 ];
 
 /** Links from before the two paths: the three homeowner modes are one path now. */

@@ -1,10 +1,11 @@
 import { factsFor, type ConsultFact } from '../../engine/money/consultRequest';
 import { defaultExtendYears, loanDecision, mortgageDecision } from '../../engine/money/decisions';
 import { loanMoves, validTerms, type LoanMoveKind } from '../../engine/money/loanMoves';
-import type { MonthlyPicture, Payee } from '../../engine/money/picture';
+import type { MonthlyPicture } from '../../engine/money/picture';
 import { VERDICT_LABELS } from '../../engine/refinance';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { planOf, useJourneyLoans, type JourneyLoan } from '../../store/journeyLoans';
 import { useMortgageMove } from '../../store/mortgageMove';
 import { Card, NumberInput } from '../ui';
 import { periodOf } from './format';
@@ -31,8 +32,8 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
   const setRefinance = useMoney((state) => state.setRefinance);
   const { sample, route } = useMortgageMove();
   const mortgage = picture.spendingLines.find((line) => line.id === 'HOUSING_LOANS');
-  const loans = picture.spendingLines.find((line) => line.id === 'LOANS')?.payees.filter((payee) => payee.monthly >= 50) ?? [];
-  const loansTotal = loans.reduce((sum, payee) => sum + payee.monthly, 0);
+  const loans = useJourneyLoans(picture);
+  const loansTotal = loans.reduce((sum, loan) => sum + loan.monthly, 0);
   const interest = picture.overdraft?.interestMonthly ?? 0;
   const repayments = (mortgage?.monthly ?? 0) + loansTotal + interest;
   const share = picture.income > 0 ? repayments / picture.income : 0;
@@ -46,10 +47,10 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
           { label: 'משכנתא — עלות מעבר', value: Math.round(route.upfrontCost) },
         ]
       : []),
-    ...loans.flatMap((payee, index) => {
-      const plan = plans[payee.description];
+    ...loans.flatMap((loan, index) => {
+      const plan = planOf(loan, plans);
       return [
-        { label: `הלוואה ${index + 1} — החזר חודשי`, value: Math.round(payee.monthly) },
+        { label: `הלוואה ${index + 1} — החזר חודשי`, value: Math.round(loan.monthly) },
         ...(plan?.balance ? [{ label: `הלוואה ${index + 1} — יתרה`, value: Math.round(plan.balance) }] : []),
         ...(plan?.annualRate !== undefined ? [{ label: `הלוואה ${index + 1} — ריבית שנתית באחוזים`, value: Math.round(plan.annualRate * 1000) / 10 }] : []),
         ...(plan?.remainingMonths ? [{ label: `הלוואה ${index + 1} — חודשים שנותרו`, value: plan.remainingMonths }] : []),
@@ -114,12 +115,13 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
       <Card title="הלוואות" subtitle={loans.length > 0 ? 'לכל הלוואה: מה היתרה, הריבית וכמה נשאר — ואז מה אפשר לעשות איתה.' : undefined}>
         {loans.length === 0 ? (
           <p className="text-sm text-ink-muted">
-            לא זוהו הלוואות בדפים. אם יש — למשל הלוואה מהפנסיה שמופיעה בשם חברת הביטוח — סמנו אותה כ"הלוואות" בשלב "לאן הולך הכסף".
+            לא זוהו הלוואות. אפשר להעלות דוח הלוואות למעלה ("המסמכים שלכם"), או לסמן הלוואה מהדפים — למשל הלוואה מהפנסיה שמופיעה בשם
+            חברת הביטוח — כ"הלוואות" בשלב "לאן הולך הכסף".
           </p>
         ) : (
           <ul className="space-y-5" aria-label="ההלוואות">
-            {loans.map((payee) => (
-              <LoanCard key={payee.description} payee={payee} />
+            {loans.map((loan) => (
+              <LoanCard key={loan.key} loan={loan} />
             ))}
           </ul>
         )}
@@ -131,45 +133,50 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
 }
 
 /** One loan: its terms as the household knows them, and the three moves side by side. */
-function LoanCard({ payee }: { payee: Payee }) {
-  const plan = useMoney((state) => state.loans[payee.description]);
+function LoanCard({ loan }: { loan: JourneyLoan }) {
+  const plans = useMoney((state) => state.loans);
   const setLoan = useMoney((state) => state.setLoan);
-  const name = payee.description;
+  const plan = planOf(loan, plans);
+  const name = loan.name;
+  const key = loan.key;
   const terms = { balance: plan?.balance, annualRate: plan?.annualRate, remainingMonths: plan?.remainingMonths };
   const ready = validTerms(terms);
-  const extendYears = plan?.extendYears ?? defaultExtendYears(plan?.remainingMonths ?? 12);
-  const moves = ready ? loanMoves(terms, extendYears * 12, payee.monthly) : undefined;
-  const chosen = plan?.move ?? 'KEEP';
-  const decision = loanDecision(name, payee.monthly, plan);
+  const extendYears = plan.extendYears ?? defaultExtendYears(plan.remainingMonths ?? 12);
+  const moves = ready ? loanMoves(terms, extendYears * 12, loan.monthly) : undefined;
+  const chosen = plan.move;
+  const decision = loanDecision(name, loan.monthly, plan);
   return (
     <li className="space-y-3 rounded-xl border border-line p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink" dir="auto">
           {name}
         </h3>
-        <span className="tabular text-sm text-ink-muted">{formatCurrency(payee.monthly)} בחודש לפי הדפים</span>
+        <span className="tabular text-sm text-ink-muted">
+          {formatCurrency(loan.monthly)} בחודש {loan.onStatements ? 'לפי הדפים' : 'לפי הדוח'}
+          {loan.fromReport && loan.onStatements ? ' · הפרטים מהדוח' : ''}
+        </span>
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="space-y-1 text-xs text-ink-soft">
           <span>יתרה לסילוק (₪)</span>
-          <NumberInput label={`יתרה של ${name}`} value={plan?.balance ?? 0} digits={0} min={0} step={1_000} onChange={(balance) => setLoan(name, { balance })} />
+          <NumberInput label={`יתרה של ${name}`} value={plan.balance ?? 0} digits={0} min={0} step={1_000} onChange={(balance) => setLoan(key, { balance })} />
         </label>
         <label className="space-y-1 text-xs text-ink-soft">
           <span>ריבית שנתית (%)</span>
           <NumberInput
             label={`ריבית של ${name}`}
-            value={plan?.annualRate ?? 0}
+            value={plan.annualRate ?? 0}
             scale={100}
             digits={2}
             min={0}
             max={0.4}
             step={0.0025}
-            onChange={(annualRate) => setLoan(name, { annualRate })}
+            onChange={(annualRate) => setLoan(key, { annualRate })}
           />
         </label>
         <label className="space-y-1 text-xs text-ink-soft">
           <span>חודשים שנותרו</span>
-          <NumberInput label={`חודשים שנותרו ב${name}`} value={plan?.remainingMonths ?? 0} digits={0} min={0} max={480} step={1} onChange={(remainingMonths) => setLoan(name, { remainingMonths: Math.round(remainingMonths) })} />
+          <NumberInput label={`חודשים שנותרו ב${name}`} value={plan.remainingMonths ?? 0} digits={0} min={0} max={480} step={1} onChange={(remainingMonths) => setLoan(key, { remainingMonths: Math.round(remainingMonths) })} />
         </label>
       </div>
 
@@ -187,7 +194,7 @@ function LoanCard({ payee }: { payee: Payee }) {
                     chosen === kind ? 'border-brand-600 bg-brand-50 text-ink' : 'border-line text-ink-muted'
                   }`}
                 >
-                  <input type="radio" name={`move-${name}`} className="accent-brand-600" checked={chosen === kind} onChange={() => setLoan(name, { move: kind })} />
+                  <input type="radio" name={`move-${name}`} className="accent-brand-600" checked={chosen === kind} onChange={() => setLoan(key, { move: kind })} />
                   {MOVE_LABELS[kind]}
                 </label>
               ))}
@@ -195,7 +202,7 @@ function LoanCard({ payee }: { payee: Payee }) {
             {chosen === 'EXTEND' && (
               <label className="flex items-center gap-2 text-sm text-ink-muted">
                 לפרוס על
-                <NumberInput label={`שנים לפריסה של ${name}`} className="w-20" value={extendYears} digits={0} min={1} max={40} step={1} onChange={(years) => setLoan(name, { extendYears: Math.round(years) })} />
+                <NumberInput label={`שנים לפריסה של ${name}`} className="w-20" value={extendYears} digits={0} min={1} max={40} step={1} onChange={(years) => setLoan(key, { extendYears: Math.round(years) })} />
                 שנים
               </label>
             )}

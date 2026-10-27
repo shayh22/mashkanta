@@ -1,5 +1,5 @@
 import { DebtsStep } from '../components/money/Debts';
-import { FilesStep } from '../components/money/FilesStep';
+import { DocumentsBar, FilesStep } from '../components/money/FilesStep';
 import { FlowStep, SavingsStep, SpendingStep, SummaryStep } from '../components/money/Steps';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
 import { useMoney, useMonthlyPicture } from '../store/moneyStore';
@@ -16,7 +16,7 @@ const STEPS: PageTab<StepId>[] = [
 ];
 
 /**
- * "My money": the household's bank and card statements, read in the browser, walked through one
+ * The recovery plan ("תוכנית הבראה"): the household's bank and card statements, read in the browser, walked through one
  * screen at a time — the files, what comes in and goes out, where it goes, the loans and the
  * mortgage, where to save, and the decisions. Every screen has one headline, one chart and a box to tell the AI what it misses.
  */
@@ -40,6 +40,7 @@ export function MoneyPage() {
         <FilesStep onDone={() => go('flow')} />
       ) : (
         <>
+          <DocumentsBar />
           {current === 'flow' && <FlowStep picture={picture} />}
           {current === 'spending' && <SpendingStep picture={picture} />}
           {current === 'debts' && <DebtsStep picture={picture} />}
