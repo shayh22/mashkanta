@@ -1,33 +1,147 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { useDocumentsStatus } from '../../store/journeyLoans';
 import { useMoney, type MoneyFile } from '../../store/moneyStore';
+import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
+import { DebtImporter } from '../consolidation/DebtImporter';
+import { StatementImporter } from '../refinance/StatementImporter';
 import { Card } from '../ui';
 import { shortDate } from './format';
 
+type Kind = 'bank' | 'card' | 'mortgage' | 'loans';
+
+const ICONS: Record<Kind, string> = {
+  bank: 'M3 10h18M5 10v8m5-8v8m4-8v8m5-8v8M2 21h20M12 3 3 8h18z',
+  card: 'M2 7.5A2.5 2.5 0 0 1 4.5 5h15A2.5 2.5 0 0 1 22 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 16.5zM2 10h20M6 15h4',
+  mortgage: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6',
+  loans: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+};
+
+/**
+ * Step 1, and a bar on every step after it: the household's documents, four kinds, each one tap
+ * away — the bank account, the credit card, the mortgage report, the loans report. Statements are
+ * read in the browser; a mortgage or loans report goes through the readers the homeowner path uses,
+ * so the mortgage and the loans are entered once for the whole site.
+ */
 export function FilesStep({ onDone }: { onDone: () => void }) {
+  const ready = useMoney((state) => state.files.some((file) => file.statement));
+  return (
+    <>
+      <section aria-label="תוכנית הבראה" className="space-y-1 px-1">
+        <h1 className="text-2xl font-bold text-ink">תוכנית הבראה</h1>
+        <p className="text-sm text-ink-muted">חמצן לתזרים, צעד אחר צעד: מעלים את המסמכים, רואים לאן הולך הכסף, ובוחרים מה לשנות.</p>
+      </section>
+      <Card title="המסמכים שלכם" subtitle="מה שיש לכם — כל מסמך מוסיף לתמונה. אפשר להוסיף עוד בכל שלב.">
+        <DocumentsHub />
+        <button type="button" className="btn-primary mt-4 w-full sm:w-auto" disabled={!ready} onClick={onDone}>
+          לתמונה החודשית <span aria-hidden>←</span>
+        </button>
+        {!ready && <p className="mt-2 text-xs text-ink-soft">כדי להתחיל צריך לפחות דף עו״ש או פירוט כרטיס אשראי.</p>}
+      </Card>
+    </>
+  );
+}
+
+/** On every step after the first: what is loaded, in one line, and the hub a tap away. */
+export function DocumentsBar() {
+  const [open, setOpen] = useState(false);
+  const status = useStatusLine();
+  return (
+    <section className="no-print rounded-2xl border border-line bg-surface" aria-label="המסמכים שלכם">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-start"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-brand-700" aria-hidden>
+          <path d="m21 12-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8" />
+        </svg>
+        <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
+          <span className="font-semibold text-ink">המסמכים שלכם: </span>
+          {status}
+        </span>
+        <span className="shrink-0 text-sm font-medium text-brand-700">{open ? 'סגירה' : 'הוספה'}</span>
+      </button>
+      {open && (
+        <div className="border-t border-line p-4">
+          <DocumentsHub />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function useStatusLine(): string {
+  const { statements, loans } = useDocumentsStatus();
+  const tracks = useRefinance((state) => state.tracks);
+  const mortgage = !isSampleTracks(tracks);
+  const parts = [
+    statements > 0 ? `${statements === 1 ? 'דף חשבון אחד' : `${statements} דפי חשבון`}` : 'אין דפי חשבון',
+    mortgage ? 'משכנתא ✓' : undefined,
+    loans > 0 ? (loans === 1 ? 'הלוואה אחת' : `${loans} הלוואות`) : undefined,
+  ];
+  return parts.filter(Boolean).join(' · ');
+}
+
+/** The four kinds of document as tiles; a report's reader opens under them when its tile is chosen. */
+function DocumentsHub() {
   const files = useMoney((state) => state.files);
   const reading = useMoney((state) => state.reading);
   const addFiles = useMoney((state) => state.addFiles);
   const remove = useMoney((state) => state.remove);
+  const tracks = useRefinance((state) => state.tracks);
+  const { loans } = useDocumentsStatus();
   const input = useRef<HTMLInputElement>(null);
+  const [report, setReport] = useState<'mortgage' | 'loans'>();
   const read = files.filter((file) => file.statement);
-  const hasBank = read.some((file) => file.statement!.source === 'BANK');
-  const hasCard = read.some((file) => file.statement!.source === 'CARD');
+  const banks = read.filter((file) => file.statement!.source === 'BANK').length;
+  const cards = read.filter((file) => file.statement!.source === 'CARD').length;
+  const mortgage = !isSampleTracks(tracks);
+
+  const tiles: { kind: Kind; title: string; hint: string; done?: string; onClick: () => void; pressed?: boolean }[] = [
+    { kind: 'bank', title: 'חשבון עו״ש', hint: 'Excel או CSV מאתר הבנק', done: banks ? `${banks} נקראו` : undefined, onClick: () => input.current?.click() },
+    { kind: 'card', title: 'כרטיס אשראי', hint: 'פירוט עסקאות, Excel או CSV', done: cards ? `${cards} נקראו` : undefined, onClick: () => input.current?.click() },
+    {
+      kind: 'mortgage',
+      title: 'דוח משכנתא',
+      hint: 'דוח יתרות או פרטי משכנתא מהבנק',
+      done: mortgage ? `${tracks.length} מסלולים` : undefined,
+      onClick: () => setReport(report === 'mortgage' ? undefined : 'mortgage'),
+      pressed: report === 'mortgage',
+    },
+    {
+      kind: 'loans',
+      title: 'דוח הלוואות',
+      hint: 'לוח סילוקין או דוח מהמלווה',
+      done: loans ? `${loans} הלוואות` : undefined,
+      onClick: () => setReport(report === 'loans' ? undefined : 'loans'),
+      pressed: report === 'loans',
+    },
+  ];
 
   return (
-    <Card title="העלו את החשבונות" subtitle="עו״ש וכרטיסי אשראי, 3 חודשים ומעלה. קובץ Excel או CSV מאתר הבנק או חברת האשראי.">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <UploadTile
-          title="חשבון עו״ש"
-          hint="באתר הבנק: תנועות בחשבון ← ייצוא ל-Excel"
-          icon="M3 10h18M5 10v8m5-8v8m4-8v8m5-8v8M2 21h20M12 3 3 8h18z"
-          onClick={() => input.current?.click()}
-        />
-        <UploadTile
-          title="כרטיס אשראי"
-          hint="באתר חברת האשראי: פירוט עסקאות ← ייצוא ל-Excel"
-          icon="M2 7.5A2.5 2.5 0 0 1 4.5 5h15A2.5 2.5 0 0 1 22 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 16.5zM2 10h20M6 15h4"
-          onClick={() => input.current?.click()}
-        />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((tile) => (
+          <button
+            key={tile.kind}
+            type="button"
+            onClick={tile.onClick}
+            {...(tile.pressed !== undefined ? { 'aria-pressed': tile.pressed } : {})}
+            className={`flex min-h-28 flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-start transition ${
+              tile.pressed ? 'border-brand-600 bg-brand-50' : 'border-dashed border-brand-500/60 bg-brand-50/50 hover:bg-brand-50'
+            }`}
+          >
+            <span className="flex w-full items-center justify-between gap-2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-brand-700" aria-hidden>
+                <path d={ICONS[tile.kind]} />
+              </svg>
+              {tile.done && <span className="badge-ok">{tile.done}</span>}
+            </span>
+            <span className="text-sm font-semibold text-ink">{tile.title}</span>
+            <span className="text-xs text-ink-soft">{tile.hint}</span>
+          </button>
+        ))}
       </div>
       <input
         ref={input}
@@ -45,46 +159,27 @@ export function FilesStep({ onDone }: { onDone: () => void }) {
         }}
       />
 
+      {report === 'mortgage' && <StatementImporter />}
+      {report === 'loans' && <DebtImporter />}
+
       {(files.length > 0 || reading) && (
-        <ul className="mt-4 divide-y divide-line rounded-xl border border-line" aria-label="קבצים שהועלו">
+        <ul className="divide-y divide-line rounded-xl border border-line" aria-label="קבצים שהועלו">
           {files.map((file) => (
             <FileRow key={file.id} file={file} onRemove={() => remove(file.id)} />
           ))}
           {reading && <li className="p-3 text-sm text-ink-soft">קורא…</li>}
         </ul>
       )}
-
-      {hasBank && !hasCard && (
-        <p className="mt-3 text-sm text-ink-muted">הוסיפו גם את פירוט כרטיס האשראי — בלעדיו רואים רק את החיוב החודשי, לא על מה.</p>
+      {banks > 0 && cards === 0 && (
+        <p className="text-sm text-ink-muted">הוסיפו גם את פירוט כרטיס האשראי — בלעדיו רואים רק את החיוב החודשי, לא על מה.</p>
       )}
-      {hasCard && !hasBank && (
-        <p className="mt-3 text-sm text-ink-muted">הוסיפו גם את העו״ש — שם המשכורת, המשכנתא וההוראות הקבע.</p>
-      )}
+      {cards > 0 && banks === 0 && <p className="text-sm text-ink-muted">הוסיפו גם את העו״ש — שם המשכורת, המשכנתא וההוראות הקבע.</p>}
 
-      <p className="mt-4 rounded-xl bg-surface-muted p-3 text-sm text-ink-muted">
-        הקבצים נקראים בדפדפן שלכם ולא נשלחים לשום מקום. הם לא נשמרים: סגירת הדף מוחקת אותם.
+      <p className="rounded-xl bg-surface-muted p-3 text-sm text-ink-muted">
+        דפי החשבון נקראים בדפדפן שלכם ולא נשלחים לשום מקום, ולא נשמרים: סגירת הדף מוחקת אותם. דוחות משכנתא והלוואות נקראים בדפדפן;
+        פורמט לא מוכר נשלח לקריאה עם AI רק באישורכם.
       </p>
-
-      <button type="button" className="btn-primary mt-4 w-full sm:w-auto" disabled={read.length === 0} onClick={onDone}>
-        לתמונה החודשית <span aria-hidden>←</span>
-      </button>
-    </Card>
-  );
-}
-
-function UploadTile({ title, hint, icon, onClick }: { title: string; hint: string; icon: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col items-start gap-2 rounded-2xl border-2 border-dashed border-brand-500/60 bg-brand-50/60 p-4 text-start transition hover:bg-brand-50"
-    >
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-brand-700" aria-hidden>
-        <path d={icon} />
-      </svg>
-      <span className="text-base font-semibold text-ink">{title}</span>
-      <span className="text-xs text-ink-soft">{hint}</span>
-    </button>
+    </div>
   );
 }
 
@@ -112,4 +207,3 @@ function FileRow({ file, onRemove }: { file: MoneyFile; onRemove: () => void }) 
     </li>
   );
 }
-
