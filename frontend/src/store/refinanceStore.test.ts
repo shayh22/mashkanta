@@ -93,4 +93,20 @@ describe('refinance store', () => {
     expect(after.keptIds).toEqual([]);
     expect(after.tracks.map((track) => track.id)).toEqual(['new']);
   });
+
+  it('keeps no track beside an offer for the whole mortgage, so none is counted twice', () => {
+    const { tracks } = useRefinance.getState();
+    useRefinance.getState().setKeptIds([tracks[2]!.id]);
+    const whole = outstandingBalance(tracks);
+    useRefinance.getState().importOffer([{ id: 'o', type: 'FIXED_UNLINKED', amount: whole, annualRate: 0.05, termMonths: 264 }]);
+    expect(useRefinance.getState()).toMatchObject({ keptIds: [], proposalMode: 'MANUAL', manualSource: 'OFFER' });
+  });
+
+  it('keeps the kept tracks beside an offer for the rest of the mortgage', () => {
+    const { tracks } = useRefinance.getState();
+    useRefinance.getState().setKeptIds([tracks[2]!.id]);
+    const rest = outstandingBalance(tracks) - tracks[2]!.balance;
+    useRefinance.getState().importOffer([{ id: 'o', type: 'FIXED_UNLINKED', amount: rest, annualRate: 0.05, termMonths: 264 }]);
+    expect(useRefinance.getState().keptIds).toEqual([tracks[2]!.id]);
+  });
 });

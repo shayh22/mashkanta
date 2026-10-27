@@ -23,7 +23,6 @@ import type { MacroScenario } from '../engine/scenario';
 import { useWizard } from './wizardStore';
 import { useConsolidation, useConsolidationAnalysis } from './consolidationStore';
 import { useHasDebts } from './flowStore';
-import { bestRoute } from '../lib/routes';
 import { browserStorage, storageKey, uniqueId } from './persistence';
 
 /** AUTO: the same tracks at market prices. OPTIMAL: a new mix chosen by the engine. MANUAL: a quote typed in. */
@@ -66,6 +65,8 @@ interface RefinanceState {
   /** Where in the market distribution the automatic proposal is priced; 0.3 is a negotiated deal. */
   percentile: number;
   manualProposal: ProposedTrack[];
+  /** Where the hand-held proposal came from: a bank's offer document, or typed in by the borrower. */
+  manualSource: 'OFFER' | 'TYPED';
   /** Tracks left as they are in a partial refinance. */
   keptIds: string[];
   noticeGiven: boolean;
@@ -81,7 +82,11 @@ interface RefinanceState {
   updateTrack: (id: string, patch: Partial<ExistingTrack>) => void;
   removeTrack: (id: string) => void;
   setProposalMode: (mode: ProposalMode, seed?: ProposedTrack[]) => void;
-  /** A bank's offer read from a document: it becomes the proposal, in place of anything typed before. */
+  /**
+   * A bank's offer read from a document: it becomes the proposal, in place of anything typed before.
+   * An offer for more than the tracks being refinanced is for the whole mortgage, so no track is kept
+   * beside it — otherwise a kept track's balance would be counted twice.
+   */
   importOffer: (tracks: ProposedTrack[]) => void;
   setPercentile: (percentile: number) => void;
   updateProposed: (id: string, patch: Partial<ProposedTrack>) => void;
@@ -104,6 +109,7 @@ const INITIAL = {
   proposalMode: 'OPTIMAL' as ProposalMode,
   percentile: 0.3,
   manualProposal: [] as ProposedTrack[],
+  manualSource: 'TYPED' as 'OFFER' | 'TYPED',
   keptIds: [] as string[],
   noticeGiven: true,
   dayOfMonth: 20,
@@ -164,6 +170,7 @@ export const useRefinance = create<RefinanceState>()(
       setProposalMode: (proposalMode, seed) =>
         set((state) => ({
           proposalMode,
+          ...(proposalMode === 'MANUAL' && state.manualProposal.length === 0 ? { manualSource: 'TYPED' as const } : {}),
           // Switching to manual starts from the automatic proposal, so the borrower edits a sensible
           // mix rather than an empty table.
           manualProposal:
@@ -171,7 +178,20 @@ export const useRefinance = create<RefinanceState>()(
               ? seed
               : state.manualProposal,
         })),
-      importOffer: (manualProposal) => set({ manualProposal, proposalMode: 'MANUAL' }),
+      importOffer: (manualProposal) =>
+        set((state) => {
+          const offered = manualProposal.reduce((sum, track) => sum + track.amount, 0);
+          const refinanced = state.tracks
+            .filter((track) => !state.keptIds.includes(track.id) && track.type !== 'ELIGIBILITY')
+            .reduce((sum, track) => sum + Math.max(0, track.balance), 0);
+          const wholeMortgage = state.keptIds.length > 0 && offered > refinanced * 1.05;
+          return {
+            manualProposal,
+            proposalMode: 'MANUAL',
+            manualSource: 'OFFER',
+            ...(wholeMortgage ? { keptIds: [] } : {}),
+          };
+        }),
       setPercentile: (percentile) => set({ percentile }),
       updateProposed: (id, patch) =>
         set((state) => ({
@@ -218,6 +238,7 @@ export const useRefinance = create<RefinanceState>()(
         proposalMode: state.proposalMode,
         percentile: state.percentile,
         manualProposal: state.manualProposal,
+        manualSource: state.manualSource,
         keptIds: state.keptIds,
         noticeGiven: state.noticeGiven,
         dayOfMonth: state.dayOfMonth,
@@ -326,21 +347,13 @@ export function useRefinanceAnalysis(): RefinanceView {
     [state.tracks, state.keptIds, state.propertyValue, household, state.percentile, macro, marketVersion],
   );
 
-  return useMemo(() => {
-    const balance = outstandingBalance(state.tracks);
-    const ltv = state.propertyValue > 0 ? balance / state.propertyValue : 0;
-    const kept = new Set(state.keptIds);
+  // How both proposals are priced: independent of the proposal itself, so editing an offer row
+  // re-prices the offer without re-pricing the engine's mix.
+  const balance = useMemo(() => outstandingBalance(state.tracks), [state.tracks]);
+  const ltv = state.propertyValue > 0 ? balance / state.propertyValue : 0;
+  const options = useMemo(() => {
     const scenario = scenarioOf(macro);
-    const proposal =
-      state.proposalMode === 'AUTO'
-        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept, scenario.primeAnnual)
-        : state.proposalMode === 'OPTIMAL'
-          ? withKeptTracks(optimal?.proposal ?? [], state.tracks, kept)
-          : withKeptTracks(state.manualProposal, state.tracks, kept);
-    if (!tracksValid(state.tracks) || proposal.length === 0) {
-      return { ltv, balance, proposal, perTrack: [], optimal };
-    }
-    const options = {
+    return {
       scenario,
       discountRate: state.discountRate,
       ltv,
@@ -348,29 +361,37 @@ export function useRefinanceAnalysis(): RefinanceView {
       dayOfMonth: state.dayOfMonth,
       cpiAnnual: scenario.cpiAnnual,
     };
+    // marketVersion: the scenario reads the live market table.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macro, state.discountRate, ltv, state.noticeGiven, state.dayOfMonth, marketVersion]);
+
+  const view = useMemo(() => {
+    const kept = new Set(state.keptIds);
+    const proposal =
+      state.proposalMode === 'AUTO'
+        ? likeForLikeProposal(state.tracks, ltv, state.percentile, kept, options.scenario.primeAnnual)
+        : state.proposalMode === 'OPTIMAL'
+          ? withKeptTracks(optimal?.proposal ?? [], state.tracks, kept)
+          : withKeptTracks(state.manualProposal, state.tracks, kept);
+    if (!tracksValid(state.tracks) || proposal.length === 0) {
+      return { ltv, balance, proposal, perTrack: [], optimal };
+    }
     const comparison = compareRoutes(state.tracks, proposal, state.routes, options);
     const perTrack = trackByTrack(state.tracks, state.percentile, options);
-    const engine =
-      state.proposalMode !== 'OPTIMAL' && optimal
-        ? bestRoute(compareRoutes(state.tracks, withKeptTracks(optimal.proposal, state.tracks, kept), state.routes, options))
-        : undefined;
-    return { ltv, balance, proposal, comparison, perTrack, optimal, engine };
-    // marketVersion is not read in the body: the engine prices against the live market table, and
-    // this is how a change to that table reaches the memo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.tracks,
-    state.propertyValue,
-    state.proposalMode,
-    state.percentile,
-    state.manualProposal,
-    state.keptIds,
-    state.routes,
-    state.discountRate,
-    state.noticeGiven,
-    state.dayOfMonth,
-    macro,
-    marketVersion,
-    optimal,
-  ]);
+    return { ltv, balance, proposal, comparison, perTrack, optimal };
+  }, [state.tracks, state.proposalMode, state.percentile, state.manualProposal, state.keptIds, state.routes, ltv, balance, options, optimal]);
+
+  // The engine's mix as the yardstick for any other proposal, priced on the same route as that
+  // proposal so the gap is the mix alone, not the route.
+  const shownRoute = view.comparison?.best;
+  const engine = useMemo(() => {
+    if (state.proposalMode === 'OPTIMAL' || !optimal || !shownRoute) {
+      return undefined;
+    }
+    const kept = new Set(state.keptIds);
+    const priced = compareRoutes(state.tracks, withKeptTracks(optimal.proposal, state.tracks, kept), state.routes, options);
+    return shownRoute === 'EXTERNAL' ? priced.external : priced.internal;
+  }, [state.proposalMode, optimal, shownRoute, state.tracks, state.keptIds, state.routes, options]);
+
+  return useMemo(() => ({ ...view, engine }), [view, engine]);
 }

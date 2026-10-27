@@ -61,14 +61,14 @@ describe('document jobs', () => {
   );
 
   it('refuses empty, oversized and unsupported files before reading them', async () => {
-    await expect(uploadApproval(new File([], 'empty.pdf'), 0.6)).rejects.toThrow('הקובץ ריק.');
+    await expect(uploadApproval(new File([], 'empty.pdf'))).rejects.toThrow('הקובץ ריק.');
     const huge = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.pdf');
-    await expect(uploadApproval(huge, 0.6)).rejects.toThrow('הקובץ גדול מ-10MB.');
-    await expect(uploadApproval(new File(['x'], 'offer.docx'), 0.6)).rejects.toThrow('ניתן להעלות קבצי PDF בלבד.');
+    await expect(uploadApproval(huge)).rejects.toThrow('הקובץ גדול מ-10MB.');
+    await expect(uploadApproval(new File(['x'], 'offer.docx'))).rejects.toThrow('ניתן להעלות קבצי PDF בלבד.');
   });
 
   it('reads an approval in the background and reports the tracks when done', async () => {
-    const jobId = await uploadApproval(approval, 0.6);
+    const jobId = await uploadApproval(approval);
     await vi.waitFor(async () => expect((await fetchDocumentJob(jobId)).status).toBe('COMPLETED'));
     const job = await fetchDocumentJob(jobId);
     expect(job.result?.bankCode).toBe('LEUMI');
