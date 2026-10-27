@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OwnPage } from '../../pages/OwnPage';
@@ -15,6 +15,17 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver;
+  // jsdom's Blob has no arrayBuffer(); the document reader needs it.
+  if (!Blob.prototype.arrayBuffer) {
+    Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  }
 });
 
 beforeEach(() => {
@@ -92,5 +103,44 @@ describe("the homeowner's path", () => {
     expect(await screen.findByText('איחוד בלבד מול איחוד + מיחזור', {}, { timeout: 5_000 })).toBeTruthy();
     await user.click(screen.getByRole('switch', { name: /לממן את עמלות המיחזור/ }));
     expect(useCombinedSettings.getState().financeCosts).toBe(false);
+  });
+
+  it('shows a dearer offer against the engine, with a way back to its choice', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    const balance = useRefinance.getState().tracks.reduce((sum, track) => sum + track.balance, 0);
+    useRefinance.getState().importOffer([
+      { id: 'x', type: 'FIXED_UNLINKED', amount: balance, annualRate: 0.075, termMonths: 300 },
+    ]);
+    renderPage();
+    const yardstick = screen.getByRole('group', { name: 'מול בחירת המנוע' });
+    expect(within(yardstick).getByText(/התמהיל שהמנוע בוחר חוסך/)).toBeTruthy();
+    await user.click(within(yardstick).getByRole('button', { name: 'מעבר לבחירת המנוע' }));
+    expect(useRefinance.getState().proposalMode).toBe('OPTIMAL');
+    expect(screen.queryByRole('group', { name: 'מול בחירת המנוע' })).toBeNull();
+    expect(screen.getByRole('region', { name: /התמהיל שנבחר לכם/ })).toBeTruthy();
+  });
+
+  it("reads a bank's offer and shows it in place of the mix, against the engine's choice", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'יש לי הצעה מהבנק' }));
+    const offer = [
+      'אישור עקרוני אחיד — בנק לאומי',
+      'פריים מינוס 0.6 · 500,000 ₪ · 264 חודשים',
+      'קבועה לא צמודה 4.40% 560,000 ₪ 264 חודשים',
+    ].join('\n');
+    const input = document.querySelector<HTMLInputElement>('#own-offer input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File([offer], 'offer.txt', { type: 'text/plain' })] } });
+
+    expect(await screen.findByText(/נקראו 2 מסלולים מההצעה/, {}, { timeout: 5_000 })).toBeTruthy();
+    expect(useRefinance.getState().proposalMode).toBe('MANUAL');
+    expect(useRefinance.getState().manualProposal.map((track) => [track.type, track.amount])).toEqual([
+      ['PRIME', 500_000],
+      ['FIXED_UNLINKED', 560_000],
+    ]);
+    const card = screen.getByRole('region', { name: /ההצעה שקיבלתם/ });
+    expect(within(card).getByRole('group', { name: 'מול בחירת המנוע' })).toBeTruthy();
   });
 });
