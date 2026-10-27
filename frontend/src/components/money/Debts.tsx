@@ -90,7 +90,17 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
         />
       </Card>
 
-      <Card title="המשכנתא" subtitle={mortgage ? `${formatCurrency(mortgage.monthly)} בחודש לפי הדפים` : 'לא זוהה החזר משכנתא בדפים'}>
+      <Card
+        title="המשכנתא"
+        subtitle={mortgage ? `${formatCurrency(mortgage.monthly)} בחודש לפי הדפים` : 'לא זוהה החזר משכנתא בדפים'}
+        fold={
+          route
+            ? `${formatCurrency(route.currentPayment)} ← ${formatCurrency(route.proposedPayment)} בתמהיל של המנוע`
+            : mortgage
+              ? `${formatCurrency(mortgage.monthly)} בחודש · להזנת המשכנתא לבדיקה`
+              : 'לא זוהה החזר משכנתא'
+        }
+      >
         {sample || !route ? (
           <p className="text-sm text-ink-muted">
             כדי לבדוק מיחזור או שינוי מסלולים, הזינו את המשכנתא שלכם — דוח מהבנק או ידנית.{' '}
@@ -120,7 +130,11 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
         )}
       </Card>
 
-      <Card title="הלוואות" subtitle={loans.length > 0 ? 'לכל הלוואה: מה היתרה, הריבית וכמה נשאר — ואז מה אפשר לעשות איתה.' : undefined}>
+      <Card
+        title="הלוואות"
+        subtitle={loans.length > 0 ? 'לכל הלוואה: מה היתרה, הריבית וכמה נשאר — ואז מה אפשר לעשות איתה.' : undefined}
+        fold={loans.length > 0 ? `${loans.length === 1 ? 'הלוואה אחת' : `${loans.length} הלוואות`} · ${formatCurrency(loansTotal)} בחודש` : 'לא זוהו הלוואות'}
+      >
         {loans.length === 0 ? (
           <p className="text-sm text-ink-muted">
             לא זוהו הלוואות. אפשר להעלות דוח הלוואות למעלה ("המסמכים שלכם"), או לסמן הלוואה מהדפים — למשל הלוואה מהפנסיה שמופיעה בשם

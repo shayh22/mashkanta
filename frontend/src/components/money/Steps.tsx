@@ -28,9 +28,9 @@ const net = (picture: MonthlyPicture) => picture.income - picture.spending;
 const periodLine = (picture: MonthlyPicture) =>
   `${picture.partial ? 'התקופה בקבצים' : `ממוצע ${picture.months.length} חודשים מלאים`}: ${periodOf(picture.months)}`;
 
-function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function ChartCard({ title, subtitle, fold, children }: { title: string; subtitle?: string; fold?: string; children: ReactNode }) {
   return (
-    <Card title={title} subtitle={subtitle}>
+    <Card title={title} subtitle={subtitle} fold={fold}>
       {children}
     </Card>
   );
@@ -66,6 +66,11 @@ export function FlowStep({ picture }: { picture: MonthlyPicture }) {
       {picture.balances.length > 1 && (
         <ChartCard
           title="יתרת החשבון"
+          fold={
+            overdraft && overdraft.monthsBelow > 0
+              ? `מתחת לאפס ב-${overdraft.monthsBelow} מתוך ${overdraft.months} החודשים`
+              : 'לא ירדה מתחת לאפס'
+          }
           subtitle={
             overdraft && overdraft.monthsBelow > 0
               ? `ב-${overdraft.monthsBelow} מתוך ${overdraft.months} החודשים מתחת לאפס, עד מינוס ${formatCurrency(-overdraft.lowest)} (${shortDate(overdraft.lowestDate)})${overdraft.interestMonthly >= 1 ? ` · ריבית כ-${formatCurrency(overdraft.interestMonthly)} בחודש` : ''}`
@@ -76,7 +81,10 @@ export function FlowStep({ picture }: { picture: MonthlyPicture }) {
         </ChartCard>
       )}
       {picture.incomeLines.length > 0 && (
-        <Card title="מה נכנס">
+        <Card
+          title="מה נכנס"
+          fold={`${formatCurrency(picture.income)} בחודש · ${picture.incomeLines.map((line) => line.label).join(', ')}`}
+        >
           <ul className="divide-y divide-line">
             {picture.incomeLines.map((line) => (
               <li key={line.id} className="flex items-baseline justify-between gap-3 py-2 text-sm">
@@ -132,7 +140,15 @@ export function SavingsStep({ picture, onExplain }: { picture: MonthlyPicture; o
           {known >= 1 ? `לפחות ${formatCurrency(known)} בחודש אפשר לחסוך כבר עכשיו` : 'הנה מה שכדאי לבדוק'}
         </h2>
       </section>
-      <ChartCard title="על מה אפשר לוותר" subtitle="כל קטגוריה לפי מה שאמרתם עליה. הקו: אחרי מה שסימנתם לביטול.">
+      <ChartCard
+        title="על מה אפשר לוותר"
+        subtitle="כל קטגוריה לפי מה שאמרתם עליה. הקו: אחרי מה שסימנתם לביטול."
+        fold={
+          explainedAny
+            ? `לבטל ${formatCurrency(rows.reduce((sum, row) => sum + row.cancel, 0))} · לצמצם ${formatCurrency(rows.reduce((sum, row) => sum + row.reduce, 0))} בחודש`
+            : 'עוד לא סימנתם מה חובה ומה אפשר לצמצם'
+        }
+      >
         <FlexibilityBars rows={rows} />
         {!explainedAny && (
           <p className="mt-3 text-sm text-ink-muted">
@@ -243,7 +259,7 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
               ]}
             />
           </ChartCard>
-          <ChartCard title="מה כל החלטה מפנה" subtitle="בכל חודש">
+          <ChartCard title="מה כל החלטה מפנה" subtitle="בכל חודש" fold={`יחד ${formatCurrency(freed)} בחודש`}>
             <DecisionBars items={decisions.filter((d) => chosen.has(d.key))} />
           </ChartCard>
         </>

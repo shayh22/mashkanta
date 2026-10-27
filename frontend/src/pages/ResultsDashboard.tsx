@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { MoreDetails } from '../components/MoreDetails';
 import type { BaselineResponse, MixProposal, OptimizationResponse } from '../lib/types';
 import { formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../lib/format';
 import { MixExplainer } from '../components/MixExplainer';
@@ -122,8 +123,7 @@ export function ResultsDashboard({
 
       <MixExplainer request={explainRequest} />
 
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink-soft">פרטים נוספים</h2>
+      <MoreDetails>
         <Disclosure title="השוואה לסלים האחידים" summary={manual ? 'מול בחירת המנוע ושלושת הסלים' : 'מול שלושת הסלים שכל בנק חייב להציע'}>
           <MixComparison
             recommended={recommended}
@@ -147,7 +147,7 @@ export function ResultsDashboard({
           {result.alternatives.length > 0 && <Alternatives alternatives={result.alternatives} />}
           {baseline && <MarketBaselinePanel baseline={baseline} highlightLtv={recommended.compliance.ltv} />}
         </Disclosure>
-      </div>
+      </MoreDetails>
 
       <ReportExportModal result={result} open={exportOpen} onClose={() => setExportOpen(false)} />
     </div>
