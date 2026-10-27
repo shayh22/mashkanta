@@ -1,4 +1,6 @@
-import { Suspense, lazy, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { APP_NAME, Logo } from './components/Logo';
+import { Splash } from './components/Splash';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, fetchBaseline, fetchReference, optimize } from './lib/api';
 import type { BorrowerProfileRequest, MacroRequest } from './lib/types';
@@ -246,6 +248,10 @@ export default function App() {
 
 function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
   const ref = useRef<HTMLElement>(null);
+  const brand = useRef<HTMLDivElement>(null);
+  // The opening animation lands on the header's mark; until it does, the header's own stays hidden.
+  const [landed, setLanded] = useState(false);
+  const onLanded = useCallback(() => setLanded(true), []);
   // Section tabs stick directly under the header, whose height changes when the title wraps on a
   // narrow phone; publish the real height for them as --header-h.
   useEffect(() => {
@@ -262,12 +268,11 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
 
   return (
     <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <Splash target={brand} onDone={onLanded} />
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-base font-bold text-on-brand">
-            ₪
-          </span>
-          <h1 className="truncate text-sm font-semibold text-ink">משכנתא חכמה</h1>
+        <div ref={brand} className={`flex min-w-0 items-center gap-2.5 ${landed ? '' : 'invisible'}`}>
+          <Logo size={32} />
+          <h1 className="truncate text-sm font-semibold text-ink">{APP_NAME}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <MarketStatus />

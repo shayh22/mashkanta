@@ -59,9 +59,14 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        'splash-in': {
+          '0%': { opacity: '0', transform: 'scale(0.92)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 220ms ease-out both',
+        'splash-in': 'splash-in 500ms ease-out',
       },
     },
   },
