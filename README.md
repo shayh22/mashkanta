@@ -356,6 +356,33 @@ the income), so the endpoint cannot be used as a general chatbot. Same protectio
 same origin only, 20 requests an hour per visitor, no-retention providers, nothing logged. The request
 can be inspected before it is sent.
 
+## Working the mortgage track by track
+
+A full refinance is not the only move. A track below today's market rate is usually worth keeping —
+nothing a refinance buys is cheaper — and the rest can be refinanced on its own or paid down from
+savings. The result screen of the homeowner path has a *track playground* (`components/own/TrackPlayground.tsx`):
+for every track, keep it, refinance it into another kind of track and term, or repay part of it from
+savings. Tracks below their market average are marked "good rate — worth keeping", and until the
+borrower changes something the plan follows the per-track verdicts (refinance where that pays on its
+own, keep where it does not).
+
+`engine/trackPlan.ts` prices the plan the way a full refinance is priced: refinanced tracks at the
+market rate for their new kind and term (eligibility loans are never refinanced), the early-repayment
+fees of the Banking Order on what is refinanced and on what is repaid (the no-notice fee applies to
+cash repaid, not to money the same bank lends again; one operational fee), switching costs once
+anything is refinanced, and the cash put in counted as paid on the day. Net present value and the
+breakeven month follow, and the plan is set beside a full refinance into the engine's mix.
+
+**Asking for a plan in your own words.** When AI is switched on, a box above the tracks takes a goal
+("lower the payment without touching the fixed track", "I have 100k aside — where does it do most?").
+`/api/plan` (`worker/plan.ts`) sends the goal and the track figures (kind, balance, rate, remaining term,
+market rate, refinance fee — nothing identifying) and gets back a strict schema of one action per track.
+The answer is held to the request on both sides (`engine/planRequest.ts`): only tracks that exist, no
+refinancing an eligibility loan, terms of 1–30 years, prepayments no larger than the balance — anything
+else becomes *keep*. The actions land in the playground, where the engine prices them; the model's
+answer is never shown as a figure. Same origin only, a goal of at most 400 characters, 20 requests an
+hour per visitor, no-retention providers.
+
 ## Reading unfamiliar documents with AI
 
 Known formats — the Hapoalim mortgage details statement and the standard approval-in-principle — are

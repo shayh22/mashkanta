@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { isUsable } from './src/engine/boiMarket';
 import { handleExplain } from './worker/explain';
 import { handleExtract } from './worker/extract';
+import { handlePlan } from './worker/plan';
 import { readMarket } from './worker/market';
 
 /**
@@ -35,7 +36,9 @@ function marketApi(): Plugin {
       ? handleExtract
       : request.url?.startsWith('/api/explain')
         ? handleExplain
-        : undefined;
+        : request.url?.startsWith('/api/plan')
+          ? handlePlan
+          : undefined;
     if (!route) {
       next();
       return;
