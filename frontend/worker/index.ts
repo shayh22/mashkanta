@@ -1,18 +1,20 @@
 import { isUsable } from '../src/engine/boiMarket';
 import { handleExplain } from './explain';
 import { handleExtract, type ExtractEnv } from './extract';
+import { handleAdvise } from './advise';
 import { handleCategorize } from './categorize';
 import { handlePlan } from './plan';
 import { readMarket } from './market';
 
 /**
- * The only server code in the deployment, five routes; every other path is served from static
+ * The only server code in the deployment, six routes; every other path is served from static
  * assets without reaching this script (`run_worker_first` in wrangler.toml lists only `/api/*`):
  * - `/api/market` reads the Bank of Israel figures on the app's behalf;
  * - `/api/extract` reads an unrecognised document through OpenRouter (see `extract.ts`);
  * - `/api/explain` puts a priced mortgage mix into words through OpenRouter (see `explain.ts`);
  * - `/api/plan` turns a homeowner's goal into an action per mortgage track (see `plan.ts`);
- * - `/api/categorize` sorts business names from statements into spending categories (see `categorize.ts`).
+ * - `/api/categorize` sorts business names from statements into spending categories (see `categorize.ts`);
+ * - `/api/advise` turns a household's monthly totals and goal into a few steps (see `advise.ts`).
  *
  * Market results are cached at the edge for six hours, so the statistics service sees a handful of
  * requests a day however many people open the app. A forced refresh (`?fresh=1`) skips the cache
@@ -60,6 +62,9 @@ export default {
     }
     if (url.pathname === '/api/categorize') {
       return handleCategorize(request, env, cache, fetch);
+    }
+    if (url.pathname === '/api/advise') {
+      return handleAdvise(request, env, cache, fetch);
     }
     if (url.pathname !== '/api/market') {
       return env.ASSETS.fetch(request);

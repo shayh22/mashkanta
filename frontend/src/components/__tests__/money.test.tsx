@@ -30,14 +30,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function serve(enabled: boolean, categories?: unknown) {
+function serve(enabled: boolean, categories?: unknown, advice?: unknown) {
   const posts: { url: string; body: unknown }[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
         posts.push({ url, body: JSON.parse(init.body as string) });
-        return new Response(JSON.stringify({ model: 'm', categories }));
+        return new Response(JSON.stringify({ model: 'm', categories, advice }));
       }
       return new Response(JSON.stringify({ enabled }));
     }),
@@ -84,7 +84,10 @@ describe('my money', () => {
     expect(within(summary).getByText(/ממוצע 3 חודשים מלאים/)).toBeTruthy();
     const findings = screen.getByRole('list', { name: 'ממצאים' });
     expect(within(findings).getByText(/חד-פעמיים/)).toBeTruthy();
-    expect(within(findings).getByText(/ירד למינוס/)).toBeTruthy();
+    // The overdraft is an idea to act on, priced by the interest it cost.
+    const ideas = screen.getByRole('list', { name: 'רעיונות לחיסכון' });
+    expect(within(ideas).getByText('לצאת מהמינוס')).toBeTruthy();
+    expect(within(ideas).getByText('המשכנתא — ההוצאה הגדולה')).toBeTruthy();
     // Without the card file, the card bills show as cards without detail.
     expect(within(findings).getByText(/בלי פירוט/)).toBeTruthy();
     expect(row('משכנתא והלוואות')).toHaveLength(1);
@@ -123,5 +126,29 @@ describe('my money', () => {
     expect(posts).toEqual([{ url: '/api/categorize', body: { payees: ['בנק-משכ חיוב'] } }]);
     // The borrower's own choice stays: AI never overrides it.
     expect(useMoneyCategories.getState().overrides['בנק-משכ חיוב']).toBe('OTHER');
+  });
+
+  it('the advisor sends totals only, and adds up what its targets free', async () => {
+    const posts = serve(true, undefined, {
+      summary: 'קודם המינוס',
+      steps: [
+        { title: 'לסגור את המינוס', detail: 'מהכסף החד-פעמי', category: null, targetMonthly: null },
+        { title: 'פחות במשכנתא?', detail: 'לבדוק מיחזור', category: 'HOUSING_LOANS', targetMonthly: 4_000 },
+      ],
+      cautions: ['להשאיר כרית'],
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await uploadAndOpen(user);
+    const advisor = await screen.findByRole('region', { name: 'היועץ' });
+    await user.type(within(advisor).getByRole('textbox', { name: /מה חשוב לכם/ }), 'לצאת מהמינוס');
+    await user.click(within(advisor).getByRole('button', { name: 'בנו לי תוכנית' }));
+    await waitFor(() => expect(within(advisor).getByText('קודם המינוס')).toBeTruthy());
+    const sent = posts.find((post) => post.url === '/api/advise')!.body as Record<string, unknown>;
+    expect(sent.goal).toBe('לצאת מהמינוס');
+    expect(JSON.stringify(sent)).not.toContain('בנק-משכ');
+    // Mortgage 5,000 → 4,000: the app's sum, not the model's.
+    expect(within(advisor).getByText(/מפנים/).textContent).toContain('1,000');
+    expect(within(advisor).getByRole('list', { name: 'התוכנית' }).children).toHaveLength(2);
   });
 });
