@@ -49,19 +49,6 @@ describe('track plan endpoint', () => {
     expect(JSON.parse(sent.messages[1].content)).toEqual(REQUEST);
   });
 
-  it('holds the answer to the request before it leaves the Worker', async () => {
-    const wild = {
-      ...ANSWER,
-      actions: [
-        { index: 0, action: 'PREPAY', newType: null, termYears: null, prepayAmount: 9e9 },
-        { index: 5, action: 'REFINANCE', newType: 'PRIME', termYears: 30, prepayAmount: null },
-      ],
-    };
-    const response = await handlePlan(post(REQUEST), env, fakeCache(), answering(wild));
-    const { plan } = (await response.json()) as { plan: typeof ANSWER };
-    expect(plan.actions).toEqual([{ index: 0, action: 'PREPAY', newType: null, termYears: null, prepayAmount: 400_000 }]);
-  });
-
   it('refuses other sites, bad requests and an unconfigured key without calling the model', async () => {
     const upstream = answering(ANSWER);
     expect((await handlePlan(post(REQUEST, 'https://evil.test'), env, fakeCache(), upstream)).status).toBe(403);

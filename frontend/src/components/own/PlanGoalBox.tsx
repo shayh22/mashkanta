@@ -1,46 +1,60 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { MAX_GOAL_LENGTH, type PlanAnswer, type PlanRequest } from '../../engine/planRequest';
-import type { TrackAction } from '../../engine/trackPlan';
+import { MAX_GOAL_LENGTH, type PlanRequest } from '../../engine/planRequest';
+import { KEEP, type TrackAction } from '../../engine/trackPlan';
 import { proposePlan, useAiEnabled } from '../../lib/aiClient';
-import { useTrackPlan, useTrackPlanStore } from '../../store/trackPlanStore';
+import { useRefinance } from '../../store/refinanceStore';
+import { tracksKeyOf, useTrackPlanStore, type TrackPlanView } from '../../store/trackPlanStore';
 
 const EXAMPLES = ['להוריד את ההחזר החודשי בלי לגעת במסלול הקבוע', 'יש לי 100 אלף בצד — איפה הכי כדאי לשים אותם?'];
+
+const liveKey = () =>
+  tracksKeyOf(
+    useRefinance
+      .getState()
+      .tracks.filter((track) => track.balance > 0 && track.remainingMonths > 0)
+      .map((track) => track.id),
+  );
+
+/**
+ * Asks for a plan and applies it. Runs to the end even if the section is folded meanwhile, and
+ * applies nothing if the tracks changed while the answer was on its way.
+ */
+async function planFor(request: PlanRequest, trackIds: readonly string[]): Promise<void> {
+  const planned = await proposePlan(request);
+  const tracksKey = tracksKeyOf(trackIds);
+  if (liveKey() !== tracksKey) {
+    throw new Error('המסלולים השתנו בזמן שההצעה הוכנה. שלחו שוב.');
+  }
+  const actions: Record<string, TrackAction> = {};
+  trackIds.forEach((id, index) => {
+    actions[id] = planned.actions[index] ?? KEEP;
+  });
+  const store = useTrackPlanStore.getState();
+  store.replace(actions);
+  store.setAnswer({ tracksKey, plan: planned });
+}
 
 /**
  * "What do you want?" in the borrower's own words. A model turns the goal into an action per track;
  * the plan lands in the playground, where the engine prices it like any plan the borrower builds.
  * Shown only when AI is switched on; only the track figures and the goal are sent.
  */
-export function PlanGoalBox() {
+export function PlanGoalBox({ plan }: { plan: TrackPlanView }) {
   const enabled = useAiEnabled();
-  const { planTracks, trackIds, result } = useTrackPlan();
-  const replace = useTrackPlanStore((state) => state.replace);
-  const [goal, setGoal] = useState('');
-  const planner = useMutation({ mutationFn: (request: PlanRequest) => proposePlan(request) });
-  const [answer, setAnswer] = useState<PlanAnswer>();
-  const tracksKey = trackIds.join('|');
-
-  // A plan for other tracks would point at the wrong ones.
-  useEffect(() => setAnswer(undefined), [tracksKey]);
+  const { planTracks, trackIds, result } = plan;
+  const goal = useTrackPlanStore((state) => state.goal);
+  const setGoal = useTrackPlanStore((state) => state.setGoal);
+  const stored = useTrackPlanStore((state) => state.answer);
+  const planner = useMutation({ mutationFn: (request: PlanRequest) => planFor(request, trackIds) });
+  // An answer about other tracks would point at the wrong ones.
+  const answer = stored?.tracksKey === tracksKeyOf(trackIds) ? stored.plan : undefined;
 
   if (!enabled || planTracks.length === 0 || !result) {
     return null;
   }
 
-  const submit = () => {
-    const request: PlanRequest = { goal: goal.trim(), tracks: planTracks, monthlyPayment: Math.round(result.currentPayment) };
-    planner.mutate(request, {
-      onSuccess: (planned) => {
-        const actions: Record<string, TrackAction> = {};
-        trackIds.forEach((id, index) => {
-          actions[id] = planned.actions[index] ?? { kind: 'KEEP' };
-        });
-        replace(actions);
-        setAnswer(planned);
-      },
-    });
-  };
+  const submit = () =>
+    planner.mutate({ goal: goal.trim(), tracks: planTracks, monthlyPayment: Math.round(result.currentPayment) });
 
   return (
     <section className="card space-y-3 border-brand-500/30 bg-brand-50/40 no-print" aria-label="מה אתם רוצים להשיג">

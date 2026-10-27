@@ -402,7 +402,7 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
       {consolidating && <ConsolidationLoanCard analysis={move!.combined} />}
       <MixExplainer request={explainRequest} />
       <Disclosure id="own-tracks" title="משחק במסלולים — במקום מיחזור מלא" summary={trackPlanSummary} printable={false}>
-        <TrackPlayground fullRefinance={mode === 'OPTIMAL' ? route : engine} />
+        <TrackPlayground plan={trackPlan} fullRefinance={mode === 'OPTIMAL' ? route : engine} />
       </Disclosure>
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-ink-soft">פרטים נוספים</h2>

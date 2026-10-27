@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import type { RouteAnalysis } from '../../engine/refinance';
-import { KEEP } from '../../engine/trackPlan';
+import { clampTerm, KEEP } from '../../engine/trackPlan';
 import { formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../../lib/format';
 import { TRACK_TERMS } from '../../lib/glossary';
 import { TRACK_LABEL, TRACK_OPTIONS } from '../../lib/trackOptions';
 import type { TrackType } from '../../lib/types';
 import { useRefinance } from '../../store/refinanceStore';
-import { useTrackPlan, useTrackPlanStore } from '../../store/trackPlanStore';
+import { useTrackPlanStore, type TrackPlanView } from '../../store/trackPlanStore';
 import { Term } from '../Glossary';
 import { NumberInput } from '../ui';
 import { PlanGoalBox } from './PlanGoalBox';
@@ -18,20 +18,20 @@ const NEW_TRACKS = TRACK_OPTIONS.filter((option) => option.value !== 'ELIGIBILIT
  * tracks at a good rate, refinance only the dear ones, or put savings into one. The engine prices
  * the plan the same way it prices a full refinance, and sets it beside one.
  */
-export function TrackPlayground({ fullRefinance }: { fullRefinance?: RouteAnalysis }) {
+export function TrackPlayground({ plan, fullRefinance }: { plan: TrackPlanView; fullRefinance?: RouteAnalysis }) {
   const tracks = useRefinance((state) => state.tracks);
-  const { actions, suggested, goodRate, result } = useTrackPlan();
+  const { actions, suggested, goodRate, result, trackIds } = plan;
   const setAction = useTrackPlanStore((state) => state.setAction);
   const replace = useTrackPlanStore((state) => state.replace);
-  const ownChoices = suggested.size < tracks.length;
+  const ownChoices = suggested.size < trackIds.length;
 
   return (
     <div className="space-y-5">
-      <PlanGoalBox />
+      <PlanGoalBox plan={plan} />
 
       <ul className="divide-y divide-line rounded-xl border border-line" aria-label="המסלולים">
         {tracks
-          .filter((track) => track.balance > 0)
+          .filter((track) => trackIds.includes(track.id))
           .map((track) => {
             const action = actions[track.id] ?? KEEP;
             const name = TRACK_LABEL[track.type];
@@ -59,7 +59,7 @@ export function TrackPlayground({ fullRefinance }: { fullRefinance?: RouteAnalys
                       setAction(
                         track.id,
                         event.target.value === 'REFINANCE'
-                          ? { kind: 'REFINANCE', type: track.type === 'ELIGIBILITY' ? 'FIXED_UNLINKED' : track.type, termMonths: track.remainingMonths }
+                          ? { kind: 'REFINANCE', type: track.type === 'ELIGIBILITY' ? 'FIXED_UNLINKED' : track.type, termMonths: clampTerm(track.remainingMonths) }
                           : event.target.value === 'PREPAY'
                             ? { kind: 'PREPAY', amount: Math.min(track.balance, 50_000) }
                             : KEEP,
