@@ -7,11 +7,12 @@ import type { ProposalMode } from '../../store/refinanceStore';
 import { Term } from '../Glossary';
 import { AllocationBar } from '../MixComparison';
 
-const SOURCE: Record<ProposalMode, string> = {
-  OPTIMAL: 'נבחר על ידי המנוע לפי ההכנסה ורמת הסיכון שלכם',
-  AUTO: 'אותם מסלולים כמו היום, במחיר שוק',
-  MANUAL: 'ההצעה שהעליתם או הזנתם',
-};
+const HEADINGS = {
+  OPTIMAL: ['התמהיל שנבחר לכם', 'נבחר על ידי המנוע לפי ההכנסה ורמת הסיכון שלכם'],
+  AUTO: ['התמהיל שנבחר לכם', 'אותם מסלולים כמו היום, במחיר שוק'],
+  OFFER: ['ההצעה שקיבלתם', 'כפי שנקראה מהמסמך שהעליתם'],
+  TYPED: ['התמהיל שבניתם', 'המסלולים שהזנתם'],
+} as const;
 
 /**
  * The answer to "which mix?", in one card at the top of the result: the new mortgage track by
@@ -21,6 +22,7 @@ export function RecommendedMix({
   proposal,
   route,
   mode,
+  source,
   onChange,
   onOffer,
   engine,
@@ -29,6 +31,8 @@ export function RecommendedMix({
   proposal: readonly ProposedTrack[];
   route: RouteAnalysis;
   mode: ProposalMode;
+  /** For a hand-held proposal: an offer read from a document, or typed in. */
+  source: 'OFFER' | 'TYPED';
   onChange: () => void;
   /** Opens the upload of a bank's offer. */
   onOffer: () => void;
@@ -36,6 +40,12 @@ export function RecommendedMix({
   engine?: RouteAnalysis;
   onUseEngine: () => void;
 }) {
+  const [heading, subheading] = HEADINGS[mode === 'MANUAL' ? source : mode];
+  // A hand-held proposal that lends more or less than is owed is not the same loan: say so, rather
+  // than let a track the reader missed pass for a cheaper offer.
+  const owed = route.current.totalPrincipal;
+  const lent = route.proposed.totalPrincipal;
+  const mismatch = mode === 'MANUAL' && owed > 0 && Math.abs(lent - owed) > owed * 0.02;
   const tracks = proposal.filter((track) => track.amount > 0);
   const total = tracks.reduce((sum, track) => sum + track.amount, 0);
   const allocations = tracks.map((track) => ({
@@ -51,10 +61,10 @@ export function RecommendedMix({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="recommended-mix" className="flex items-center text-lg font-semibold text-ink">
-            {mode === 'MANUAL' ? 'ההצעה שקיבלתם' : 'התמהיל שנבחר לכם'}
+            {heading}
             <Term id="mix" />
           </h2>
-          <p className="mt-0.5 text-xs text-ink-soft">{SOURCE[mode]}</p>
+          <p className="mt-0.5 text-xs text-ink-soft">{subheading}</p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
           <button type="button" className="btn-ghost" onClick={onOffer}>
@@ -96,14 +106,21 @@ export function RecommendedMix({
         </div>
       </dl>
 
-      {engine && <EngineComparison shown={route} engine={engine} onUseEngine={onUseEngine} />}
+      {mismatch && (
+        <p className="mt-4 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-caution" role="alert">
+          ⚠️ {source === 'OFFER' ? 'ההצעה' : 'התמהיל'} מסתכם ב-{formatCurrency(lent)}, אבל היתרה היום היא {formatCurrency(owed)}.
+          ייתכן שמסלול לא נקרא או חסר — בדקו ב"שינוי התמהיל" לפני שמשווים.
+        </p>
+      )}
+      {engine && !mismatch && <EngineComparison shown={route} engine={engine} onUseEngine={onUseEngine} />}
     </section>
   );
 }
 
 /**
- * An offer, or the same mix re-priced, against the mix the engine would choose for the same
- * mortgage: the payment and everything paid until the end, and a way back to the engine's choice.
+ * Another proposal (an offer, or the same mix re-priced) against the mix the engine would choose
+ * for the same mortgage, on the same route. Judged by net present value — the measure the verdict
+ * itself uses — with the monthly payment beside it.
  */
 function EngineComparison({
   shown,
@@ -114,29 +131,29 @@ function EngineComparison({
   engine: RouteAnalysis;
   onUseEngine: () => void;
 }) {
-  const totalGap = shown.proposed.totalPaid + shown.upfrontCost - (engine.proposed.totalPaid + engine.upfrontCost);
-  const close = Math.abs(totalGap) < 1_000;
+  const gap = engine.netPresentValue - shown.netPresentValue;
+  const close = Math.abs(gap) < 1_000;
   return (
     <div
       className={`mt-4 rounded-xl border p-4 text-sm ${
-        close || totalGap < 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/10'
+        close || gap < 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/10'
       }`}
       aria-label="מול בחירת המנוע"
       role="group"
     >
       <p className="font-medium text-ink">
         {close
-          ? '✓ כמעט זהה בעלות לתמהיל שהמנוע בוחר.'
-          : totalGap > 0
-            ? `התמהיל שהמנוע בוחר חוסך ${formatCurrency(totalGap)} בסך התשלומים.`
-            : `זול ב-${formatCurrency(-totalGap)} בסך התשלומים מהתמהיל שהמנוע בוחר.`}
+          ? '✓ שווה כמעט בדיוק כמו התמהיל שהמנוע בוחר.'
+          : gap > 0
+            ? `התמהיל שהמנוע בוחר שווה ${formatCurrency(gap)} יותר, בערך נוכחי.`
+            : `שווה ${formatCurrency(-gap)} יותר מהתמהיל שהמנוע בוחר, בערך נוכחי.`}
+        <Term id="npv" />
       </p>
       <p className="mt-1 text-xs text-ink-muted">
-        בחירת המנוע: החזר {formatCurrency(engine.proposedPayment)} · סך התשלומים{' '}
-        {formatCurrency(engine.proposed.totalPaid + engine.upfrontCost)} (כאן{' '}
-        {formatCurrency(shown.proposed.totalPaid + shown.upfrontCost)})
+        בחירת המנוע: החזר {formatCurrency(engine.proposedPayment)} (כאן {formatCurrency(shown.proposedPayment)}) · ערך
+        נוכחי {formatCurrency(engine.netPresentValue)} (כאן {formatCurrency(shown.netPresentValue)})
       </p>
-      {!close && totalGap > 0 && (
+      {!close && gap > 0 && (
         <button type="button" className="btn-ghost no-print mt-3" onClick={onUseEngine}>
           מעבר לבחירת המנוע
         </button>

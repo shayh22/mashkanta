@@ -389,7 +389,7 @@ function toJobResult(extraction: DocumentExtraction): NonNullable<DocumentJob['r
   };
 }
 
-export async function uploadApproval(file: File, _ltv: number): Promise<string> {
+export async function uploadApproval(file: File): Promise<string> {
   if (file.size === 0) {
     throw new ApiError('הקובץ ריק.');
   }

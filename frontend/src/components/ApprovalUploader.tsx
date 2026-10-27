@@ -25,10 +25,10 @@ const REDACTION_LABELS: Record<string, string> = {
  * forever behind the user's back.
  */
 export function ApprovalUploader({
-  ltv,
+  title = 'העלאת אישור עקרוני',
   onExtracted,
 }: {
-  ltv: number;
+  title?: string;
   onExtracted?: (job: DocumentJob) => void;
 }) {
   const [jobId, setJobId] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function ApprovalUploader({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const upload = useMutation({
-    mutationFn: (file: File) => uploadApproval(file, ltv),
+    mutationFn: (file: File) => uploadApproval(file),
     onSuccess: setJobId,
   });
 
@@ -120,7 +120,7 @@ export function ApprovalUploader({
 
   return (
     <Card
-      title="העלאת אישור עקרוני"
+      title={title}
       term="approval"
     >
       <div
