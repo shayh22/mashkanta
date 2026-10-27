@@ -1,21 +1,11 @@
 import type { ConsolidationAnalysis } from '../../engine/consolidation';
 import type { ProposedTrack, RouteAnalysis } from '../../engine/refinance';
-import type { TermId } from '../../lib/glossary';
+import { TRACK_TERMS } from '../../lib/glossary';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { TRACK_LABEL } from '../../lib/trackOptions';
-import type { TrackType } from '../../lib/types';
 import type { ProposalMode } from '../../store/refinanceStore';
 import { Term } from '../Glossary';
 import { AllocationBar } from '../MixComparison';
-
-const TRACK_TERMS: Record<TrackType, TermId> = {
-  PRIME: 'prime',
-  FIXED_UNLINKED: 'fixedUnlinked',
-  FIXED_LINKED: 'fixedLinked',
-  VARIABLE_UNLINKED: 'variableUnlinked',
-  VARIABLE_LINKED: 'variableLinked',
-  ELIGIBILITY: 'eligibility',
-};
 
 const SOURCE: Record<ProposalMode, string> = {
   OPTIMAL: 'נבחר על ידי המנוע לפי ההכנסה ורמת הסיכון שלכם',

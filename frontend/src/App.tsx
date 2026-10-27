@@ -17,7 +17,6 @@ import { ErrorCard, LoadingCard } from './components/ui';
 import { MarketStatus } from './components/MarketStatus';
 import { SinceLastVisit } from './components/SinceLastVisit';
 import { useVisits } from './store/visitStore';
-import { useHasDebts } from './store/flowStore';
 import { useMarket } from './store/marketStore';
 
 // The homeowner's path carries the charting library; loading it on demand keeps it off a visit
@@ -39,7 +38,8 @@ const LEGACY: Record<string, Mode> = { mortgage: 'buy', refinance: 'own', consol
 function modeFromHash(): Mode {
   // `#/<mode>` or `#/<mode>/<screen>`; the screen is read by the page itself.
   const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0] ?? '';
-  if (LEGACY[hash]) {
+  // Own keys only: `#/constructor` must not find Object's.
+  if (Object.hasOwn(LEGACY, hash)) {
     window.history.replaceState(null, '', `#/${LEGACY[hash]}`);
     return LEGACY[hash]!;
   }
@@ -52,20 +52,14 @@ export default function App() {
   const { profile, macro, percentile, mixMode, manualShares, setMixMode, reset } = useWizard();
   const [theme, toggleTheme] = useTheme();
 
-  // "Since your last visit" compares results only for the tools in use: a homeowner's refinance,
-  // and their consolidation once other loans are part of the check.
-  const hasDebts = useHasDebts();
+  // "Since your last visit" compares results only for the tools in use. The buyer's wizard counts on
+  // opening; the homeowner's tools count once their result is seen (see OwnPage), since every visit
+  // lands on that path first.
   useEffect(() => {
-    const visits = useVisits.getState();
     if (mode === 'buy') {
-      visits.markVisited('mortgage');
-    } else {
-      visits.markVisited('refinance');
-      if (hasDebts) {
-        visits.markVisited('consolidation');
-      }
+      useVisits.getState().markVisited('mortgage');
     }
-  }, [mode, hasDebts]);
+  }, [mode]);
 
   useEffect(() => {
     const onHash = () => setMode(modeFromHash());
@@ -156,6 +150,13 @@ export default function App() {
 
               {view === 'wizard' && (
                 <div className="space-y-5">
+                  {optimization.data && (
+                    <div className="no-print mx-auto flex w-full max-w-3xl justify-end">
+                      <button type="button" className="btn-ghost" onClick={() => setView('results')}>
+                        חזרה לתוצאות <span aria-hidden>←</span>
+                      </button>
+                    </div>
+                  )}
                   <MortgageWizard anchors={reference.data?.anchors} onSubmit={runOptimization} />
                   <p className="no-print text-center text-sm text-ink-soft">
                     כבר קיבלתם הצעה מהבנק?{' '}
@@ -196,8 +197,8 @@ export default function App() {
               {view === 'upload' && (
                 <div className="space-y-5">
                   <div className="no-print mx-auto w-full max-w-4xl">
-                    <button type="button" className="btn-ghost" onClick={() => setView('wizard')}>
-                      <span aria-hidden>→</span> חזרה לחישוב
+                    <button type="button" className="btn-ghost" onClick={() => setView(optimization.data ? 'results' : 'wizard')}>
+                      <span aria-hidden>→</span> {optimization.data ? 'חזרה לתוצאות' : 'חזרה לחישוב'}
                     </button>
                   </div>
                   <OfferReview />

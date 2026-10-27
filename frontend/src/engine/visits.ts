@@ -19,6 +19,8 @@ export interface VisitSnapshot {
   readonly refinance?: {
     readonly monthlySaving: number;
     readonly netPresentValue: number;
+    /** Which proposal the figures are for; figures for a different one are not comparable. */
+    readonly mode?: string;
   };
   /** Present only once the borrower has used the consolidation check. */
   readonly consolidation?: {
@@ -67,8 +69,13 @@ export function compareVisits(previous: VisitSnapshot, current: VisitSnapshot): 
       changes.push({ id, label, from, to, unit: 'ils', tone: to > from ? 'good' : 'bad' });
     }
   };
-  money('refinanceSaving', 'החיסכון החודשי במיחזור', previous.refinance?.monthlySaving, current.refinance?.monthlySaving);
-  money('refinanceNpv', 'הערך הנוכחי הנקי של המיחזור', previous.refinance?.netPresentValue, current.refinance?.netPresentValue);
+  // A different proposal (the engine's mix, the same mix re-priced, an offer) is a different
+  // question, not news: its figures are compared only against the same kind of proposal.
+  const sameProposal = previous.refinance?.mode === current.refinance?.mode;
+  if (sameProposal) {
+    money('refinanceSaving', 'החיסכון החודשי במיחזור', previous.refinance?.monthlySaving, current.refinance?.monthlySaving);
+    money('refinanceNpv', 'הערך הנוכחי הנקי של המיחזור', previous.refinance?.netPresentValue, current.refinance?.netPresentValue);
+  }
   money('consolidationRelief', 'החמצן התזרימי באיחוד', previous.consolidation?.monthlyRelief, current.consolidation?.monthlyRelief);
   money('consolidationRoom', 'המקסימום לאיחוד', previous.consolidation?.maxFeasibleLoan, current.consolidation?.maxFeasibleLoan);
 

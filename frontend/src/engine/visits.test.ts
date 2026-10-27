@@ -45,3 +45,21 @@ describe('changes since the last visit', () => {
     expect(newPublication(before, before)).toBeUndefined();
   });
 });
+
+describe('refinance figures for a different proposal', () => {
+  const at = '2026-10-20T08:00:00.000Z';
+  const market = { prime: 0.06 };
+  it('are not reported as a change', () => {
+    const before = { at, market, refinance: { monthlySaving: 400, netPresentValue: 30_000, mode: 'AUTO' } };
+    const after = { at, market, refinance: { monthlySaving: 1_100, netPresentValue: 95_000, mode: 'OPTIMAL' } };
+    expect(compareVisits(before, after)).toEqual([]);
+    // Saved before the mode was recorded: not comparable either.
+    expect(compareVisits({ at, market, refinance: { monthlySaving: 400, netPresentValue: 30_000 } }, after)).toEqual([]);
+  });
+
+  it('are compared as before for the same proposal', () => {
+    const before = { at, market, refinance: { monthlySaving: 400, netPresentValue: 30_000, mode: 'OPTIMAL' } };
+    const after = { at, market, refinance: { monthlySaving: 1_100, netPresentValue: 95_000, mode: 'OPTIMAL' } };
+    expect(compareVisits(before, after).map((change) => change.id)).toEqual(['refinanceSaving', 'refinanceNpv']);
+  });
+});

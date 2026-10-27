@@ -1,12 +1,8 @@
 import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { ResponsiveChart } from '../charts/ResponsiveChart';
-import { CONSOLIDATION_LIMITS, repayWithExtra, type ConsolidationAnalysis } from '../../engine/consolidation';
+import { CONSOLIDATION_LIMITS, type ConsolidationAnalysis } from '../../engine/consolidation';
 import { formatCompact, formatCurrency, formatPercent, formatSignedCurrency, formatTerm } from '../../lib/format';
-import { useConsolidation } from '../../store/consolidationStore';
-import { Card, LevelBadge, RangeField, Stat } from '../ui';
-import { WaterfallChart } from '../charts/WaterfallChart';
-import { RiskPanel } from '../charts/RiskGauge';
-import { ltvRisk, primeRisk, ptiRisk } from '../../engine/risk';
+import { Card, LevelBadge, Stat } from '../ui';
 
 const LEVEL_TEXT = { OK: 'תקין', WARNING: 'לתשומת לב', BLOCKING: 'חוסם' } as const;
 
@@ -156,74 +152,4 @@ export function BeforeAfterPanel({ analysis }: { analysis: ConsolidationAnalysis
       </p>
     </Card>
   );
-}
-
-/** What happens if part of the monthly relief is paid back into the loan to shorten it. */
-export function ShorteningSimulator({ analysis }: { analysis: ConsolidationAnalysis }) {
-  const { reinvestShare, setReinvestShare } = useConsolidation();
-  const extraCash = useConsolidation((state) => state.terms.extraCash);
-  const relief = Math.max(0, analysis.monthlyRelief);
-  const extra = relief * reinvestShare;
-  const result = repayWithExtra(analysis.allocation, extra);
-  const baseline = analysis.includedRemainingCost + extraCash;
-  const difference = result.totalPaid - baseline;
-
-  if (analysis.allocation.amount <= 0) {
-    return null;
-  }
-
-  return (
-    <Card
-      title="קיצור תקופה חכם"
-      subtitle="חלק מהחיסכון החודשי → פירעון מוקדם"
-    >
-      <RangeField
-        label="חלק מהחמצן התזרימי שמוחזר להלוואה"
-        value={reinvestShare}
-        min={0}
-        max={1}
-        step={0.05}
-        display={`${formatPercent(reinvestShare, 0)} · ${formatCurrency(extra)} לחודש`}
-        onChange={setReinvestShare}
-      />
-      <dl className="mt-5 grid grid-cols-2 gap-5 sm:grid-cols-4">
-        <Stat label="החזר חודשי בפועל" value={formatCurrency(analysis.allocation.payment + extra)} />
-        <Stat label="סיום ההלוואה" value={formatTerm(result.months)} note={`במקום ${formatTerm(analysis.allocation.termMonths)}`} />
-        <Stat label="סך תשלומים" value={formatCurrency(result.totalPaid)} />
-        <Stat
-          label="מול להשאיר את החובות"
-          value={formatSignedCurrency(difference)}
-          tone={difference > 0 ? 'negative' : 'positive'}
-        />
-      </dl>
-      <p className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700">
-        {analysis.breakEvenShare === undefined
-          ? 'גם החזרת כל החיסכון אינה מונעת התייקרות — שקלו תקופה קצרה יותר או לאחד פחות הלוואות.'
-          : analysis.breakEvenShare === 0
-            ? 'האיחוד זול יותר כבר בלי החזר מוקדם.'
-            : `החזרת ${formatPercent(analysis.breakEvenShare, 0)} מהחיסכון (${formatCurrency(relief * analysis.breakEvenShare)} בחודש) מספיקה כדי שהאיחוד לא יעלה יותר מהמצב היום — ועדיין יישאר חמצן של ${formatCurrency(relief * (1 - analysis.breakEvenShare))} בחודש.`}
-      </p>
-    </Card>
-  );
-}
-
-/** Today's total payment, each debt that disappears, the new loan, and the total after. */
-export function ConsolidationWaterfall({ analysis }: { analysis: ConsolidationAnalysis }) {
-  return (
-    <WaterfallChart
-      title="מפל ההחזר החודשי"
-      start={analysis.paymentBefore}
-      steps={[
-        ...analysis.included.map((debt) => ({ label: debt.label, delta: -debt.monthlyPayment })),
-        { label: 'הלוואה חדשה', delta: analysis.allocation.payment },
-      ]}
-      endLabel="אחרי איחוד"
-    />
-  );
-}
-
-/** Stability after consolidation, against the Directive 329 thresholds. */
-export function ConsolidationRisk({ analysis }: { analysis: ConsolidationAnalysis }) {
-  const r = analysis.regulation;
-  return <RiskPanel indicators={[ltvRisk(r.ltvAfter), ptiRisk(r.pti), primeRisk(r.variableShareAfter)]} />;
 }

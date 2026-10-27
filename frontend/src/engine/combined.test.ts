@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { combinedPlan, planToText } from './actionPlan';
-import { analyseCombined, combinedSteps, positionFromMix } from './combined';
+import { analyseCombined, positionFromMix } from './combined';
 import type { ConsolidationInput } from './consolidation';
 import type { ExistingTrack } from './prepayment';
 import {
@@ -127,17 +127,7 @@ describe('refinance and consolidation in one move', () => {
   });
 });
 
-describe('the combined move, step by step', () => {
-  it('builds a waterfall that closes exactly on the payment after both moves', () => {
-    const move = analyseCombined(household, refinance, { financeUpfrontCosts: true });
-    const steps = combinedSteps(move);
-    expect(steps[0]!.label).toBe('מיחזור המשכנתא');
-    expect(steps[0]!.delta).toBeCloseTo(refinance.proposedPayment - refinance.currentPayment, 6);
-    expect(steps.at(-1)!.delta).toBeCloseTo(move.combined.allocation.payment, 6);
-    const total = steps.reduce((sum, step) => sum + step.delta, 0);
-    expect(move.paymentToday + total).toBeCloseTo(move.paymentAfter, 6);
-  });
-
+describe('the combined action plan', () => {
   it('plans the refinance first and the consolidation second, under one bottom line', () => {
     const comparison = compareRoutes(existing, proposal, DEFAULT_ROUTES, options);
     const best = comparison.best === 'EXTERNAL' ? comparison.external : comparison.internal;
