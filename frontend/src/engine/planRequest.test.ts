@@ -30,10 +30,12 @@ describe('plan request', () => {
     expect(validatePlanRequest(null)).toBe('not an object');
   });
 
-  it('asks for strict actions that never refinance into an eligibility loan', () => {
+  it('asks for strict actions, every field required', () => {
     const item = PLAN_SCHEMA.properties.actions.items;
+    expect(item.additionalProperties).toBe(false);
     expect(item.required).toEqual(['index', 'action', 'newType', 'termYears', 'prepayAmount']);
-    expect(item.properties.newType.enum).not.toContain('ELIGIBILITY');
+    // Only plain nullable types: a nullable enum is refused by the provider.
+    expect(item.properties.newType).toEqual({ type: ['string', 'null'] });
   });
 });
 

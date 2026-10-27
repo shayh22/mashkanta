@@ -66,7 +66,8 @@ export const PLAN_SCHEMA = {
         properties: {
           index: { type: 'integer' },
           action: { type: 'string', enum: [...PLAN_ACTIONS] },
-          newType: { type: ['string', 'null'], enum: [...NEW_TYPES, null] },
+          // A nullable enum is refused upstream; the kinds are in the instructions and checked on the way back.
+          newType: nullable('string'),
           termYears: nullable('integer'),
           prepayAmount: nullable('number'),
         },
