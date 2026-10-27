@@ -7,6 +7,7 @@ import { useCombinedSettings } from '../../store/combinedStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useFlow } from '../../store/flowStore';
 import { useRefinance } from '../../store/refinanceStore';
+import { useTrackPlanStore } from '../../store/trackPlanStore';
 import { useVisits } from '../../store/visitStore';
 
 beforeAll(() => {
@@ -36,6 +37,7 @@ beforeEach(() => {
   useFlow.setState({ hasDebts: undefined });
   useCombinedSettings.setState({ financeCosts: true });
   useVisits.setState({ visited: [] });
+  useTrackPlanStore.setState({ actions: {} });
 });
 afterEach(cleanup);
 
@@ -105,6 +107,18 @@ describe("the homeowner's path", () => {
     expect(await screen.findByText('איחוד בלבד מול איחוד + מיחזור', {}, { timeout: 5_000 })).toBeTruthy();
     await user.click(screen.getByRole('switch', { name: /לממן את עמלות המיחזור/ }));
     expect(useCombinedSettings.getState().financeCosts).toBe(false);
+  });
+
+  it('offers to work the mortgage track by track, set against the full refinance', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    renderPage();
+    const toggle = screen.getByRole('button', { name: /משחק במסלולים — במקום מיחזור מלא/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await user.click(toggle);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'מה לעשות במסלול פריים' }), 'REFINANCE');
+    const outcome = screen.getByRole('region', { name: 'תוצאת המשחק' });
+    expect(within(outcome).getByText(/מיחזור מלא בתמהיל המנוע|על מיחזור מלא בתמהיל המנוע/)).toBeTruthy();
   });
 
   it('shows a dearer offer against the engine, with a way back to its choice', async () => {
