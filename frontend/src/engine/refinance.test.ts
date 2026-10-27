@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ExistingTrack } from './prepayment';
 import {
+  offerToProposal,
   analyseRoute,
   compareRoutes,
   DEFAULT_ROUTES,
@@ -250,5 +251,43 @@ describe('no-notice fee when the same bank refinances', () => {
   it("still applies to the part repaid from the borrower's own cash", () => {
     const partly = analyseRoute(primeOnly, relend(300_000), DEFAULT_ROUTES.INTERNAL, noNotice);
     expect(partly.prepayment.noticeFee).toBeCloseTo(100, 6);
+  });
+});
+
+describe('a bank offer read from its document', () => {
+  const existing: ExistingTrack[] = [
+    { id: 'p', type: 'PRIME', balance: 300_000, annualRate: 0.06, remainingMonths: 200, monthsElapsed: 40 },
+    { id: 'e', type: 'ELIGIBILITY', balance: 80_000, annualRate: 0.03, remainingMonths: 240, monthsElapsed: 40 },
+  ];
+  let next = 0;
+  const id = () => `o${++next}`;
+
+  it('becomes a proposal, a missing term taking the longest left on the mortgage', () => {
+    const proposal = offerToProposal(
+      [
+        { track: 'PRIME', amount: 150_000, annualRate: 0.055, termMonths: 180 },
+        { track: 'FIXED_UNLINKED', amount: 150_000, annualRate: 0.047, termMonths: 0 },
+      ],
+      existing,
+      id,
+    );
+    expect(proposal).toEqual([
+      { id: 'o1', type: 'PRIME', amount: 150_000, annualRate: 0.055, termMonths: 180 },
+      { id: 'o2', type: 'FIXED_UNLINKED', amount: 150_000, annualRate: 0.047, termMonths: 240 },
+    ]);
+  });
+
+  it('leaves out the eligibility loan the mortgage already carries, and empty rows', () => {
+    const proposal = offerToProposal(
+      [
+        { track: 'ELIGIBILITY', amount: 80_000, annualRate: 0.03, termMonths: 240 },
+        { track: 'FIXED_LINKED', amount: 0, annualRate: 0.035, termMonths: 240 },
+        { track: 'FIXED_LINKED', amount: 300_000, annualRate: 0.035, termMonths: 240 },
+      ],
+      existing,
+      id,
+    );
+    expect(proposal.map((track) => track.type)).toEqual(['FIXED_LINKED']);
+    expect(offerToProposal([{ track: 'ELIGIBILITY', amount: 50_000, annualRate: 0.03, termMonths: 0 }], [existing[0]!], id)).toHaveLength(1);
   });
 });

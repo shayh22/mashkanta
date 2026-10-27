@@ -3,7 +3,8 @@
 An independent, data-driven platform for comparing mortgage offers in the Israeli market. It prices
 multi-track mixes the way Israeli lenders actually structure them, enforces the Bank of Israel
 constraints a proposal has to satisfy, stress tests it against rate and inflation shocks, and scores
-it against a market baseline built only from public and crowdsourced data.
+it against a market baseline built from public Bank of Israel data (the Java service can also blend in
+anonymously contributed offers; the browser app collects nothing).
 
 It has two paths, each two screens and a deep link:
 

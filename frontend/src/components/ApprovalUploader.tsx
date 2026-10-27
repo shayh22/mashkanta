@@ -33,11 +33,10 @@ export function ApprovalUploader({
 }) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [contribute, setContribute] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const upload = useMutation({
-    mutationFn: (file: File) => uploadApproval(file, ltv, contribute),
+    mutationFn: (file: File) => uploadApproval(file, ltv),
     onSuccess: setJobId,
   });
 
@@ -149,6 +148,7 @@ export function ApprovalUploader({
           type="file"
           accept=".pdf,.txt,application/pdf,image/png,image/jpeg,image/webp"
           className="sr-only"
+          aria-label="בחירת מסמך הצעה או אישור עקרוני"
           onChange={(event) => handleFiles(event.target.files)}
         />
       </div>
@@ -184,18 +184,6 @@ export function ApprovalUploader({
         </div>
       )}
 
-      <label className="mt-3 flex items-start gap-2 text-xs text-ink-muted">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          checked={contribute}
-          onChange={(event) => setContribute(event.target.checked)}
-        />
-        <span>
-          אני מאשר/ת לתרום את תנאי ההצעה באופן אנונימי לבסיס הנתונים הציבורי. נשמרים רק שם הבנק,
-          המסלול, הריבית ושיעור המימון — ללא כל פרט מזהה.
-        </span>
-      </label>
 
       {upload.isPending && <p className="mt-4 text-sm text-ink-soft">מעלה את הקובץ…</p>}
 
