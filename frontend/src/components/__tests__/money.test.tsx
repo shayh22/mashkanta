@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BANK_CSV } from '../../engine/money/__fixtures__/statements';
+import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements';
 import { MoneyPage } from '../../pages/MoneyPage';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
 
@@ -23,7 +23,7 @@ beforeAll(() => {
 beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
   useMoney.setState({ files: [], reading: false });
-  useMoneyCategories.setState({ overrides: {} });
+  useMoneyCategories.setState({ explanations: {} });
 });
 afterEach(() => {
   cleanup();
@@ -58,6 +58,26 @@ function renderPage() {
 const row = (name: string) => screen.queryAllByText(name, { selector: 'summary span' });
 
 const bankFile = () => new File([BANK_CSV], 'bank.csv', { type: 'text/csv' });
+/** An Excel day number as the dd/mm/yyyy a CSV export writes. */
+const dayOf = (excel: number) => {
+  const iso = new Date(Date.UTC(1899, 11, 30) + excel * 86_400_000).toISOString();
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+};
+/** The card export as CSV: the same rows, read by the same reader. */
+const cardFile = () =>
+  new File(
+    [
+      CARD_ROWS.map((row) =>
+        row
+          .map((cell, column) =>
+            cell === null ? '' : `"${(typeof cell === 'number' && (column === 0 || column === 4) ? dayOf(cell) : String(cell)).replace(/"/g, '""')}"`,
+          )
+          .join(','),
+      ).join('\n'),
+    ],
+    'card.csv',
+    { type: 'text/csv' },
+  );
 
 async function uploadAndOpen(user: ReturnType<typeof userEvent.setup>) {
   await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), bankFile());
@@ -90,7 +110,7 @@ describe('my money', () => {
     expect(within(ideas).getByText('המשכנתא — ההוצאה הגדולה')).toBeTruthy();
     // Without the card file, the card bills show as cards without detail.
     expect(within(findings).getByText(/בלי פירוט/)).toBeTruthy();
-    expect(row('משכנתא והלוואות')).toHaveLength(1);
+    expect(row('משכנתא')).toHaveLength(1);
     expect(screen.getByRole('link', { name: /לבדוק את המשכנתא/ }).getAttribute('href')).toBe('#/own');
   });
 
@@ -109,15 +129,16 @@ describe('my money', () => {
     const user = userEvent.setup();
     renderPage();
     await uploadAndOpen(user);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'קטגוריה של בנק-משכ חיוב' }), 'INSURANCE');
-    expect(useMoneyCategories.getState().overrides).toEqual({ 'בנק-משכ חיוב': 'INSURANCE' });
-    expect(row('משכנתא והלוואות')).toHaveLength(0);
+    const categories = screen.getByRole('list', { name: 'קטגוריות' });
+    await user.selectOptions(within(categories).getByRole('combobox', { name: 'קטגוריה של בנק-משכ חיוב' }), 'INSURANCE');
+    expect(useMoneyCategories.getState().explanations).toEqual({ 'בנק-משכ חיוב': { category: 'INSURANCE' } });
+    expect(row('משכנתא')).toHaveLength(0);
     expect(row('ביטוחים')).toHaveLength(1);
   });
 
   it('sorts "other" with AI by business names alone', async () => {
     const posts = serve(true, { items: [{ index: 0, category: 'SHOPPING' }] });
-    useMoneyCategories.setState({ overrides: { 'בנק-משכ חיוב': 'OTHER' } });
+    useMoneyCategories.setState({ explanations: { 'בנק-משכ חיוב': { category: 'OTHER' } } });
     const user = userEvent.setup();
     renderPage();
     await uploadAndOpen(user);
@@ -125,7 +146,7 @@ describe('my money', () => {
     await waitFor(() => expect(screen.getByText(/בתי עסק מוינו/)).toBeTruthy());
     expect(posts).toEqual([{ url: '/api/categorize', body: { payees: ['בנק-משכ חיוב'] } }]);
     // The borrower's own choice stays: AI never overrides it.
-    expect(useMoneyCategories.getState().overrides['בנק-משכ חיוב']).toBe('OTHER');
+    expect(useMoneyCategories.getState().explanations['בנק-משכ חיוב']).toEqual({ category: 'OTHER' });
   });
 
   it('the advisor sends totals only, and adds up what its targets free', async () => {
@@ -150,5 +171,34 @@ describe('my money', () => {
     // Mortgage 5,000 → 4,000: the app's sum, not the model's.
     expect(within(advisor).getByText(/מפנים/).textContent).toContain('1,000');
     expect(within(advisor).getByRole('list', { name: 'התוכנית' }).children).toHaveLength(2);
+  });
+
+  it('explains a charge: what it is, where it belongs, and that it can go — and the savings follow', async () => {
+    serve(false);
+    const user = userEvent.setup();
+    renderPage();
+    await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), [bankFile(), cardFile()]);
+    await waitFor(() => expect(screen.getAllByText('נקרא')).toHaveLength(2));
+    await user.click(screen.getByRole('button', { name: /לתמונה החודשית/ }));
+    const card = screen.getByRole('heading', { name: 'מה זה? ההוצאות הגדולות' }).closest('section')!;
+    // The largest charge whose kind is not obvious leads the list; the mortgage is not asked about.
+    const first = within(within(card).getByRole('list', { name: 'הוצאות להסבר' })).getAllByRole('listitem')[0]!;
+    expect(within(first).getByText('חנות הדוגמאות')).toBeTruthy();
+    expect(within(card).queryByText('בנק-משכ חיוב')).toBeNull();
+    await user.type(within(first).getByRole('textbox', { name: 'מה זה חנות הדוגמאות' }), 'הלוואה מהפנסיה');
+    await user.selectOptions(within(first).getByRole('combobox', { name: 'קטגוריה של חנות הדוגמאות' }), 'LOANS');
+    await user.click(within(first).getByRole('button', { name: 'אפשר לבטל' }));
+    expect(useMoneyCategories.getState().explanations['חנות הדוגמאות']).toEqual({
+      note: 'הלוואה מהפנסיה',
+      category: 'LOANS',
+      flexibility: 'CANCEL',
+    });
+    expect(within(card).getByText(/הוסברו 1 מתוך/)).toBeTruthy();
+    const ideas = screen.getByRole('list', { name: 'רעיונות לחיסכון' });
+    expect(within(ideas).getByText('מה שסימנתם לביטול')).toBeTruthy();
+    expect(within(ideas).getByText('הלוואות')).toBeTruthy();
+    // Pressing the same choice again takes it back.
+    await user.click(within(first).getByRole('button', { name: 'אפשר לבטל' }));
+    expect(useMoneyCategories.getState().explanations['חנות הדוגמאות']!.flexibility).toBeUndefined();
   });
 });

@@ -420,6 +420,17 @@ cover), cash whose use is unknown, and the mortgage as the largest expense (with
 mortgage check). A shekel saving is given only where the statements show one; the rest say
 "to check" rather than guess.
 
+**Explaining the charges** (`engine/money/explanations.ts`). The rules only read what a statement
+prints, and a statement can mislead: a loan from a pension fund is charged under the insurer's name.
+The household can explain any charge — what it is in their own words, which category it belongs to
+(loans are a category of their own, apart from the mortgage), and whether it is a must, can be cut,
+or can be cancelled. A "what is this?" card asks first about the largest charges whose kind is not
+obvious, and every business in the categories has the same "explain" control. Explanations are kept
+by business name in the browser and change everything at once: what is marked to cancel becomes a
+priced saving, what can be cut becomes a list for the advisor, what is a must leaves the "to review"
+list, and the advisor is told, per category, how much is a must, could be cut or cancelled — amounts
+only, never the notes — and its targets are held above the must part.
+
 **The advisor** (`engine/money/adviceRequest.ts`, `/api/advise`). When AI is on, the household
 writes what matters to them ("out of the overdraft in six months") and gets up to five steps, some
 of them a monthly target for a spending category. Only totals are sent — income, spending by

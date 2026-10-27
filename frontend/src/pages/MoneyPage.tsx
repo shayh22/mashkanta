@@ -7,7 +7,8 @@ import { CATEGORY_LABELS, type CategoryId } from '../engine/money/categories';
 import { adviceRequestOf, freedByAdvice, MAX_GOAL_LENGTH, type AdviceRequest } from '../engine/money/adviceRequest';
 import { MAX_PAYEES } from '../engine/money/categorizeRequest';
 import { knownSaving, savingIdeas, type SavingIdea } from '../engine/money/savings';
-import { payeeOf, type CategoryLine, type MonthlyPicture } from '../engine/money/picture';
+import { FLEXIBILITY_LABELS, isExplained, MAX_NOTE_LENGTH, type Flexibility } from '../engine/money/explanations';
+import { payeeOf, type CategoryLine, type MonthlyPicture, type Payee } from '../engine/money/picture';
 import { adviseHousehold, categorizePayees, useAiEnabled } from '../lib/aiClient';
 import { formatCurrency, formatSignedCurrency } from '../lib/format';
 import { usePageTab, type PageTab } from '../lib/pageTabs';
@@ -35,6 +36,7 @@ const SPENDING_CHOICES: readonly CategoryId[] = [
   'TRANSFERS_OUT',
   'CASH',
   'HOUSING_LOANS',
+  'LOANS',
   'FEES',
   'OTHER',
 ];
@@ -218,6 +220,8 @@ function PictureScreen({ onBack }: { onBack: () => void }) {
 
       <Findings picture={picture} />
 
+      <ExplainCard picture={picture} />
+
       <SavingsCard picture={picture} />
 
       <AdvisorCard picture={picture} />
@@ -346,7 +350,7 @@ const NOTES: Partial<Record<CategoryId, string>> = {
 };
 
 function CategoryRow({ line, share }: { line: CategoryLine; share: number }) {
-  const setCategory = useMoneyCategories((state) => state.setCategory);
+  const explanations = useMoneyCategories((state) => state.explanations);
   const canMove = line.id !== 'CARD_UNDETAILED';
   return (
     <li>
@@ -373,34 +377,138 @@ function CategoryRow({ line, share }: { line: CategoryLine; share: number }) {
         </summary>
         <div className="mt-2 space-y-1 ps-4">
           {NOTES[line.id] && <p className="text-xs text-ink-soft">{NOTES[line.id]}</p>}
-          <ul className="space-y-1">
-            {line.payees.slice(0, 12).map((payee) => (
-              <li key={payee.description} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                <span className="min-w-0 flex-1 truncate text-ink-muted" dir="auto">
-                  {payee.description}
-                </span>
-                <span className="tabular text-ink">{formatCurrency(payee.monthly)}</span>
-                {canMove && (
-                  <select
-                    className="input w-auto py-0.5 text-xs"
-                    aria-label={`קטגוריה של ${payee.description}`}
-                    value={line.id}
-                    onChange={(event) => setCategory(payee.description, event.target.value as CategoryId)}
-                  >
-                    {SPENDING_CHOICES.map((id) => (
-                      <option key={id} value={id}>
-                        {CATEGORY_LABELS[id]}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </li>
-            ))}
+          <ul className="space-y-1.5">
+            {line.payees.slice(0, 12).map((payee) => {
+              const explanation = explanations[payee.description];
+              return (
+                <li key={payee.description} className="text-xs">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="min-w-0 flex-1 truncate text-ink-muted" dir="auto">
+                      {payee.description}
+                    </span>
+                    {explanation?.flexibility && <span className="badge-neutral">{FLEXIBILITY_LABELS[explanation.flexibility]}</span>}
+                    <span className="tabular text-ink">{formatCurrency(payee.monthly)}</span>
+                  </div>
+                  {explanation?.note && <p className="text-ink-soft">{explanation.note}</p>}
+                  {canMove && (
+                    <details className="mt-0.5">
+                      <summary className="cursor-pointer font-medium text-brand-700">הסבר</summary>
+                      <PayeeExplainer payee={payee} category={line.id} />
+                    </details>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {line.payees.length > 12 && <p className="text-xs text-ink-soft">ועוד {line.payees.length - 12} בתי עסק</p>}
         </div>
       </details>
     </li>
+  );
+}
+
+/**
+ * What the household knows and the statement does not: what a charge really is, where it belongs,
+ * and whether it can go. Every change applies at once to the picture, the savings and the advisor.
+ */
+function PayeeExplainer({ payee, category }: { payee: Payee; category: CategoryId }) {
+  const explanation = useMoneyCategories((state) => state.explanations[payee.description]);
+  const explain = useMoneyCategories((state) => state.explain);
+  const name = payee.description;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input
+        className="input min-w-0 flex-1 basis-48 py-1 text-xs"
+        maxLength={MAX_NOTE_LENGTH}
+        placeholder="מה זה? למשל: החזר הלוואה מהפנסיה"
+        aria-label={`מה זה ${name}`}
+        value={explanation?.note ?? ''}
+        onChange={(event) => explain(name, { note: event.target.value })}
+      />
+      <select
+        className="input w-auto py-1 text-xs"
+        aria-label={`קטגוריה של ${name}`}
+        value={category}
+        onChange={(event) => explain(name, { category: event.target.value as CategoryId })}
+      >
+        {SPENDING_CHOICES.map((id) => (
+          <option key={id} value={id}>
+            {CATEGORY_LABELS[id]}
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-1" role="group" aria-label={`אפשר לוותר על ${name}?`}>
+        {(Object.keys(FLEXIBILITY_LABELS) as Flexibility[]).map((flexibility) => {
+          const pressed = explanation?.flexibility === flexibility;
+          return (
+            <button
+              key={flexibility}
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => explain(name, { flexibility: pressed ? undefined : flexibility })}
+              className={`rounded-lg border px-2 py-1 text-xs ${
+                pressed ? 'border-brand-600 bg-brand-600 text-on-brand' : 'border-line bg-surface text-ink-muted hover:border-brand-500'
+              }`}
+            >
+              {FLEXIBILITY_LABELS[flexibility]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Categories whose charges speak for themselves, or cannot be explained one by one. */
+const SELF_EXPLAINED: ReadonlySet<CategoryId> = new Set(['HOUSING_LOANS', 'GROCERIES', 'CASH', 'FEES', 'CARD_UNDETAILED']);
+
+/**
+ * "What is this?" for the largest charges — the ones that move the picture most: a pension loan
+ * the statement names after the insurer, a standing order nobody remembers.
+ */
+function ExplainCard({ picture }: { picture: MonthlyPicture }) {
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const [more, setMore] = useState(false);
+  const candidates = picture.spendingLines
+    .filter((line) => !SELF_EXPLAINED.has(line.id))
+    .flatMap((line) => line.payees.map((payee) => ({ payee, category: line.id, label: line.label })))
+    .filter((entry) => entry.payee.monthly >= 50)
+    .sort((a, b) => b.payee.monthly - a.payee.monthly)
+    .slice(0, 16);
+  if (candidates.length === 0) {
+    return null;
+  }
+  const explained = candidates.filter((entry) => isExplained(explanations[entry.payee.description])).length;
+  const shown = candidates.slice(0, more ? 16 : 6);
+  return (
+    <Card
+      title="מה זה? ההוצאות הגדולות"
+      subtitle="ספרו מה כל הוצאה ואם אפשר לוותר עליה — החיסכון והיועץ יתאימו את עצמם."
+      action={<span className="badge-neutral shrink-0">הוסברו {explained} מתוך {candidates.length}</span>}
+    >
+      <ul className="divide-y divide-line" aria-label="הוצאות להסבר">
+        {shown.map(({ payee, category, label }) => (
+          <li key={payee.description} className="py-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="min-w-0 truncate text-sm font-medium text-ink" dir="auto">
+                {payee.description}
+              </span>
+              <span className="tabular text-sm font-semibold text-ink">{formatCurrency(payee.monthly)} בחודש</span>
+            </div>
+            <p className="text-xs text-ink-soft">
+              זוהה כ: {label}
+              {payee.standing ? ' · הוראת קבע' : ''}
+            </p>
+            <PayeeExplainer payee={payee} category={category} />
+          </li>
+        ))}
+      </ul>
+      {candidates.length > 6 && (
+        <button type="button" className="btn-ghost mt-2 text-sm" onClick={() => setMore(!more)}>
+          {more ? 'פחות' : `עוד ${candidates.length - 6}`}
+        </button>
+      )}
+    </Card>
   );
 }
 
@@ -442,7 +550,8 @@ function AiSort({ line }: { line: CategoryLine }) {
 
 /** What to do about it: each idea from the statements, with the saving where they show one. */
 function SavingsCard({ picture }: { picture: MonthlyPicture }) {
-  const ideas = savingIdeas(picture);
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const ideas = savingIdeas(picture, explanations);
   if (ideas.length === 0) {
     return null;
   }
@@ -513,7 +622,8 @@ function AdvisorCard({ picture }: { picture: MonthlyPicture }) {
   const [goal, setGoal] = useState('');
   const advisor = useMutation({ mutationFn: (request: AdviceRequest) => adviseHousehold(request) });
   const { reset } = advisor;
-  const totals = useMemo(() => adviceRequestOf(picture, ''), [picture]);
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const totals = useMemo(() => adviceRequestOf(picture, '', explanations), [picture, explanations]);
   const totalsKey = JSON.stringify(totals);
   // New files or categories make the plan's figures wrong; drop it rather than leave it beside new ones.
   useEffect(() => reset(), [totalsKey, reset]);

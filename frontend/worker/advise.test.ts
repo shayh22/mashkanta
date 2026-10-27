@@ -20,7 +20,7 @@ const REQUEST: AdviceRequest = {
   oneOff: 0,
   months: 3,
   overdraft: null,
-  categories: [{ id: 'DINING', monthly: 900 }],
+  categories: [{ id: 'DINING', monthly: 900, must: 0, reduce: 300, cancel: 0 }],
   ideas: [],
 };
 const ANSWER = {

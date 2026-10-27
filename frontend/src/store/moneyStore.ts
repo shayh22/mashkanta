@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CategoryId } from '../engine/money/categories';
+import { overridesOf, type PayeeExplanation } from '../engine/money/explanations';
 import { monthlyPicture, type MonthlyPicture } from '../engine/money/picture';
 import { readCsv, readXlsx } from '../engine/money/sheets';
 import { readStatement, type Statement } from '../engine/money/statementImport';
@@ -9,8 +10,8 @@ import { browserStorage, storageKey, uniqueId } from './persistence';
 
 /**
  * The household's statements. Read in the browser and kept in memory only: they never leave the
- * device and are gone when the page closes. What the borrower decides about a business's category
- * is kept, so the next upload is sorted the same way.
+ * device and are gone when the page closes. What the household says about a business — its
+ * category, what it is, whether it can go — is kept, so the next upload reads the same way.
  */
 
 export interface MoneyFile {
@@ -58,30 +59,67 @@ export const useMoney = create<MoneyState>()((set) => ({
   remove: (id) => set((state) => ({ files: state.files.filter((file) => file.id !== id) })),
 }));
 
-interface CategoryState {
+interface ExplanationState {
   /** By business name, as `payeeOf` writes it. */
-  overrides: Record<string, CategoryId>;
-  setCategory: (payee: string, category: CategoryId) => void;
+  explanations: Record<string, PayeeExplanation>;
+  /** Changes what the household says about one business; an empty field is dropped. */
+  explain: (payee: string, patch: PayeeExplanation) => void;
+  /** Categories from the AI: never over the household's own. */
   merge: (categories: Record<string, CategoryId>) => void;
 }
 
-export const useMoneyCategories = create<CategoryState>()(
+export const useMoneyCategories = create<ExplanationState>()(
   persist(
     (set) => ({
-      overrides: {},
-      setCategory: (payee, category) => set((state) => ({ overrides: { ...state.overrides, [payee]: category } })),
-      // The borrower's own choices win over a later AI pass.
-      merge: (categories) => set((state) => ({ overrides: { ...categories, ...state.overrides } })),
+      explanations: {},
+      explain: (payee, patch) =>
+        set((state) => {
+          const next: Record<string, unknown> = { ...state.explanations[payee], ...patch };
+          for (const key of Object.keys(next)) {
+            if (next[key] === undefined || next[key] === '') {
+              delete next[key];
+            }
+          }
+          const explanations = { ...state.explanations };
+          if (Object.keys(next).length > 0) {
+            explanations[payee] = next as PayeeExplanation;
+          } else {
+            delete explanations[payee];
+          }
+          return { explanations };
+        }),
+      merge: (categories) =>
+        set((state) => {
+          const explanations = { ...state.explanations };
+          for (const [payee, category] of Object.entries(categories)) {
+            if (!explanations[payee]?.category) {
+              explanations[payee] = { ...explanations[payee], category };
+            }
+          }
+          return { explanations };
+        }),
     }),
-    { name: storageKey('money-categories'), version: 1, storage: browserStorage },
+    {
+      name: storageKey('money-categories'),
+      version: 2,
+      storage: browserStorage,
+      // Version 1 kept a category per business, nothing else.
+      migrate: (persisted, version) => {
+        if (version < 2) {
+          const overrides = ((persisted as { overrides?: Record<string, CategoryId> }) ?? {}).overrides ?? {};
+          return { explanations: Object.fromEntries(Object.entries(overrides).map(([payee, category]) => [payee, { category }])) };
+        }
+        return persisted as ExplanationState;
+      },
+    },
   ),
 );
 
 export function useMonthlyPicture(): MonthlyPicture | undefined {
   const files = useMoney((state) => state.files);
-  const overrides = useMoneyCategories((state) => state.overrides);
+  const explanations = useMoneyCategories((state) => state.explanations);
   return useMemo(
-    () => monthlyPicture(files.flatMap((file) => (file.statement ? [file.statement] : [])), overrides),
-    [files, overrides],
+    () => monthlyPicture(files.flatMap((file) => (file.statement ? [file.statement] : [])), overridesOf(explanations)),
+    [files, explanations],
   );
 }
