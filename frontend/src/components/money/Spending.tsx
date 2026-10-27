@@ -15,7 +15,11 @@ export function SpendingCard({ picture }: { picture: MonthlyPicture }) {
   const fixedShare = picture.spending > 0 ? picture.fixed / picture.spending : 0;
   const other = picture.spendingLines.find((line) => line.id === 'OTHER');
   return (
-    <Card title="לאן הולך הכסף" subtitle="ממוצע לחודש. לחצו על קטגוריה לראות את בתי העסק ולתקן סיווג.">
+    <Card
+      title="לאן הולך הכסף"
+      subtitle="ממוצע לחודש. לחצו על קטגוריה לראות את בתי העסק ולתקן סיווג."
+      fold={`${picture.spendingLines.length} קטגוריות · קבועות ${formatCurrency(picture.fixed)} בחודש`}
+    >
       <div className="mb-4 space-y-1.5">
         <div className="flex h-3 overflow-hidden rounded-full bg-surface-sunken" aria-hidden>
           <div className="bg-brand-600" style={{ width: `${fixedShare * 100}%` }} />
@@ -179,6 +183,7 @@ export function ExplainCard({ picture }: { picture: MonthlyPicture }) {
       title="מה זה? ההוצאות הגדולות"
       subtitle="ספרו מה כל הוצאה ואם אפשר לוותר עליה — החיסכון והיועץ יתאימו את עצמם."
       action={<span className="badge-neutral shrink-0">הוסברו {explained} מתוך {candidates.length}</span>}
+      fold={`הוסברו ${explained} מתוך ${candidates.length} · הקישו להסביר`}
     >
       <ul className="divide-y divide-line" aria-label="הוצאות להסבר">
         {shown.map(({ payee, category, label }) => (
