@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { waffleCells } from '../../lib/waffle';
 import { BANK_CSV, cardXlsx } from './__fixtures__/statements';
 import { factsFor, MAX_QUESTION_LENGTH, toConsultAnswer, validateConsultRequest } from './consultRequest';
-import { decisionsOf, freedBy } from './decisions';
+import { decisionsOf, defaultExtendYears, freedBy, loanDecision, mortgageDecision } from './decisions';
 import { flexibilityRows } from './flexibility';
 import { balancesOf, monthlyPicture } from './picture';
 import { parseCsv, readXlsx } from './sheets';
@@ -85,3 +85,40 @@ describe('the waffle', () => {
     expect(waffleCells([0, 0])).toEqual([0, 0]);
   });
 });
+
+describe('moves on the loans screen, as decisions', () => {
+  const plan = { balance: 20_000, annualRate: 0.06, remainingMonths: 36 };
+
+  it('prices a balloon against the payment the statements show, and says what it costs', () => {
+    const decision = loanDecision('הלוואה דוגמה', 667, { ...plan, move: 'BALLOON' })!;
+    expect(decision.monthly).toBeCloseTo(567, 6);
+    expect(decision.label).toBe('הלוואה דוגמה: בלון');
+    expect(decision.note).toContain('20,000');
+    expect(decision.source).toBe('debts');
+  });
+
+  it('spreads a loan over twice what is left by default, or as chosen', () => {
+    expect(defaultExtendYears(36)).toBe(6);
+    expect(defaultExtendYears(300)).toBe(40);
+    expect(loanDecision('ה', 667, { ...plan, move: 'EXTEND' })!.label).toBe('ה: פריסה ל-6 שנים');
+    expect(loanDecision('ה', 667, { ...plan, move: 'EXTEND', extendYears: 10 })!.label).toBe('ה: פריסה ל-10 שנים');
+  });
+
+  it('is nothing while the loan is kept, its terms are missing, or nothing is freed', () => {
+    expect(loanDecision('ה', 667, { ...plan, move: 'KEEP' })).toBeUndefined();
+    expect(loanDecision('ה', 667, { move: 'BALLOON', balance: 20_000 })).toBeUndefined();
+    expect(loanDecision('ה', 667, undefined)).toBeUndefined();
+    // A balloon dearer than the payment frees nothing.
+    expect(loanDecision('ה', 50, { ...plan, move: 'BALLOON' })).toBeUndefined();
+  });
+
+  it('counts a refinance only when it lowers the payment, with its cost', () => {
+    expect(mortgageDecision({ currentPayment: 6_000, proposedPayment: 5_400, upfrontCost: 3_000 })).toMatchObject({
+      monthly: 600,
+      note: 'עלות מעבר 3,000 ₪',
+    });
+    expect(mortgageDecision({ currentPayment: 6_000, proposedPayment: 6_100, upfrontCost: 0 })).toBeUndefined();
+    expect(mortgageDecision(undefined)).toBeUndefined();
+  });
+});
+

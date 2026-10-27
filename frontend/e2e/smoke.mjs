@@ -22,9 +22,15 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 /** Every screen of both paths. Each opens every folded section, so all of it is checked. */
-const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-flow', 'money-spending', 'money-savings', 'money-summary'];
+const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary'];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
-const MONEY_STEPS = { 'money-flow': 'שלב 2: נכנס ויוצא', 'money-spending': 'שלב 3: לאן הולך הכסף', 'money-savings': 'שלב 4: איפה לחסוך', 'money-summary': 'שלב 5: הסיכום' };
+const MONEY_STEPS = {
+  'money-flow': 'שלב 2: נכנס ויוצא',
+  'money-spending': 'שלב 3: לאן הולך הכסף',
+  'money-debts': 'שלב 4: הלוואות ומשכנתא',
+  'money-savings': 'שלב 5: איפה לחסוך',
+  'money-summary': 'שלב 6: הסיכום',
+};
 
 /** An invented bank statement, in the layout Israeli banks export, for the household picture. */
 const SAMPLE_BANK = [
@@ -33,6 +39,7 @@ const SAMPLE_BANK = [
     `"28/${month}/26","28/${month}/26","משכורת חברת דוגמה","15,000","2,000"`,
     `"15/${month}/26","15/${month}/26","חיוב לכרטיס ויזה 1111","-900","-13,000"`,
     `"10/${month}/26","10/${month}/26","בנק-משכ חיוב","-5,000","-12,100"`,
+    `"05/${month}/26","05/${month}/26","פירעון הלוואה 1234","-1,200","-7,100"`,
     `"02/${month}/26","02/${month}/26","כספומט בנק דוגמה","-400","-7,100"`,
   ]),
 ].join('\n');

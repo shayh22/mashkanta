@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CategoryId } from '../engine/money/categories';
 import type { ConsultStep } from '../engine/money/consultRequest';
+import type { LoanPlan } from '../engine/money/decisions';
 import { overridesOf, type PayeeExplanation } from '../engine/money/explanations';
 import { monthlyPicture, type MonthlyPicture } from '../engine/money/picture';
 import { readCsv, readXlsx } from '../engine/money/sheets';
@@ -48,6 +49,12 @@ interface MoneyState {
   /** What the household told the AI on each screen; in memory, like the files. */
   notes: Partial<Record<ConsultStep, string>>;
   setNote: (step: ConsultStep, note: string) => void;
+  /** Each loan's terms, as the household knows them, and the move chosen for it; by business name. */
+  loans: Record<string, LoanPlan>;
+  setLoan: (payee: string, patch: Partial<LoanPlan>) => void;
+  /** Whether the summary counts refinancing the mortgage into the engine's mix. */
+  refinance: boolean;
+  setRefinance: (refinance: boolean) => void;
   addFiles: (files: readonly File[]) => Promise<void>;
   remove: (id: string) => void;
 }
@@ -57,6 +64,10 @@ export const useMoney = create<MoneyState>()((set) => ({
   reading: false,
   notes: {},
   setNote: (step, note) => set((state) => ({ notes: { ...state.notes, [step]: note } })),
+  loans: {},
+  setLoan: (payee, patch) => set((state) => ({ loans: { ...state.loans, [payee]: { move: 'KEEP', ...state.loans[payee], ...patch } } })),
+  refinance: false,
+  setRefinance: (refinance) => set({ refinance }),
   addFiles: async (files) => {
     set({ reading: true });
     const read = await Promise.all(files.map(readMoneyFile));
