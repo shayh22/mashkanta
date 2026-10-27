@@ -22,7 +22,9 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 /** Every screen of both paths. Each opens every folded section, so all of it is checked. */
-const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-result'];
+const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-flow', 'money-spending', 'money-savings', 'money-summary'];
+/** The household journey's steps after the files, by the name its progress bar gives each. */
+const MONEY_STEPS = { 'money-flow': 'שלב 2: נכנס ויוצא', 'money-spending': 'שלב 3: לאן הולך הכסף', 'money-savings': 'שלב 4: איפה לחסוך', 'money-summary': 'שלב 5: הסיכום' };
 
 /** An invented bank statement, in the layout Israeli banks export, for the household picture. */
 const SAMPLE_BANK = [
@@ -100,12 +102,16 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
       if (screen.startsWith('money')) {
         await page.goto(`${base}/#/money`);
       }
-      if (screen === 'money-result') {
-        await page
-          .getByLabel('בחירת קבצי עו״ש או כרטיס אשראי')
-          .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_BANK) });
-        await page.getByRole('button', { name: /לתמונה החודשית/ }).click();
-        await page.getByRole('region', { name: 'התמונה החודשית' }).waitFor({ timeout: 15_000 });
+      if (MONEY_STEPS[screen]) {
+        // The statements live in memory: upload them again if this page has none.
+        if ((await page.getByRole('list', { name: 'קבצים שהועלו' }).count()) === 0) {
+          await page
+            .getByLabel('בחירת קבצי עו״ש או כרטיס אשראי')
+            .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_BANK) });
+          await page.getByText('נקרא', { exact: true }).waitFor({ timeout: 15_000 });
+        }
+        await page.getByRole('button', { name: MONEY_STEPS[screen] }).click();
+        await page.getByRole('button', { name: MONEY_STEPS[screen] }).and(page.locator('[aria-current="step"]')).waitFor();
         // The categories fold with <details>; open them so their pickers are checked too.
         await page.locator('main details').evaluateAll((all) => all.forEach((details) => (details.open = true)));
       }

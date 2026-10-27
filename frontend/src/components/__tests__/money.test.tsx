@@ -7,6 +7,12 @@ import { MoneyPage } from '../../pages/MoneyPage';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
 
 beforeAll(() => {
+  // Recharts measures its container; jsdom has no ResizeObserver.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
   // jsdom's Blob has no arrayBuffer().
   if (!Blob.prototype.arrayBuffer) {
     Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
@@ -22,7 +28,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
-  useMoney.setState({ files: [], reading: false });
+  useMoney.setState({ files: [], reading: false, notes: {} });
   useMoneyCategories.setState({ explanations: {} });
 });
 afterEach(() => {
@@ -30,14 +36,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function serve(enabled: boolean, categories?: unknown, advice?: unknown) {
+/** AI on or off; each endpoint answers with its entry in `replies`. */
+function serve(enabled: boolean, replies: Record<string, unknown> = {}) {
   const posts: { url: string; body: unknown }[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
         posts.push({ url, body: JSON.parse(init.body as string) });
-        return new Response(JSON.stringify({ model: 'm', categories, advice }));
+        return new Response(JSON.stringify({ model: 'm', ...(replies[url] as object) }));
       }
       return new Response(JSON.stringify({ enabled }));
     }),
@@ -79,39 +86,58 @@ const cardFile = () =>
     { type: 'text/csv' },
   );
 
-async function uploadAndOpen(user: ReturnType<typeof userEvent.setup>) {
-  await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), bankFile());
-  const files = await screen.findByRole('list', { name: 'קבצים שהועלו' });
-  await waitFor(() => expect(within(files).getByText(/16 תנועות/)).toBeTruthy());
+async function upload(user: ReturnType<typeof userEvent.setup>, files: File[] = [bankFile()]) {
+  await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), files);
+  await waitFor(() => expect(screen.getAllByText('נקרא')).toHaveLength(files.length));
   await user.click(screen.getByRole('button', { name: /לתמונה החודשית/ }));
 }
 
-describe('my money', () => {
-  it('waits for a statement before the picture, and says the files stay on the device', () => {
+const next = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: /^הבא:/ }));
+
+describe('my money, step by step', () => {
+  it('waits for a statement before the journey, and says the files stay on the device', () => {
     serve(false);
     renderPage();
     expect((screen.getByRole('button', { name: /לתמונה החודשית/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'שלב 2: נכנס ויוצא' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/לא נשלחים לשום מקום/)).toBeTruthy();
   });
 
-  it('reads a bank statement and shows the month: what comes in, what goes out, the overdraft', async () => {
+  it('walks the five screens: in and out, where it goes, where to save, the summary', async () => {
     serve(false);
     const user = userEvent.setup();
     renderPage();
-    await uploadAndOpen(user);
-    expect(window.location.hash).toBe('#/money/result');
-    const summary = screen.getByRole('region', { name: 'התמונה החודשית' });
-    expect(within(summary).getByText(/ממוצע 3 חודשים מלאים/)).toBeTruthy();
-    const findings = screen.getByRole('list', { name: 'ממצאים' });
-    expect(within(findings).getByText(/חד-פעמיים/)).toBeTruthy();
-    // The overdraft is an idea to act on, priced by the interest it cost.
+    await upload(user);
+
+    expect(window.location.hash).toBe('#/money/flow');
+    expect(screen.getByRole('button', { name: 'שלב 2: נכנס ויוצא' }).getAttribute('aria-current')).toBe('step');
+    const flow = screen.getByRole('region', { name: 'נכנס ויוצא' });
+    expect(within(flow).getByText(/ממוצע 3 חודשים מלאים/)).toBeTruthy();
+    expect(within(screen.getByRole('list', { name: 'ממצאים' })).getByText(/חד-פעמיים/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'יתרת החשבון' })).toBeTruthy();
+
+    await next(user);
+    expect(window.location.hash).toBe('#/money/spending');
+    expect(screen.getByRole('img', { name: /חלוקת ההוצאות לפי קטגוריה/ })).toBeTruthy();
+    expect(row('משכנתא')).toHaveLength(1);
+
+    await next(user);
+    expect(window.location.hash).toBe('#/money/savings');
     const ideas = screen.getByRole('list', { name: 'רעיונות לחיסכון' });
     expect(within(ideas).getByText('לצאת מהמינוס')).toBeTruthy();
     expect(within(ideas).getByText('המשכנתא — ההוצאה הגדולה')).toBeTruthy();
-    // Without the card file, the card bills show as cards without detail.
-    expect(within(findings).getByText(/בלי פירוט/)).toBeTruthy();
-    expect(row('משכנתא')).toHaveLength(1);
-    expect(screen.getByRole('link', { name: /לבדוק את המשכנתא/ }).getAttribute('href')).toBe('#/own');
+    expect(screen.getByRole('list', { name: 'כל קטגוריה לפי מה שאפשר לוותר עליו' })).toBeTruthy();
+
+    await next(user);
+    expect(window.location.hash).toBe('#/money/summary');
+    expect(screen.queryByRole('button', { name: /^הבא:/ })).toBeNull();
+    const decisions = screen.getByRole('list', { name: 'החלטות' });
+    expect(within(decisions).getByText('לצאת מהמינוס (בלי ריבית)')).toBeTruthy();
+    const summary = screen.getByRole('region', { name: 'הסיכום' });
+    expect(within(summary).getByText(/אחרי ההחלטות/)).toBeTruthy();
+    // Unticking a decision takes its saving out.
+    await user.click(within(decisions).getByRole('checkbox'));
+    expect(screen.queryByRole('heading', { name: 'היום ואחרי' })).toBeNull();
   });
 
   it('says what is wrong with a file it cannot read', async () => {
@@ -128,7 +154,8 @@ describe('my money', () => {
     serve(false);
     const user = userEvent.setup();
     renderPage();
-    await uploadAndOpen(user);
+    await upload(user);
+    await next(user);
     const categories = screen.getByRole('list', { name: 'קטגוריות' });
     await user.selectOptions(within(categories).getByRole('combobox', { name: 'קטגוריה של בנק-משכ חיוב' }), 'INSURANCE');
     expect(useMoneyCategories.getState().explanations).toEqual({ 'בנק-משכ חיוב': { category: 'INSURANCE' } });
@@ -137,49 +164,58 @@ describe('my money', () => {
   });
 
   it('sorts "other" with AI by business names alone', async () => {
-    const posts = serve(true, { items: [{ index: 0, category: 'SHOPPING' }] });
+    const posts = serve(true, { '/api/categorize': { categories: { items: [{ index: 0, category: 'SHOPPING' }] } } });
     useMoneyCategories.setState({ explanations: { 'בנק-משכ חיוב': { category: 'OTHER' } } });
     const user = userEvent.setup();
     renderPage();
-    await uploadAndOpen(user);
+    await upload(user);
+    await next(user);
     await user.click(await screen.findByRole('button', { name: 'מיינו עם AI' }));
     await waitFor(() => expect(screen.getByText(/בתי עסק מוינו/)).toBeTruthy());
-    expect(posts).toEqual([{ url: '/api/categorize', body: { payees: ['בנק-משכ חיוב'] } }]);
+    expect(posts.filter((post) => post.url === '/api/categorize')).toEqual([{ url: '/api/categorize', body: { payees: ['בנק-משכ חיוב'] } }]);
     // The borrower's own choice stays: AI never overrides it.
     expect(useMoneyCategories.getState().explanations['בנק-משכ חיוב']).toEqual({ category: 'OTHER' });
   });
 
-  it('the advisor sends totals only, and adds up what its targets free', async () => {
-    const posts = serve(true, undefined, {
-      summary: 'קודם המינוס',
-      steps: [
-        { title: 'לסגור את המינוס', detail: 'מהכסף החד-פעמי', category: null, targetMonthly: null },
-        { title: 'פחות במשכנתא?', detail: 'לבדוק מיחזור', category: 'HOUSING_LOANS', targetMonthly: 4_000 },
-      ],
-      cautions: ['להשאיר כרית'],
+  it('on each screen, tells the AI what the numbers miss — the totals and the words only — and keeps it for the summary', async () => {
+    const posts = serve(true, {
+      '/api/consult': { answer: { answer: 'הבונוס מסביר את אוגוסט', points: ['לא לבנות עליו'] } },
+      '/api/advise': { advice: { summary: 'תוכנית', steps: [{ title: 'פחות במשכנתא', detail: 'מיחזור', category: 'HOUSING_LOANS', targetMonthly: 4_000 }], cautions: [] } },
     });
     const user = userEvent.setup();
     renderPage();
-    await uploadAndOpen(user);
+    await upload(user);
+    const box = await screen.findByRole('region', { name: 'ספרו ל-AI' });
+    await user.type(within(box).getByRole('textbox'), 'ביוני קיבלתי בונוס');
+    await user.click(within(box).getByRole('button', { name: 'שאלו את היועץ' }));
+    await waitFor(() => expect(within(box).getByText('הבונוס מסביר את אוגוסט')).toBeTruthy());
+    const consult = posts.find((post) => post.url === '/api/consult')!.body as { step: string; question: string; facts: { label: string }[] };
+    expect(consult.step).toBe('flow');
+    expect(consult.question).toBe('ביוני קיבלתי בונוס');
+    expect(JSON.stringify(consult)).not.toContain('בנק-משכ');
+
+    await next(user);
+    await next(user);
+    await next(user);
     const advisor = await screen.findByRole('region', { name: 'היועץ' });
+    expect(within(advisor).getByText(/ו-1 ההערות שכתבתם/)).toBeTruthy();
     await user.type(within(advisor).getByRole('textbox', { name: /מה חשוב לכם/ }), 'לצאת מהמינוס');
     await user.click(within(advisor).getByRole('button', { name: 'בנו לי תוכנית' }));
-    await waitFor(() => expect(within(advisor).getByText('קודם המינוס')).toBeTruthy());
-    const sent = posts.find((post) => post.url === '/api/advise')!.body as Record<string, unknown>;
-    expect(sent.goal).toBe('לצאת מהמינוס');
-    expect(JSON.stringify(sent)).not.toContain('בנק-משכ');
-    // Mortgage 5,000 → 4,000: the app's sum, not the model's.
-    expect(within(advisor).getByText(/מפנים/).textContent).toContain('1,000');
-    expect(within(advisor).getByRole('list', { name: 'התוכנית' }).children).toHaveLength(2);
+    await waitFor(() => expect(within(advisor).getByText('תוכנית')).toBeTruthy());
+    const advise = posts.find((post) => post.url === '/api/advise')!.body as { notes: string[] };
+    expect(advise.notes).toEqual(['ביוני קיבלתי בונוס']);
+    // The advisor's target joins the decisions, priced by the app: 5,000 → 4,000.
+    const decisions = screen.getByRole('list', { name: 'החלטות' });
+    expect(within(decisions).getByText('מהיועץ')).toBeTruthy();
+    expect(within(decisions).getByText(/משכנתא: יעד 4,000/)).toBeTruthy();
   });
 
   it('explains a charge: what it is, where it belongs, and that it can go — and the savings follow', async () => {
     serve(false);
     const user = userEvent.setup();
     renderPage();
-    await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), [bankFile(), cardFile()]);
-    await waitFor(() => expect(screen.getAllByText('נקרא')).toHaveLength(2));
-    await user.click(screen.getByRole('button', { name: /לתמונה החודשית/ }));
+    await upload(user, [bankFile(), cardFile()]);
+    await next(user);
     const card = screen.getByRole('heading', { name: 'מה זה? ההוצאות הגדולות' }).closest('section')!;
     // The largest charge whose kind is not obvious leads the list; the mortgage is not asked about.
     const first = within(within(card).getByRole('list', { name: 'הוצאות להסבר' })).getAllByRole('listitem')[0]!;
@@ -194,11 +230,11 @@ describe('my money', () => {
       flexibility: 'CANCEL',
     });
     expect(within(card).getByText(/הוסברו 1 מתוך/)).toBeTruthy();
+    await next(user);
     const ideas = screen.getByRole('list', { name: 'רעיונות לחיסכון' });
     expect(within(ideas).getByText('מה שסימנתם לביטול')).toBeTruthy();
     expect(within(ideas).getByText('הלוואות')).toBeTruthy();
-    // Pressing the same choice again takes it back.
-    await user.click(within(first).getByRole('button', { name: 'אפשר לבטל' }));
-    expect(useMoneyCategories.getState().explanations['חנות הדוגמאות']!.flexibility).toBeUndefined();
+    await next(user);
+    expect(within(screen.getByRole('list', { name: 'החלטות' })).getByText('לבטל את מה שסימנתם')).toBeTruthy();
   });
 });

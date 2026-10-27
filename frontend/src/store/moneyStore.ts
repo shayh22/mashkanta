@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CategoryId } from '../engine/money/categories';
+import type { ConsultStep } from '../engine/money/consultRequest';
 import { overridesOf, type PayeeExplanation } from '../engine/money/explanations';
 import { monthlyPicture, type MonthlyPicture } from '../engine/money/picture';
 import { readCsv, readXlsx } from '../engine/money/sheets';
@@ -44,6 +45,9 @@ export async function readMoneyFile(file: File): Promise<MoneyFile> {
 interface MoneyState {
   files: MoneyFile[];
   reading: boolean;
+  /** What the household told the AI on each screen; in memory, like the files. */
+  notes: Partial<Record<ConsultStep, string>>;
+  setNote: (step: ConsultStep, note: string) => void;
   addFiles: (files: readonly File[]) => Promise<void>;
   remove: (id: string) => void;
 }
@@ -51,6 +55,8 @@ interface MoneyState {
 export const useMoney = create<MoneyState>()((set) => ({
   files: [],
   reading: false,
+  notes: {},
+  setNote: (step, note) => set((state) => ({ notes: { ...state.notes, [step]: note } })),
   addFiles: async (files) => {
     set({ reading: true });
     const read = await Promise.all(files.map(readMoneyFile));
