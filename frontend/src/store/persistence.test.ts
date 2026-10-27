@@ -82,4 +82,41 @@ describe('input persistence', () => {
     const ids = new Set(Array.from({ length: 500 }, () => uniqueId('t')));
     expect(ids.size).toBe(500);
   });
+
+  it('starts from the defaults, without failing, when storage cannot be read or cleared', async () => {
+    useRefinance.getState().setPropertyValue(2_750_000);
+    global.localStorage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+      removeItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    await expect(useRefinance.persist.rehydrate()).resolves.toBeUndefined();
+    expect(useRefinance.getState().propertyValue).toBe(2_750_000);
+    await expect(Promise.resolve(useRefinance.persist.clearStorage())).resolves.toBeUndefined();
+  });
+
+  it('ignores a corrupted saved value instead of crashing on load', async () => {
+    useWizard.getState().setProfile({ monthlyNetIncome: 33_000 });
+    storage.setItem(storageKey('wizard'), '{not json');
+    await expect(useWizard.persist.rehydrate()).resolves.toBeUndefined();
+    expect(useWizard.getState().profile.monthlyNetIncome).toBe(33_000);
+  });
+
+  it('still issues unique, prefixed ids where crypto.randomUUID is unavailable', () => {
+    const crypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: {}, configurable: true });
+    try {
+      const ids = new Set(Array.from({ length: 200 }, () => uniqueId('d')));
+      expect(ids.size).toBe(200);
+      expect([...ids].every((id) => /^d-[a-z0-9]{1,8}$/.test(id))).toBe(true);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: crypto, configurable: true });
+    }
+  });
 });
