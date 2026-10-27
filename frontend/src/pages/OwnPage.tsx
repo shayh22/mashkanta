@@ -13,7 +13,7 @@ import { Card, CurrencyField, LoadingCard, RangeField, SegmentedControl } from '
 import { combinedPlan, refinancePlan } from '../engine/actionPlan';
 import { priceMix } from '../engine/amortization';
 import { positionFromMix } from '../engine/combined';
-import { existingSpecs, offerToProposal, VERDICT_LABELS, type RefinanceVerdict } from '../engine/refinance';
+import { existingSpecs, explainVerdict, offerToProposal, VERDICT_LABELS, type RefinanceVerdict } from '../engine/refinance';
 import { ApprovalUploader } from '../components/ApprovalUploader';
 import type { DocumentJob } from '../lib/types';
 import { scenarioOf } from '../lib/api';
@@ -25,6 +25,7 @@ import { useCombinedMove } from '../store/combinedStore';
 import { useConsolidation, useConsolidationAnalysis } from '../store/consolidationStore';
 import { useFlow, useHasDebts } from '../store/flowStore';
 import { newTrackId, tracksValid, useRefinance } from '../store/refinanceStore';
+import { useVisits } from '../store/visitStore';
 import { useWizard } from '../store/wizardStore';
 
 const loadDetails = () => import('../components/own/OwnDetails');
@@ -169,7 +170,7 @@ function DataScreen({ ready, onDone }: { ready: boolean; onDone: () => void }) {
         </>
       )}
 
-      <HouseholdCard />
+      <OwnHousehold withDebts={hasDebts} />
 
       <div className="no-print flex justify-end">
         <button type="button" className="btn-primary" disabled={!ready} onClick={onDone}>
@@ -181,10 +182,15 @@ function DataScreen({ ready, onDone }: { ready: boolean; onDone: () => void }) {
   );
 }
 
-/** Income and appetite for risk: what the engine needs to choose the mix. */
-function HouseholdCard() {
+/**
+ * Income and appetite for risk, which the engine needs to choose the mix; and, when other loans are
+ * in the check, any all-purpose loan already secured on the home, which uses up the exemption.
+ */
+function OwnHousehold({ withDebts }: { withDebts: boolean }) {
   const netIncome = useConsolidation((state) => state.netIncome);
   const setNetIncome = useConsolidation((state) => state.setNetIncome);
+  const priorAllPurpose = useConsolidation((state) => state.property.priorAllPurposeBalance);
+  const setProperty = useConsolidation((state) => state.setProperty);
   const profile = useWizard((state) => state.profile);
   const setProfile = useWizard((state) => state.setProfile);
 
@@ -220,6 +226,18 @@ function HouseholdCard() {
           onChange={(value) => setProfile({ volatilityCapacity: value })}
           term="absorption"
         />
+        {withDebts && (
+          <CurrencyField
+            label="הלוואה לכל מטרה קיימת על הדירה"
+            hint="אם יש — נספרת בפטור של 120,000 ₪"
+            value={priorAllPurpose}
+            min={0}
+            max={1_000_000}
+            step={5_000}
+            onChange={(value) => setProperty({ priorAllPurposeBalance: value })}
+            term="allPurpose"
+          />
+        )}
       </div>
     </Card>
   );
@@ -256,6 +274,14 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
   }, []);
 
   const consolidating = hasDebts && !!move && move.combined.included.length > 0;
+  // Seen results are what "since your last visit" compares next time — only the tools in use.
+  useEffect(() => {
+    const visits = useVisits.getState();
+    visits.markVisited('refinance');
+    if (consolidating) {
+      visits.markVisited('consolidation');
+    }
+  }, [consolidating]);
   const prime = scenarioOf(macro).primeAnnual;
   const plan = useMemo(() => {
     if (!comparison) {
@@ -271,12 +297,41 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
   );
 
   if (!comparison) {
-    return null;
+    // Nothing to compare — a hand-entered proposal emptied of every track. The editor stays within
+    // reach, so the way out is on this screen rather than a blank one.
+    return (
+      <>
+        <Card title="אין הצעה לבדוק">
+          <p className="text-sm text-ink-muted">ההצעה ריקה. חזרו לתמהיל שהמנוע בוחר, או הוסיפו מסלולים.</p>
+          <button type="button" className="btn-primary mt-4" onClick={() => setProposalMode('OPTIMAL')}>
+            חזרה לבחירת המנוע
+          </button>
+        </Card>
+        <ProposalEditor proposal={proposal} optimal={optimal} />
+        <div className="no-print">
+          <button type="button" className="btn-ghost" onClick={onBack}>
+            <span aria-hidden>→</span> עריכת הנתונים
+          </button>
+        </div>
+      </>
+    );
   }
   const route = bestRoute(comparison);
   const today = consolidating ? move!.paymentToday : route.currentPayment;
   const after = consolidating ? move!.paymentAfter : route.proposedPayment;
-  const blocked = consolidating && !move!.combined.regulation.feasible;
+  const relief = today - after;
+  // The bottom line of what is shown: with consolidation, the combined move — its feasibility, the
+  // 40% bank policy and whether the payment falls — not the refinance's verdict alone.
+  const regulation = consolidating ? move!.combined.regulation : undefined;
+  const [tone, title]: [SummaryTone, string] = !regulation
+    ? [VERDICT_TONE[route.verdict], VERDICT_LABELS[route.verdict]]
+    : !regulation.feasible
+      ? ['negative', 'האיחוד בסכום הזה חורג מהוראה 329']
+      : relief <= 0
+        ? ['caution', 'ההחזר החודשי לא יורד']
+        : !regulation.bankFeasible
+          ? ['caution', 'עומד ברגולציה, מעל מדיניות 40% בבנקים']
+          : ['positive', `שני המהלכים מורידים ${formatCurrency(relief)} בחודש`];
   const reveal = (id: string) =>
     requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
   const openEditor = () => {
@@ -293,31 +348,33 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
     <>
       <SummaryBar
         label="התוצאה"
-        tone={blocked ? 'negative' : VERDICT_TONE[route.verdict]}
+        tone={tone}
         eyebrow={consolidating ? 'מיחזור + איחוד הלוואות' : 'מיחזור המשכנתא'}
-        title={blocked ? 'האיחוד בסכום הזה חורג מהוראה 329' : VERDICT_LABELS[route.verdict]}
+        title={title}
         figures={[
           { label: 'החזר חודשי', value: formatCurrency(after), note: `היום ${formatCurrency(today)}` },
           {
             label: consolidating ? 'חמצן תזרימי' : 'חיסכון חודשי',
-            value: formatSignedCurrency(today - after),
-            tone: today - after > 0 ? 'positive' : 'negative',
+            value: formatSignedCurrency(relief),
+            tone: relief > 0 ? 'positive' : 'negative',
             term: consolidating ? 'relief' : undefined,
           },
           {
-            label: 'נקודת איזון',
+            label: consolidating ? 'נקודת איזון (מיחזור)' : 'נקודת איזון',
             value: route.breakevenMonth > 0 ? `חודש ${route.breakevenMonth}` : 'אין',
             note: `עלות מעבר ${formatCurrency(route.upfrontCost)}`,
             term: 'breakeven',
           },
           {
-            label: 'ערך נוכחי נקי',
+            label: consolidating ? 'ערך נוכחי (מיחזור)' : 'ערך נוכחי נקי',
             value: formatSignedCurrency(route.netPresentValue),
             tone: route.netPresentValue > 0 ? 'positive' : 'negative',
             term: 'npv',
           },
         ]}
       />
+
+      {!consolidating && <p className="-mt-2 px-1 text-sm text-ink-muted">{explainVerdict(route)}</p>}
 
       <RecommendedMix
         proposal={proposal}

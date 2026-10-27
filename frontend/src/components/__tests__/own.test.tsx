@@ -7,6 +7,7 @@ import { useCombinedSettings } from '../../store/combinedStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useFlow } from '../../store/flowStore';
 import { useRefinance } from '../../store/refinanceStore';
+import { useVisits } from '../../store/visitStore';
 
 beforeAll(() => {
   // Recharts measures its container; jsdom has no ResizeObserver.
@@ -34,6 +35,7 @@ beforeEach(() => {
   useConsolidation.getState().reset();
   useFlow.setState({ hasDebts: undefined });
   useCombinedSettings.setState({ financeCosts: true });
+  useVisits.setState({ visited: [] });
 });
 afterEach(cleanup);
 
@@ -142,5 +144,42 @@ describe("the homeowner's path", () => {
     ]);
     const card = screen.getByRole('region', { name: /ההצעה שקיבלתם/ });
     expect(within(card).getByRole('group', { name: 'מול בחירת המנוע' })).toBeTruthy();
+  });
+
+  it('keeps a way out when a hand-entered proposal has been emptied', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '#/own/result');
+    useRefinance.getState().importOffer([]);
+    renderPage();
+    expect(screen.getByText('אין הצעה לבדוק')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'הוספת מסלול מוצע' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'חזרה לבחירת המנוע' }));
+    expect(screen.getByRole('region', { name: /התמהיל שנבחר לכם/ })).toBeTruthy();
+  });
+
+  it('asks for an all-purpose loan already on the home only when other loans are in the check', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.queryByText('הלוואה לכל מטרה קיימת על הדירה')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'יש' }));
+    expect(screen.getByText('הלוואה לכל מטרה קיימת על הדירה')).toBeTruthy();
+  });
+
+  it('counts the refinance as used only once its result is seen', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(useVisits.getState().visited).toEqual([]);
+    await user.click(screen.getByRole('button', { name: /לתוצאה/ }));
+    expect(useVisits.getState().visited).toEqual(['refinance']);
+  });
+
+  it('sums up the combined move by the combined payment, not by the refinance alone', async () => {
+    window.history.replaceState(null, '', '#/own/result');
+    useFlow.setState({ hasDebts: true });
+    renderPage();
+    const result = screen.getByRole('region', { name: 'התוצאה' });
+    expect(within(result).getByText(/שני המהלכים מורידים .* בחודש/)).toBeTruthy();
+    expect(within(result).getByText('נקודת איזון (מיחזור)')).toBeTruthy();
+    expect(useVisits.getState().visited).toEqual(['refinance', 'consolidation']);
   });
 });

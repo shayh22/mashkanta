@@ -2,7 +2,7 @@ import { checkManualMix, MANUAL_TRACKS, sharesTotal, type ManualShares } from '.
 import { formatCurrency, formatPercent } from '../lib/format';
 import { TRACK_LABEL } from '../lib/trackOptions';
 import type { TrackType } from '../lib/types';
-import type { TermId } from '../lib/glossary';
+import { TRACK_TERMS } from '../lib/glossary';
 import { Term } from './Glossary';
 import { NumberInput } from './ui';
 
@@ -11,15 +11,6 @@ const PRESETS: { label: string; shares: ManualShares }[] = [
   { label: 'פריים + קבועה לא צמודה', shares: { PRIME: 1 / 3, FIXED_UNLINKED: 2 / 3 } },
   { label: '100% קבועה לא צמודה', shares: { FIXED_UNLINKED: 1 } },
 ];
-
-/** The glossary entry behind each track name. */
-const TRACK_TERMS: Record<string, TermId> = {
-  PRIME: 'prime',
-  FIXED_UNLINKED: 'fixedUnlinked',
-  FIXED_LINKED: 'fixedLinked',
-  VARIABLE_UNLINKED: 'variableUnlinked',
-  VARIABLE_LINKED: 'variableLinked',
-};
 
 /**
  * The mix built by hand: a percentage per track, with the amount it means and the Directive 329
@@ -76,7 +67,7 @@ export function ManualMixEditor({
             <li key={track} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-ink">
-                  <Term id={TRACK_TERMS[track]!}>{TRACK_LABEL[track]}</Term>
+                  <Term id={TRACK_TERMS[track]}>{TRACK_LABEL[track]}</Term>
                 </p>
               </div>
               <span className="tabular w-24 text-end text-xs text-ink-muted">{formatCurrency(free * share)}</span>

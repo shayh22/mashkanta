@@ -5,7 +5,7 @@ import { formatCurrency, formatPercent } from '../lib/format';
 import { bestRoute } from '../lib/routes';
 import { useConsolidationAnalysis } from '../store/consolidationStore';
 import { useMarket } from '../store/marketStore';
-import { useRefinanceAnalysis } from '../store/refinanceStore';
+import { useRefinance, useRefinanceAnalysis } from '../store/refinanceStore';
 import { previousVisitSnapshot, useVisits } from '../store/visitStore';
 
 /** A visit less than this long after the last one is the same sitting, not a return. */
@@ -28,6 +28,7 @@ export function SinceLastVisit() {
   const visited = useVisits((state) => state.visited);
   const save = useVisits((state) => state.save);
   const refinance = useRefinanceAnalysis();
+  const proposalMode = useRefinance((state) => state.proposalMode);
   const consolidation = useConsolidationAnalysis();
   const [report, setReport] = useState<{ since: string; changes: VisitChange[]; published?: string }>();
   const [dismissed, setDismissed] = useState(false);
@@ -45,7 +46,7 @@ export function SinceLastVisit() {
       },
       refinance:
         best && visited.includes('refinance')
-          ? { monthlySaving: best.monthlySaving, netPresentValue: best.netPresentValue }
+          ? { monthlySaving: best.monthlySaving, netPresentValue: best.netPresentValue, mode: proposalMode }
           : undefined,
       consolidation:
         visited.includes('consolidation') || visited.includes('combined')
@@ -55,7 +56,7 @@ export function SinceLastVisit() {
             }
           : undefined,
     };
-  }, [market, refinance.comparison, consolidation, visited]);
+  }, [market, refinance.comparison, consolidation, visited, proposalMode]);
 
   // Compare once, on the first fresh market read of this visit.
   useEffect(() => {

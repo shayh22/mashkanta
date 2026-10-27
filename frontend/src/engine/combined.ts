@@ -89,22 +89,3 @@ export function analyseCombined(
     extraCreditRoom: combined.regulation.maxFeasibleLoan - consolidationOnly.regulation.maxFeasibleLoan,
   };
 }
-
-/** One step of the monthly-payment waterfall: a label and the signed change it makes. */
-export interface CombinedStep {
-  readonly label: string;
-  readonly delta: number;
-}
-
-/**
- * Today's total payment to the total after both moves, one step at a time: the refinanced
- * mortgage, each debt that is closed, and the new all-purpose loan. The steps sum exactly to
- * paymentAfter − paymentToday, so the waterfall closes.
- */
-export function combinedSteps(move: CombinedMove): CombinedStep[] {
-  return [
-    { label: 'מיחזור המשכנתא', delta: move.refinance.proposedPayment - move.refinance.currentPayment },
-    ...move.combined.included.map((debt) => ({ label: debt.label, delta: -debt.monthlyPayment })),
-    { label: 'הלוואה לכל מטרה', delta: move.combined.allocation.payment },
-  ];
-}

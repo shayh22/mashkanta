@@ -18,9 +18,10 @@ import {
   type RouteKind,
   type SwitchingCosts,
 } from '../engine/refinance';
-import { optimalRefinance, type OptimalRefinance } from '../engine/refinanceOptimal';
+import { optimalRefinance, type Household, type OptimalRefinance } from '../engine/refinanceOptimal';
+import type { MacroScenario } from '../engine/scenario';
 import { useWizard } from './wizardStore';
-import { useConsolidation } from './consolidationStore';
+import { useConsolidation, useConsolidationAnalysis } from './consolidationStore';
 import { useHasDebts } from './flowStore';
 import { bestRoute } from '../lib/routes';
 import { browserStorage, storageKey, uniqueId } from './persistence';
@@ -252,25 +253,60 @@ export interface RefinanceView {
   engine?: RouteAnalysis;
 }
 
+/**
+ * The optimal-mix search takes a tenth of a second, and several views ask for the same one (the
+ * result screen, the "since your last visit" banner). The last answer is kept and reused while its
+ * inputs, and the market table it was priced against, are unchanged.
+ */
+let lastOptimal: { key: string; value: OptimalRefinance | undefined } | undefined;
+function cachedOptimalRefinance(
+  marketVersion: number,
+  tracks: readonly ExistingTrack[],
+  kept: ReadonlySet<string>,
+  propertyValue: number,
+  household: Household,
+  percentile: number,
+  scenario: MacroScenario,
+): OptimalRefinance | undefined {
+  const key = JSON.stringify([marketVersion, tracks, [...kept].sort(), propertyValue, household, percentile, scenario]);
+  if (lastOptimal?.key !== key) {
+    lastOptimal = { key, value: optimalRefinance(tracks, kept, propertyValue, household, percentile, scenario) ?? undefined };
+  }
+  return lastOptimal.value;
+}
+
 /** The whole analysis, recomputed only when an input changes. It takes a few milliseconds. */
 export function useRefinanceAnalysis(): RefinanceView {
   const state = useRefinance();
   const macro = useWizard((wizard) => wizard.macro);
   // The household behind the optimal mix: income from the homeowner's inputs, appetite for risk as
-  // set in the wizard, and the payments of other loans that stay as they are.
-  const profile = useWizard((wizard) => wizard.profile);
+  // set in the wizard, and the monthly payments that sit beside the mortgage — the loans that stay,
+  // and the all-purpose loan that replaces the ones being consolidated. Only these fields are read,
+  // so typing elsewhere in the wizard does not re-run the search.
+  const riskTolerance = useWizard((wizard) => wizard.profile.riskTolerance);
+  const volatilityCapacity = useWizard((wizard) => wizard.profile.volatilityCapacity);
+  const primePreference = useWizard((wizard) => wizard.profile.primePreference);
+  const stablePreference = useWizard((wizard) => wizard.profile.stablePreference);
+  const dynamicPreference = useWizard((wizard) => wizard.profile.dynamicPreference);
   const netIncome = useConsolidation((consolidation) => consolidation.netIncome);
   const debts = useConsolidation((consolidation) => consolidation.debts);
+  const consolidation = useConsolidationAnalysis();
   const hasDebts = useHasDebts();
+  const consolidationPayment = hasDebts && consolidation.included.length > 0 ? consolidation.allocation.payment : 0;
   const household = useMemo(
     () => ({
-      ...profile,
+      riskTolerance,
+      volatilityCapacity,
+      primePreference,
+      stablePreference,
+      dynamicPreference,
       monthlyNetIncome: netIncome,
       existingMonthlyObligations: hasDebts
-        ? debts.filter((debt) => !debt.include).reduce((sum, debt) => sum + Math.max(0, debt.monthlyPayment), 0)
+        ? debts.filter((debt) => !debt.include).reduce((sum, debt) => sum + Math.max(0, debt.monthlyPayment), 0) +
+          consolidationPayment
         : 0,
     }),
-    [profile, netIncome, debts, hasDebts],
+    [riskTolerance, volatilityCapacity, primePreference, stablePreference, dynamicPreference, netIncome, debts, hasDebts, consolidationPayment],
   );
   const marketVersion = useMarketVersion();
 
@@ -278,16 +314,15 @@ export function useRefinanceAnalysis(): RefinanceView {
   // an offer or the same mix re-priced is always shown against what the engine would choose.
   const optimal = useMemo(
     () =>
-      optimalRefinance(
+      cachedOptimalRefinance(
+        marketVersion,
         state.tracks,
         new Set(state.keptIds),
         state.propertyValue,
         household,
         state.percentile,
         scenarioOf(macro),
-      ) ?? undefined,
-    // marketVersion: the engine prices against the live market table.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      ),
     [state.tracks, state.keptIds, state.propertyValue, household, state.percentile, macro, marketVersion],
   );
 
