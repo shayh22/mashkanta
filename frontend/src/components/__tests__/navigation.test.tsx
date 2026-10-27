@@ -20,26 +20,28 @@ describe('mode navigation', () => {
   });
   afterEach(cleanup);
 
-  it('offers two paths as a tablist with one selected, focusable tab', () => {
+  it('offers the three paths as a tablist with one selected, focusable tab', () => {
     renderApp();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['יש לי משכנתא', 'קונים דירה']);
-    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
-    expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['יש לי משכנתא', 'קונים דירה', 'הכסף שלי']);
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false']);
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
   });
 
-  it('moves with the arrow keys, right to left, and updates the link', async () => {
+  it('moves with the arrow keys, right to left, wraps around, and updates the link', async () => {
     const user = userEvent.setup();
     renderApp();
-    const [own, buy] = screen.getAllByRole('tab');
+    const [own, buy, money] = screen.getAllByRole('tab');
     buy!.focus();
     await user.keyboard('{ArrowLeft}');
+    expect(document.activeElement).toBe(money);
+    expect(money!.getAttribute('aria-selected')).toBe('true');
+    expect(window.location.hash).toBe('#/money');
+    await user.keyboard('{ArrowRight}{ArrowRight}');
     expect(document.activeElement).toBe(own);
-    expect(own!.getAttribute('aria-selected')).toBe('true');
     expect(window.location.hash).toBe('#/own');
     await user.keyboard('{ArrowRight}');
-    expect(document.activeElement).toBe(buy);
-    expect(window.location.hash).toBe('#/buy');
+    expect(document.activeElement).toBe(money);
   });
 
   it.each([
