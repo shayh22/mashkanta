@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActionPlanReport } from '../components/ActionPlanReport';
 import { Disclosure } from '../components/Disclosure';
 import { MixExplainer } from '../components/MixExplainer';
@@ -13,7 +13,9 @@ import { Card, CurrencyField, LoadingCard, RangeField, SegmentedControl } from '
 import { combinedPlan, refinancePlan } from '../engine/actionPlan';
 import { priceMix } from '../engine/amortization';
 import { positionFromMix } from '../engine/combined';
-import { existingSpecs, VERDICT_LABELS, type RefinanceVerdict } from '../engine/refinance';
+import { existingSpecs, offerToProposal, VERDICT_LABELS, type RefinanceVerdict } from '../engine/refinance';
+import { ApprovalUploader } from '../components/ApprovalUploader';
+import type { DocumentJob } from '../lib/types';
 import { scenarioOf } from '../lib/api';
 import { refinanceExplainRequest } from '../lib/explainRequest';
 import { formatCurrency, formatSignedCurrency } from '../lib/format';
@@ -22,7 +24,7 @@ import { bestRoute } from '../lib/routes';
 import { useCombinedMove } from '../store/combinedStore';
 import { useConsolidation, useConsolidationAnalysis } from '../store/consolidationStore';
 import { useFlow, useHasDebts } from '../store/flowStore';
-import { tracksValid, useRefinance } from '../store/refinanceStore';
+import { newTrackId, tracksValid, useRefinance } from '../store/refinanceStore';
 import { useWizard } from '../store/wizardStore';
 
 const loadDetails = () => import('../components/own/OwnDetails');
@@ -224,7 +226,24 @@ function HouseholdCard() {
 }
 
 function ResultScreen({ onBack }: { onBack: () => void }) {
-  const { comparison, proposal, ltv, perTrack, optimal, move } = useCombinedMove();
+  const { comparison, proposal, ltv, perTrack, optimal, move, engine } = useCombinedMove();
+  const tracks = useRefinance((state) => state.tracks);
+  const setProposalMode = useRefinance((state) => state.setProposalMode);
+  const importOffer = useRefinance((state) => state.importOffer);
+  const [offering, setOffering] = useState(false);
+  const [offerRead, setOfferRead] = useState<number>();
+  // Stable, because the uploader reports a finished document from an effect that depends on it.
+  const onOfferRead = useCallback(
+    (job: DocumentJob) => {
+      const read = offerToProposal(job.result?.tracks ?? [], tracks, newTrackId);
+      if (read.length > 0) {
+        importOffer(read);
+        setOfferRead(read.length);
+        requestAnimationFrame(() => document.getElementById('recommended-mix')?.scrollIntoView?.({ behavior: 'smooth' }));
+      }
+    },
+    [tracks, importOffer],
+  );
   const mode = useRefinance((state) => state.proposalMode);
   const noticeGiven = useRefinance((state) => state.noticeGiven);
   const riskTolerance = useWizard((state) => state.profile.riskTolerance);
@@ -258,10 +277,17 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
   const today = consolidating ? move!.paymentToday : route.currentPayment;
   const after = consolidating ? move!.paymentAfter : route.proposedPayment;
   const blocked = consolidating && !move!.combined.regulation.feasible;
+  const reveal = (id: string) =>
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
   const openEditor = () => {
     setEditing(true);
-    requestAnimationFrame(() => document.getElementById('own-edit-mix')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
+    reveal('own-edit-mix');
   };
+  const openOffer = () => {
+    setOffering(true);
+    reveal('own-offer');
+  };
+
 
   return (
     <>
@@ -293,7 +319,15 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
         ]}
       />
 
-      <RecommendedMix proposal={proposal} route={route} mode={mode} onChange={openEditor} />
+      <RecommendedMix
+        proposal={proposal}
+        route={route}
+        mode={mode}
+        onChange={openEditor}
+        onOffer={openOffer}
+        engine={engine}
+        onUseEngine={() => setProposalMode('OPTIMAL')}
+      />
       {consolidating && <ConsolidationLoanCard analysis={move!.combined} />}
       <MixExplainer request={explainRequest} />
       <div className="space-y-3">
@@ -303,6 +337,20 @@ function ResultScreen({ onBack }: { onBack: () => void }) {
             <ActionPlanReport plan={plan} />
           </Disclosure>
         )}
+        <Disclosure
+          id="own-offer"
+          title="השוואה להצעה מהבנק"
+          summary="העלו את הצעת המיחזור (PDF או צילום) — נשווה אותה לתמהיל שהמנוע בוחר"
+          open={offering}
+          onToggle={setOffering}
+        >
+          <ApprovalUploader ltv={ltv} onExtracted={onOfferRead} />
+          {offerRead !== undefined && (
+            <p className="text-sm text-positive" role="status">
+              ✓ נקראו {offerRead} מסלולים מההצעה — היא מוצגת למעלה, מול בחירת המנוע.
+            </p>
+          )}
+        </Disclosure>
         <Disclosure
           id="own-edit-mix"
           title="שינוי התמהיל"

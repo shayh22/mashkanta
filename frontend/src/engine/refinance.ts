@@ -362,3 +362,26 @@ export function trackByTrack(
       };
     });
 }
+
+/**
+ * A bank's refinance offer, as read from its document, made into a proposal. A track the document
+ * gives no term for takes the longest term left on the mortgage being replaced; an eligibility loan
+ * already on the mortgage stays as it is, so the offer's copy of it is not counted twice.
+ */
+export function offerToProposal(
+  offer: readonly { track: TrackType; amount: number; annualRate: number; termMonths: number }[],
+  existing: readonly ExistingTrack[],
+  newId: () => string,
+): ProposedTrack[] {
+  const longest = Math.max(12, ...existing.map((track) => track.remainingMonths));
+  const hasEligibility = existing.some((track) => track.type === 'ELIGIBILITY' && track.balance > 0);
+  return offer
+    .filter((track) => track.amount > 0 && !(hasEligibility && track.track === 'ELIGIBILITY'))
+    .map((track) => ({
+      id: newId(),
+      type: track.track,
+      amount: track.amount,
+      annualRate: track.annualRate,
+      termMonths: track.termMonths > 0 ? track.termMonths : longest,
+    }));
+}
