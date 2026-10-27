@@ -20,6 +20,10 @@ export interface Payee {
   readonly description: string;
   readonly monthly: number;
   readonly count: number;
+  /** In how many of the months counted it appears. */
+  readonly months: number;
+  /** Charged as a standing order, where the statement says so. */
+  readonly standing: boolean;
 }
 
 export interface CategoryLine {
@@ -126,11 +130,17 @@ function lines(
     .map(([id, members]) => {
       const total = sign * members.reduce((sum, transaction) => sum + transaction.amount, 0);
       const lastMonth = sign * members.filter((transaction) => monthOf(transaction.date) === last).reduce((sum, t) => sum + t.amount, 0);
-      const payees = new Map<string, { total: number; count: number }>();
+      const payees = new Map<string, { total: number; count: number; months: Set<string>; standing: boolean }>();
       for (const transaction of members) {
         const name = payeeOf(transaction.description) || transaction.description;
-        const entry = payees.get(name) ?? { total: 0, count: 0 };
-        payees.set(name, { total: entry.total + sign * transaction.amount, count: entry.count + 1 });
+        const entry = payees.get(name) ?? { total: 0, count: 0, months: new Set<string>(), standing: false };
+        entry.months.add(monthOf(transaction.date));
+        payees.set(name, {
+          total: entry.total + sign * transaction.amount,
+          count: entry.count + 1,
+          months: entry.months,
+          standing: entry.standing || !!transaction.kind?.includes('הוראת קבע'),
+        });
       }
       const monthly = total / count;
       return {
@@ -140,7 +150,13 @@ function lines(
         lastMonth,
         rising: count >= 3 && lastMonth > monthly * 1.3 && lastMonth - monthly > 200,
         payees: [...payees.entries()]
-          .map(([description, entry]) => ({ description, monthly: entry.total / count, count: entry.count }))
+          .map(([description, entry]) => ({
+            description,
+            monthly: entry.total / count,
+            count: entry.count,
+            months: entry.months.size,
+            standing: entry.standing,
+          }))
           .sort((a, b) => b.monthly - a.monthly),
         transactions: members.length,
       };

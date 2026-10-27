@@ -411,6 +411,23 @@ card company (Excel or CSV), and gets one monthly picture: what comes in, what g
   (`worker/categorize.ts`), which returns one category each from a fixed list; the borrower's own
   choices always win. Same protections as the other AI endpoints.
 
+**Where to save** (`engine/money/savings.ts`). Under the picture, a card of ideas read off the
+statements, each with something to do: the overdraft (priced by the interest it cost, with a link
+to consolidating loans), bank and card fees, a category whose last month ran well above its
+average, subscriptions and standing orders (marked so on the card statement, or charged once a
+month in every month), several insurances (with the government's policy register to find double
+cover), cash whose use is unknown, and the mortgage as the largest expense (with a link to the
+mortgage check). A shekel saving is given only where the statements show one; the rest say
+"to check" rather than guess.
+
+**The advisor** (`engine/money/adviceRequest.ts`, `/api/advise`). When AI is on, the household
+writes what matters to them ("out of the overdraft in six months") and gets up to five steps, some
+of them a monthly target for a spending category. Only totals are sent — income, spending by
+category, the fixed part, one-off money, the overdraft, the ideas found — never business names,
+dates or accounts, and the request can be inspected before it is sent. A target is kept only for a
+category the household has and below what it spends there; what the targets free up, and the
+month after them, is the app's own sum.
+
 ## Reading unfamiliar documents with AI
 
 Known formats — the Hapoalim mortgage details statement and the standard approval-in-principle — are
