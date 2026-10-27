@@ -5,7 +5,14 @@ import type { MonthlyPicture } from '../../engine/money/picture';
 import { VERDICT_LABELS } from '../../engine/refinance';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
-import { planOf, useJourneyLoans, type JourneyLoan } from '../../store/journeyLoans';
+import {
+  loanCandidates,
+  NOT_ON_STATEMENTS,
+  planOf,
+  useJourneyLoans,
+  type JourneyLoan,
+  type LoanCandidate,
+} from '../../store/journeyLoans';
 import { useMortgageMove } from '../../store/mortgageMove';
 import { Card, NumberInput } from '../ui';
 import { periodOf } from './format';
@@ -33,6 +40,7 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
   const { sample, route } = useMortgageMove();
   const mortgage = picture.spendingLines.find((line) => line.id === 'HOUSING_LOANS');
   const loans = useJourneyLoans(picture);
+  const candidates = loanCandidates(picture);
   const loansTotal = loans.reduce((sum, loan) => sum + loan.monthly, 0);
   const interest = picture.overdraft?.interestMonthly ?? 0;
   const repayments = (mortgage?.monthly ?? 0) + loansTotal + interest;
@@ -121,7 +129,7 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
         ) : (
           <ul className="space-y-5" aria-label="ההלוואות">
             {loans.map((loan) => (
-              <LoanCard key={loan.key} loan={loan} />
+              <LoanCard key={loan.key} loan={loan} candidates={candidates} />
             ))}
           </ul>
         )}
@@ -133,9 +141,10 @@ export function DebtsStep({ picture }: { picture: MonthlyPicture }) {
 }
 
 /** One loan: its terms as the household knows them, and the three moves side by side. */
-function LoanCard({ loan }: { loan: JourneyLoan }) {
+function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonly LoanCandidate[] }) {
   const plans = useMoney((state) => state.loans);
   const setLoan = useMoney((state) => state.setLoan);
+  const linkLoan = useMoney((state) => state.linkLoan);
   const plan = planOf(loan, plans);
   const name = loan.name;
   const key = loan.key;
@@ -156,6 +165,30 @@ function LoanCard({ loan }: { loan: JourneyLoan }) {
           {loan.fromReport && loan.onStatements ? ' · הפרטים מהדוח' : ''}
         </span>
       </div>
+      {loan.debtId && (
+        // Which charge on the statements this report loan is, so its repayment counts once.
+        <label className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+          <span>
+            {loan.reportLabel && loan.reportLabel !== name ? `"${loan.reportLabel}" מהדוח · ` : ''}בדפי החשבון ההחזר הזה הוא:
+          </span>
+          <select
+            className="input w-auto py-1 text-xs"
+            aria-label={`איפה ההחזר של ${loan.reportLabel ?? name} בדפי החשבון`}
+            value={loan.onStatements ? name : NOT_ON_STATEMENTS}
+            onChange={(event) => linkLoan(loan.debtId!, event.target.value)}
+          >
+            <option value={NOT_ON_STATEMENTS}>לא מופיע — משולם מחשבון אחר</option>
+            {[...candidates]
+              .sort((a, b) => Math.abs(a.monthly - loan.monthly) - Math.abs(b.monthly - loan.monthly))
+              .filter((candidate, index) => index < 8 || candidate.name === name)
+              .map((candidate) => (
+                <option key={candidate.name} value={candidate.name}>
+                  {candidate.name} · {formatCurrency(candidate.monthly)}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="space-y-1 text-xs text-ink-soft">
           <span>יתרה לסילוק (₪)</span>

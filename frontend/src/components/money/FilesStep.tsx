@@ -2,9 +2,12 @@ import { useRef, useState } from 'react';
 import { useDocumentsStatus } from '../../store/journeyLoans';
 import { useMoney, type MoneyFile } from '../../store/moneyStore';
 import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
+import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
+import { TRACK_LABEL } from '../../lib/trackOptions';
+import { isSampleDebts, useConsolidation } from '../../store/consolidationStore';
 import { DebtImporter } from '../consolidation/DebtImporter';
 import { StatementImporter } from '../refinance/StatementImporter';
-import { Card } from '../ui';
+import { Card, ScrollRegion } from '../ui';
 import { shortDate } from './format';
 
 type Kind = 'bank' | 'card' | 'mortgage' | 'loans';
@@ -159,8 +162,18 @@ function DocumentsHub() {
         }}
       />
 
-      {report === 'mortgage' && <StatementImporter />}
-      {report === 'loans' && <DebtImporter />}
+      {report === 'mortgage' && (
+        <>
+          {mortgage && <MortgageDetails />}
+          <StatementImporter />
+        </>
+      )}
+      {report === 'loans' && (
+        <>
+          {loans > 0 && <LoansDetails />}
+          <DebtImporter />
+        </>
+      )}
 
       {(files.length > 0 || reading) && (
         <ul className="divide-y divide-line rounded-xl border border-line" aria-label="קבצים שהועלו">
@@ -205,5 +218,92 @@ function FileRow({ file, onRemove }: { file: MoneyFile; onRemove: () => void }) 
         הסרה
       </button>
     </li>
+  );
+}
+
+/** The mortgage as the site holds it — from the report, or typed in the homeowner path. */
+function MortgageDetails() {
+  const tracks = useRefinance((state) => state.tracks);
+  const total = tracks.reduce((sum, track) => sum + track.balance, 0);
+  return (
+    <section aria-label="המשכנתא שנקראה" className="rounded-xl border border-line p-3">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink">
+          המשכנתא: {tracks.length} מסלולים · {formatCurrency(total)}
+        </h3>
+        <a className="text-xs font-medium text-brand-700 hover:underline" href="#/own">
+          לעריכה
+        </a>
+      </div>
+      <ScrollRegion label="מסלולי המשכנתא">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-ink-soft">
+              <th className="py-1.5 text-start font-medium">מסלול</th>
+              <th className="py-1.5 text-start font-medium">יתרה</th>
+              <th className="py-1.5 text-start font-medium">ריבית</th>
+              <th className="py-1.5 text-start font-medium">נותרו</th>
+            </tr>
+          </thead>
+          <tbody className="tabular divide-y divide-line">
+            {tracks.map((track) => (
+              <tr key={track.id}>
+                <td className="py-1.5 text-ink">{TRACK_LABEL[track.type]}</td>
+                <td className="py-1.5">{formatCurrency(track.balance)}</td>
+                <td className="py-1.5">{formatPercent(track.annualRate)}</td>
+                <td className="py-1.5">{formatTerm(track.remainingMonths)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScrollRegion>
+    </section>
+  );
+}
+
+/** The loans as the site holds them — from a report, or typed in the homeowner path. */
+function LoansDetails() {
+  const debts = useConsolidation((state) => state.debts);
+  if (isSampleDebts(debts)) {
+    return null;
+  }
+  const monthly = debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
+  return (
+    <section aria-label="ההלוואות שנקראו" className="rounded-xl border border-line p-3">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink">
+          {debts.length === 1 ? 'הלוואה אחת' : `${debts.length} הלוואות`} · {formatCurrency(monthly)} בחודש
+        </h3>
+        <a className="text-xs font-medium text-brand-700 hover:underline" href="#/own">
+          לעריכה
+        </a>
+      </div>
+      <ScrollRegion label="ההלוואות">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-ink-soft">
+              <th className="py-1.5 text-start font-medium">הלוואה</th>
+              <th className="py-1.5 text-start font-medium">יתרה</th>
+              <th className="py-1.5 text-start font-medium">ריבית</th>
+              <th className="py-1.5 text-start font-medium">החזר</th>
+              <th className="py-1.5 text-start font-medium">נותרו</th>
+            </tr>
+          </thead>
+          <tbody className="tabular divide-y divide-line">
+            {debts.map((debt) => (
+              <tr key={debt.id}>
+                <td className="py-1.5 text-ink" dir="auto">
+                  {debt.label}
+                </td>
+                <td className="py-1.5">{formatCurrency(debt.balance)}</td>
+                <td className="py-1.5">{formatPercent(debt.annualRate)}</td>
+                <td className="py-1.5">{formatCurrency(debt.monthlyPayment)}</td>
+                <td className="py-1.5">{formatTerm(debt.remainingMonths)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScrollRegion>
+    </section>
   );
 }

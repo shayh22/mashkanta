@@ -52,6 +52,9 @@ interface MoneyState {
   /** Each loan's terms, as the household knows them, and the move chosen for it; by business name. */
   loans: Record<string, LoanPlan>;
   setLoan: (payee: string, patch: Partial<LoanPlan>) => void;
+  /** A report loan's repayment on the statements, chosen by the household: a charge's name, or NOT_ON_STATEMENTS. */
+  loanLinks: Record<string, string>;
+  linkLoan: (debtId: string, payee: string) => void;
   /** Whether the summary counts refinancing the mortgage into the engine's mix. */
   refinance: boolean;
   setRefinance: (refinance: boolean) => void;
@@ -66,6 +69,8 @@ export const useMoney = create<MoneyState>()((set) => ({
   setNote: (step, note) => set((state) => ({ notes: { ...state.notes, [step]: note } })),
   loans: {},
   setLoan: (payee, patch) => set((state) => ({ loans: { ...state.loans, [payee]: { move: 'KEEP', ...state.loans[payee], ...patch } } })),
+  loanLinks: {},
+  linkLoan: (debtId, payee) => set((state) => ({ loanLinks: { ...state.loanLinks, [debtId]: payee } })),
   refinance: false,
   setRefinance: (refinance) => set({ refinance }),
   addFiles: async (files) => {
