@@ -385,14 +385,24 @@ hour per visitor, no-retention providers.
 
 ## My money: the household's month from its statements
 
-**One screen at a time.** The path is a journey of five steps with a progress bar: the files; what
+**One screen at a time.** The path is a journey of six steps with a progress bar: the files; what
 comes in and goes out (a monthly bar chart of income against spending with the net as a line, and
 the account balance day by day from the statement's balance column, the overdraft shaded); where
 the money goes (a 10×10 waffle — each cell one shekel in a hundred — the "what is this?" card and the
-categories); where to save (each category as one bar split into must / could cut / could cancel /
+categories); loans and the mortgage (below); where to save (each category as one bar split into must / could cut / could cancel /
 not yet explained, and the saving ideas); and the summary (the decisions to tick, a slope chart from
 today to after, what each decision frees, and the advisor). The charts are plain elements except the
 two time series, which use the app's charting library, and follow light and dark.
+
+**Loans and the mortgage** (`components/money/Debts.tsx`, `engine/money/loanMoves.ts`). A step of
+its own: how much of the income goes to repayments, as one bar against the banks' usual 40% ceiling;
+the mortgage — refinanced into the engine's mix, from the homeowner path's data so it is entered once,
+with its switching costs; and each loan from the statements (including one the household marked as a
+loan, like a pension-fund loan charged under the insurer's name). For a loan the household enters
+the balance, rate and months left, and sees three moves side by side: keep it, turn it into a
+balloon (only the interest each month, the balance at the end), or spread it over more years — each
+with its monthly payment, what is left to pay at the end, and what it costs in all. The chosen moves
+join the summary's decisions with their cost written under them.
 
 **Tell the AI on every screen** (`engine/money/consultRequest.ts`, `/api/consult`). Each step has a
 box for what the numbers do not show ("August had a bonus", "the insurer charge is a pension loan")

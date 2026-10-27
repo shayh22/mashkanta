@@ -1,6 +1,7 @@
 import { CATEGORY_LABELS, type CategoryId } from './categories';
 import type { Explanations } from './explanations';
 import type { MonthlyPicture } from './picture';
+import { loanMoves, validTerms, type LoanMoveKind } from './loanMoves';
 import { savingIdeas } from './savings';
 
 /**
@@ -15,7 +16,68 @@ export interface Decision {
   readonly label: string;
   /** Freed a month. */
   readonly monthly: number;
-  readonly source: 'statements' | 'advisor';
+  readonly source: 'statements' | 'advisor' | 'debts';
+  /** What it costs or asks, where it is not free: a balloon's lump sum, a refinance's fees. */
+  readonly note?: string;
+}
+
+/** A loan as the household describes it, and what it chose to do with it. */
+export interface LoanPlan {
+  readonly balance?: number;
+  readonly annualRate?: number;
+  readonly remainingMonths?: number;
+  readonly move: LoanMoveKind;
+  /** For EXTEND: the new length, in years. */
+  readonly extendYears?: number;
+}
+
+export interface MortgageMove {
+  readonly currentPayment: number;
+  readonly proposedPayment: number;
+  readonly upfrontCost: number;
+}
+
+const shekel = (value: number) => `${Math.round(value).toLocaleString('he-IL')} ₪`;
+
+/** Spreading a loan over twice what is left, up to forty years, unless the household says otherwise. */
+export const defaultExtendYears = (remainingMonths: number) => Math.min(40, Math.max(1, Math.ceil((remainingMonths * 2) / 12)));
+
+/** A loan's chosen move, priced; undefined while it is kept or its terms are missing. */
+export function loanDecision(payee: string, statedMonthly: number, plan: LoanPlan | undefined): Decision | undefined {
+  const terms = { balance: plan?.balance, annualRate: plan?.annualRate, remainingMonths: plan?.remainingMonths };
+  if (!plan || plan.move === 'KEEP' || !validTerms(terms)) {
+    return undefined;
+  }
+  const moves = loanMoves(terms, (plan.extendYears ?? defaultExtendYears(terms.remainingMonths)) * 12, statedMonthly);
+  const move = moves[plan.move];
+  const freed = moves.KEEP.monthly - move.monthly;
+  if (freed < 1) {
+    return undefined;
+  }
+  return {
+    key: `loan:${payee}`,
+    label: `${payee}: ${plan.move === 'BALLOON' ? 'בלון' : `פריסה ל-${Math.round(move.months / 12)} שנים`}`,
+    monthly: freed,
+    source: 'debts',
+    note:
+      plan.move === 'BALLOON'
+        ? `בסוף התקופה ${shekel(move.atEnd)} בבת אחת · עולה ${shekel(move.extraCost)} יותר בסך הכל`
+        : `עולה ${shekel(move.extraCost)} יותר בסך הכל`,
+  };
+}
+
+/** Refinancing the mortgage into the engine's mix, when it lowers the payment. */
+export function mortgageDecision(move: MortgageMove | undefined): Decision | undefined {
+  if (!move || move.currentPayment - move.proposedPayment < 1) {
+    return undefined;
+  }
+  return {
+    key: 'mortgage',
+    label: 'מיחזור המשכנתא לתמהיל של המנוע',
+    monthly: move.currentPayment - move.proposedPayment,
+    source: 'debts',
+    ...(move.upfrontCost >= 1 ? { note: `עלות מעבר ${shekel(move.upfrontCost)}` } : {}),
+  };
 }
 
 export interface CategoryTarget {

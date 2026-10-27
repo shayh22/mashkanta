@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { factsFor } from '../../engine/money/consultRequest';
-import { decisionsOf, freedBy } from '../../engine/money/decisions';
+import { decisionsOf, freedBy, loanDecision, mortgageDecision, type Decision } from '../../engine/money/decisions';
 import { flexibilityRows } from '../../engine/money/flexibility';
 import type { MonthlyPicture } from '../../engine/money/picture';
 import { knownSaving, savingIdeas } from '../../engine/money/savings';
 import { formatCurrency, formatSignedCurrency } from '../../lib/format';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { useMortgageMove } from '../../store/mortgageMove';
 import { SummaryBar } from '../SummaryBar';
 import { Card } from '../ui';
 import { AdvisorCard, type AdviceTarget } from './AdvisorCard';
@@ -154,10 +155,22 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
   const notes = useMemo(() => Object.values(notesByStep).filter((note): note is string => !!note && note.trim().length >= 3), [notesByStep]);
   const [targets, setTargets] = useState<readonly AdviceTarget[]>([]);
   const onTargets = useCallback((next: readonly AdviceTarget[]) => setTargets(next), []);
-  const decisions = decisionsOf(picture, explanations, targets);
+  const plans = useMoney((state) => state.loans);
+  const refinance = useMoney((state) => state.refinance);
+  const { route } = useMortgageMove();
+  const loanLine = picture.spendingLines.find((line) => line.id === 'LOANS');
+  // The moves chosen on the loans screen, each with what it costs as well as what it frees.
+  const debtMoves = [
+    ...(refinance ? [mortgageDecision(route)] : []),
+    ...(loanLine?.payees ?? []).map((payee) => loanDecision(payee.description, payee.monthly, plans[payee.description])),
+  ].filter((decision): decision is Decision => !!decision);
+  const decisions = [...debtMoves, ...decisionsOf(picture, explanations, targets)];
   const [unchosen, setUnchosen] = useState<ReadonlySet<string>>(new Set());
   const chosen = new Set(decisions.map((d) => d.key).filter((key) => !unchosen.has(key)));
   const freed = freedBy(decisions, chosen);
+  const debtFreed = freedBy(debtMoves, chosen);
+  const repayments =
+    (picture.spendingLines.find((line) => line.id === 'HOUSING_LOANS')?.monthly ?? 0) + (loanLine?.monthly ?? 0);
   const before = net(picture);
   const after = before + freed;
   const toggle = (key: string) =>
@@ -192,15 +205,22 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
 
       <Card title="ההחלטות" subtitle="סמנו את מה שאתם עושים; הכל מתעדכן.">
         {decisions.length === 0 ? (
-          <p className="text-sm text-ink-muted">עוד אין החלטות עם סכום. סמנו בשלב "לאן הולך הכסף" מה אפשר לבטל, או בקשו תוכנית מהיועץ למטה.</p>
+          <p className="text-sm text-ink-muted">
+            עוד אין החלטות עם סכום. סמנו בשלב "לאן הולך הכסף" מה אפשר לבטל, בחרו מהלך להלוואה בשלב "הלוואות ומשכנתא", או בקשו תוכנית
+            מהיועץ למטה.
+          </p>
         ) : (
           <ul className="divide-y divide-line" aria-label="החלטות">
             {decisions.map((decision) => (
               <li key={decision.key}>
                 <label className="flex cursor-pointer items-center gap-3 py-2.5">
                   <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={chosen.has(decision.key)} onChange={() => toggle(decision.key)} />
-                  <span className="min-w-0 flex-1 text-sm text-ink">{decision.label}</span>
+                  <span className="min-w-0 flex-1 text-sm text-ink">
+                    <span dir="auto">{decision.label}</span>
+                    {decision.note && <span className="block text-xs text-caution">{decision.note}</span>}
+                  </span>
                   {decision.source === 'advisor' && <span className="badge-neutral">מהיועץ</span>}
+                  {decision.source === 'debts' && <span className="badge-neutral">הלוואות</span>}
                   <span className="tabular text-sm font-semibold text-positive">{formatCurrency(decision.monthly)}</span>
                 </label>
               </li>
@@ -216,6 +236,9 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
               series={[
                 { key: 'net', label: 'נשאר בחודש', before, after, higherIsBetter: true },
                 { key: 'spending', label: 'יוצא בחודש', before: picture.spending, after: picture.spending - freed, higherIsBetter: false },
+                ...(debtFreed >= 1
+                  ? [{ key: 'repayments', label: 'החזרי הלוואות ומשכנתא', before: repayments, after: repayments - debtFreed, higherIsBetter: false }]
+                  : []),
               ]}
             />
           </ChartCard>
