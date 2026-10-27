@@ -33,6 +33,8 @@ describe('categories', () => {
 
   it('reads money out of the bank account by the same rules', () => {
     expect(categorize(bank('בנק-משכ חיוב', -5_000))).toBe('HOUSING_LOANS');
+    // Other loans are not the mortgage.
+    expect(categorize(bank('פירעון הלוואה 123456', -10_000))).toBe('LOANS');
     expect(categorize(bank('הו"ק לוועד בית 12', -375))).toBe('HOME_BILLS');
     expect(categorize(bank('כספומט בנק דוגמה 25/10 18:33', -400))).toBe('CASH');
     expect(categorize(bank('תשלום ריבית על משיכת יתר- מינוס', -90))).toBe('FEES');

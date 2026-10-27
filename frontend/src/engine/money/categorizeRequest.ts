@@ -21,6 +21,7 @@ export const AI_CATEGORIES = [
   'SUBSCRIPTIONS',
   'TRANSFERS_OUT',
   'HOUSING_LOANS',
+  'LOANS',
   'FEES',
   'OTHER',
 ] as const satisfies readonly CategoryId[];
