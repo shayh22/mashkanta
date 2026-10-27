@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { isUsable } from './src/engine/boiMarket';
 import { handleExplain } from './worker/explain';
 import { handleExtract } from './worker/extract';
+import { handleAdvise } from './worker/advise';
 import { handleCategorize } from './worker/categorize';
 import { handlePlan } from './worker/plan';
 import { readMarket } from './worker/market';
@@ -37,6 +38,7 @@ function marketApi(): Plugin {
     '/api/explain': handleExplain,
     '/api/plan': handlePlan,
     '/api/categorize': handleCategorize,
+    '/api/advise': handleAdvise,
   };
   const extract: Connect.NextHandleFunction = (request, response, next) => {
     const route = Object.entries(ROUTES).find(([path]) => request.url?.startsWith(path))?.[1];

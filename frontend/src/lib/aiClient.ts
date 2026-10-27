@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AiDocumentKind } from '../engine/aiExtraction';
 import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
+import { toAdvice, type Advice, type AdviceRequest } from '../engine/money/adviceRequest';
 import { toCategories, type AiCategory } from '../engine/money/categorizeRequest';
 import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
@@ -117,4 +118,28 @@ export async function categorizePayees(payees: readonly string[]): Promise<Recor
     throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
   }
   return categories;
+}
+
+/** A few steps toward the household's goal, from its monthly totals; the app prices the targets. */
+export async function adviseHousehold(request: AdviceRequest): Promise<Advice> {
+  const response = await fetch('/api/advise', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'AI אינו מופעל כרגע.'
+          : `לא התקבלה תוכנית (${response.status}). נסו שוב.`,
+    );
+  }
+  const advice = toAdvice(((await response.json()) as { advice?: unknown }).advice, request);
+  if (!advice) {
+    throw new Error('התוכנית שהתקבלה לא תקינה. נסו שוב.');
+  }
+  return advice;
 }
