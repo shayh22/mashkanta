@@ -4,6 +4,7 @@ import { handleExtract, type ExtractEnv } from './extract';
 import { handleAdvise } from './advise';
 import { handleCategorize } from './categorize';
 import { handleConsult } from './consult';
+import { handleNoam } from './noam';
 import { handlePlan } from './plan';
 import { readMarket } from './market';
 
@@ -17,6 +18,7 @@ import { readMarket } from './market';
  * - `/api/categorize` sorts business names from statements into spending categories (see `categorize.ts`);
  * - `/api/advise` turns a household's monthly totals and goal into a few steps (see `advise.ts`);
  * - `/api/consult` answers about one screen of the household journey (see `consult.ts`).
+ * - `/api/noam` is the questionnaire's guide (see `noam.ts`).
  *
  * Market results are cached at the edge for six hours, so the statistics service sees a handful of
  * requests a day however many people open the app. A forced refresh (`?fresh=1`) skips the cache
@@ -70,6 +72,9 @@ export default {
     }
     if (url.pathname === '/api/consult') {
       return handleConsult(request, env, cache, fetch);
+    }
+    if (url.pathname === '/api/noam') {
+      return handleNoam(request, env, cache, fetch);
     }
     if (url.pathname !== '/api/market') {
       return env.ASSETS.fetch(request);

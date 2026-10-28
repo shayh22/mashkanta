@@ -25,7 +25,7 @@ describe('the opening', () => {
     const splash = screen.getByTestId('splash');
     expect(splash.getAttribute('aria-hidden')).toBe('true');
     expect(splash.className).toContain('pointer-events-none');
-    expect(splash.textContent).toContain('משכנתא חכמה');
+    expect(splash.textContent).toContain('מפתח כלכלי');
     expect(onDone).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(900));
     act(() => vi.advanceTimersByTime(700));

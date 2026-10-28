@@ -101,7 +101,7 @@ describe('market worker', () => {
   });
 
   it('routes every AI path to its own handler, which says whether AI is on', async () => {
-    for (const path of ['/api/extract', '/api/explain', '/api/plan', '/api/categorize', '/api/advise', '/api/consult']) {
+    for (const path of ['/api/extract', '/api/explain', '/api/plan', '/api/categorize', '/api/advise', '/api/consult', '/api/noam']) {
       const response = await get(path);
       expect({ path, body: await response.json() }).toEqual({ path, body: { enabled: false } });
     }
