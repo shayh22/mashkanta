@@ -252,6 +252,15 @@ input[type='range']::-moz-range-thumb {
     border: none;
   }
 
+  /* On paper, the questionnaire's results keep their figures, not their buttons. */
+  body[data-print='report'] .report button {
+    display: none;
+  }
+
+  body[data-print='report'] .report section {
+    break-inside: avoid;
+  }
+
   .card {
     box-shadow: none;
     backdrop-filter: none;

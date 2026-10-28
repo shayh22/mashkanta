@@ -28,6 +28,9 @@ interface QuestionnaireState {
   setGoals: (goals: readonly Goal[]) => void;
   answer: (field: string, value: AnswerValue | undefined) => void;
   go: (at: string) => void;
+  /** The tasks ticked off, by id. */
+  done: string[];
+  toggleDone: (task: string) => void;
   reset: () => void;
 }
 
@@ -49,13 +52,15 @@ export const useQuestionnaire = create<QuestionnaireState>()(
           return { answers };
         }),
       go: (at) => set({ at }),
-      reset: () => set({ goals: [], answers: {}, at: START }),
+      done: [],
+      toggleDone: (task) => set((state) => ({ done: state.done.includes(task) ? state.done.filter((each) => each !== task) : [...state.done, task] })),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [] }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done }),
     },
   ),
 );
