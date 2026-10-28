@@ -5,6 +5,7 @@ import { RecoveryResult, SharedRecovery } from '../components/flow/RecoveryResul
 import { RefinanceResult, SharedRefinance } from '../components/flow/RefinanceResult';
 import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
+import { PlanSummary } from '../components/flow/PlanSummary';
 import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
 import { MortgageOffers } from '../components/flow/Offers';
 import { LoanOffersPanel } from '../components/flow/LoanOffers';
@@ -231,6 +232,7 @@ function Results({
 
       {screen === 'plan' && (
         <>
+          <PlanSummary goals={goals} answers={answers} {...(refinance ? { refinance } : {})} />
           <TasksCard goals={goals} answers={answers} {...(refinance ? { refinance } : {})} />
           <div className="flex flex-col gap-2.5">
             <button type="button" onClick={() => setPrinting(true)} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
@@ -262,6 +264,7 @@ function Results({
           <p className="text-sm font-bold text-flow-muted">
             {APP_NAME} · דוח מ-{new Date().toLocaleDateString('he-IL')}
           </p>
+          <PlanSummary goals={goals} answers={answers} {...(refinance ? { refinance } : {})} />
           {screens
             .filter((each) => each !== 'plan')
             .map((each) => (

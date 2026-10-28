@@ -235,6 +235,7 @@ describe('the questionnaire', () => {
     await user.click(screen.getByRole('button', { name: 'הבא: התוכנית' }));
     expect(window.location.hash).toBe('#/start/plan');
     expect(screen.queryByRole('button', { name: /^הבא/ })).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'לפני ואחרי' })).getByText('החזר חודשי לדירה, לפי המחשבון')).toBeTruthy();
     const whatsapp = screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!;
     expect(whatsapp).toMatch(/^https:\/\/wa\.me\/\?text=/);
     expect(decodeURIComponent(whatsapp)).toContain(`${window.location.origin}/#/s/`);
@@ -460,6 +461,8 @@ describe('the questionnaire', () => {
     expect(within(await screen.findByRole('region', { name: 'הבנקים, לתמהיל החדש' }, { timeout: 10_000 })).getByText('הזול לתמהיל הזה')).toBeTruthy();
     await go('התוכנית');
     expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('להוריד דוח יתרות מאתר הבנק ולהעלות אותו לבדיקה מדויקת')).toBeTruthy();
+    const summary = screen.getByRole('region', { name: 'לפני ואחרי' });
+    expect(within(summary).getByText('החזר המשכנתא, בערך').nextSibling!.textContent!.replace(/\u200f/g, '')).toMatch(/^7,200\s₪←[\d,]+\s₪$/);
 
     await user.click(within(screen.getByRole('navigation', { name: 'שלבי התוצאה' })).getByRole('button', { name: 'איפה משפרים' }));
     await user.click(await screen.findByRole('button', { name: 'כל הפרטים' }));
@@ -672,6 +675,7 @@ describe('the questionnaire', () => {
     await go('השוואה בין בנקים');
     expect(screen.getByRole('region', { name: 'הצעות להלוואה' })).toBeTruthy();
     await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'לפני ואחרי' })).getByText('נשאר בסוף החודש')).toBeTruthy();
     expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).queryByRole('checkbox', { name: 'לבטל: חנות הדוגמאות' })).toBeNull();
     const shared = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
     const payload = decodeShared(shared.slice(shared.indexOf('#/s/') + 4).trim())!;
