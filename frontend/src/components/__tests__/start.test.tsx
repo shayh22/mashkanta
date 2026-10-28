@@ -21,7 +21,7 @@ beforeEach(() => {
   } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined });
   useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
@@ -317,6 +317,43 @@ describe('the questionnaire', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'שלבי התוצאה' })).getByRole('button', { name: 'השוואה בין בנקים' }));
     await user.click(screen.getByRole('button', { name: 'הסרת ההצעה של בנק לאומי' }));
     expect(useQuestionnaire.getState().offers).toHaveLength(1);
+  }, 30_000);
+
+  it('compares loan offers for one amount by what each costs in all, against the market and the mortgage', async () => {
+    serve(false);
+    useQuestionnaire.setState({
+      loanOffers: [],
+      loanAmount: undefined,
+      goals: ['RECOVERY'],
+      answers: { hasMortgage: 'YES', mortgageHow: 'MANUAL', mortgageBalance: 800_000, mortgagePayment: 7_200, mortgageYears: 'TEN_20', statementsFiles: 'LATER', worries: ['LOANS'], hasLoans: 'NO' },
+    });
+    openAt('compare');
+    const user = userEvent.setup();
+    renderPage();
+    const panel = screen.getByRole('region', { name: 'הצעות להלוואה' });
+    await user.type(within(panel).getByLabelText('כמה צריך ללוות?'), '50000');
+    expect(useQuestionnaire.getState().loanAmount).toBe(50_000);
+    for (const [lender, rate, fee] of [
+      ['בנק דוגמה', '6', '0'],
+      ['כרטיס דוגמה', '11', '300'],
+    ] as const) {
+      await user.click(within(panel).getByRole('button', { name: 'הוספת הצעה להלוואה' }));
+      await user.type(within(panel).getByLabelText('מי מציע'), lender);
+      await user.type(within(panel).getByLabelText('ההלוואה: ריבית %'), rate);
+      await user.type(within(panel).getByLabelText('ההלוואה: עמלה ₪'), fee);
+      await user.click(within(panel).getByRole('button', { name: 'הוספת ההצעה' }));
+    }
+    const rows = within(within(panel).getByRole('list', { name: 'הלוואות, מהזולה ליקרה' })).getAllByRole('listitem').map((row) => row.textContent!);
+    // Ranked by the total: the bank's offer first, the card's dearest; the market and the mortgage beside them.
+    expect(rows[0]).toContain('בנק דוגמה');
+    expect(rows[0]).toContain('ההצעה הזולה');
+    expect(rows.find((row) => row.includes('ממוצע השוק'))).toContain('להשוואה');
+    expect(rows.find((row) => row.includes('בתוך המשכנתא'))).toContain('בשעבוד הדירה');
+    expect(rows.findIndex((row) => row.includes('כרטיס דוגמה'))).toBeGreaterThan(rows.findIndex((row) => row.includes('בנק דוגמה')));
+
+    await go('התוכנית');
+    const tasks = within(screen.getByRole('region', { name: 'מה עושים עכשיו' }));
+    expect(tasks.getByText('לקחת את ההלוואה מבנק דוגמה, הזולה מבין 2 ההצעות')).toBeTruthy();
   }, 30_000);
 
   it('walks back through the result screens, and from the first to the questions', async () => {
@@ -622,8 +659,6 @@ describe('the questionnaire', () => {
     const account = screen.getByRole('region', { name: 'החשבון' });
     expect(within(account).getByRole('region', { name: 'לאן הולך הכסף, בחודש' })).toBeTruthy();
     expect(within(account).getByText(/^(נשארים|חסרים) כל חודש, בממוצע$/)).toBeTruthy();
-    // No bank to compare for a recovery plan alone.
-    expect(within(screen.getByRole('navigation', { name: 'שלבי התוצאה' })).queryByRole('button', { name: 'השוואה בין בנקים' })).toBeNull();
 
     await go('איפה משפרים');
     const decisions = () => within(screen.getByRole('region', { name: 'תוכנית ההבראה' }));
@@ -634,6 +669,8 @@ describe('the questionnaire', () => {
     expect(document.getElementById('recovery-result')!.textContent).not.toBe(before);
 
     // Left out, it is not a task, and the link does not carry it — nor ever a business's name.
+    await go('השוואה בין בנקים');
+    expect(screen.getByRole('region', { name: 'הצעות להלוואה' })).toBeTruthy();
     await go('התוכנית');
     expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).queryByRole('checkbox', { name: 'לבטל: חנות הדוגמאות' })).toBeNull();
     const shared = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
@@ -645,6 +682,7 @@ describe('the questionnaire', () => {
     await user.click(screen.getByRole('button', { name: 'איפה משפרים' }));
     expect(cancel().checked).toBe(false);
     await user.click(cancel());
+    await go('השוואה בין בנקים');
     await go('התוכנית');
     expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByRole('checkbox', { name: 'לבטל: חנות הדוגמאות' })).toBeTruthy();
     const again = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
