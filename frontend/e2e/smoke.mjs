@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-refinance', 'start-details', 'start-recovery',
+  'start', 'start-question', 'start-help', 'start-result', 'start-refinance', 'start-details', 'start-recovery', 'shared',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -149,6 +149,17 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('button', { name: 'כל הפרטים' }).click();
           await page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }).waitFor({ timeout: 20_000 });
         }
+      }
+      if (screen === 'shared') {
+        // A result someone shared, opened from its link.
+        const result = {
+          v: 1,
+          goals: ['BUY', 'RECOVERY'],
+          answers: { propertyValue: 2000000, segment: 'FIRST_HOME', equity: 600000, netIncome: 25000, stability: 'BALANCED' },
+          recovery: { months: 3, today: -1200, after: 300, decisions: [{ label: 'לבטל את מה שסימנתם', monthly: 1500 }] },
+        };
+        await page.goto(`${base}/#/s/${Buffer.from(JSON.stringify(result)).toString('base64url')}`);
+        await page.getByText('החזר חודשי בהתחלה').waitFor({ timeout: 20_000 });
       }
       if (screen === 'start-recovery') {
         // A recovery plan from the invented statement: uploaded, then the next question.

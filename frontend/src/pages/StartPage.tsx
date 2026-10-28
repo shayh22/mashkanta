@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BuyResult } from '../components/flow/BuyResult';
 import { BuyDetails, RecoveryDetails, RefinanceDetails } from '../components/flow/Details';
-import { RecoveryResult } from '../components/flow/RecoveryResult';
-import { RefinanceResult } from '../components/flow/RefinanceResult';
+import { RecoveryResult, SharedRecovery } from '../components/flow/RecoveryResult';
+import { RefinanceResult, SharedRefinance } from '../components/flow/RefinanceResult';
+import { ShareBar } from '../components/flow/Share';
+import { decodeShared, type RecoverySnapshot, type RefinanceSnapshot } from '../engine/flow/share';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
@@ -139,6 +141,11 @@ function Results({
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const here: Goal[] = [...goals];
+  // What a shared link carries beside the answers: the figures of results read from documents.
+  const [refinance, setRefinance] = useState<RefinanceSnapshot>();
+  const [recovery, setRecovery] = useState<RecoverySnapshot>();
+  const onRefinance = useCallback((snapshot: RefinanceSnapshot | undefined) => setRefinance(snapshot), []);
+  const onRecovery = useCallback((snapshot: RecoverySnapshot | undefined) => setRecovery(snapshot), []);
   const any = here.length > 0;
   useEffect(() => {
     if (any) {
@@ -159,12 +166,13 @@ function Results({
               {goal === 'BUY' ? (
                 <BuyResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('BUY')} />
               ) : goal === 'REFINANCE' ? (
-                <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} />
+                <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} onSnapshot={onRefinance} />
               ) : (
-                <RecoveryResult onEdit={onEdit} onDetails={() => onDetails('RECOVERY')} hasReview={steps.some((step) => step.id === 'canGo')} />
+                <RecoveryResult onEdit={onEdit} onDetails={() => onDetails('RECOVERY')} onSnapshot={onRecovery} hasReview={steps.some((step) => step.id === 'canGo')} />
               )}
             </div>
           ))}
+          <ShareBar result={{ goals, answers, ...(refinance ? { refinance } : {}), ...(recovery ? { recovery } : {}) }} />
         </div>
       )}
       <AnswersSummary
@@ -175,6 +183,78 @@ function Results({
         onRestart={onRestart}
         focus={!any}
       />
+    </div>
+  );
+}
+
+/**
+ * A result someone shared, at `#/s/<result>`: worked out again from its answers where it can be,
+ * its own figures where it came from documents — beside the visitor's own questionnaire, which it
+ * never touches unless they choose to take the answers in.
+ */
+export function SharedPage() {
+  const encoded = window.location.hash.replace(/^#\/?s\//, '');
+  const [shared] = useState(() => decodeShared(encoded));
+  const [confirming, setConfirming] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus({ preventScroll: true }), []);
+  const TITLES: Record<Goal, string> = { BUY: 'הדירה', REFINANCE: 'המשכנתא', RECOVERY: 'החשבון' };
+
+  // In place of the visitor's own answers, as the confirmation says: nothing of theirs mixes in.
+  const takeIn = () => {
+    useQuestionnaire.setState({ goals: [...shared!.goals], answers: { ...shared!.answers }, at: DONE });
+    window.location.hash = '#/start/done';
+  };
+
+  return (
+    <div dir="rtl" className="-mx-4 -mt-6 min-h-[calc(100vh-4rem)] bg-flow-ground px-5 pb-10 pt-5 text-flow-ink">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+        <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
+          {shared ? 'תוצאה ששותפה איתכם' : 'הקישור לא תקין'}
+        </h2>
+        {!shared ? (
+          <p className="text-base text-flow-muted">אולי הוא נקטע בהעתקה. אפשר לבקש אותו שוב, או להתחיל שאלון משלכם.</p>
+        ) : (
+          shared.goals.map((goal) => (
+            <div key={goal} className="flex flex-col gap-3">
+              {shared.goals.length > 1 && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
+              {goal === 'BUY' ? (
+                <BuyResult answers={shared.answers} />
+              ) : goal === 'REFINANCE' ? (
+                <SharedRefinance answers={shared.answers} snapshot={shared.refinance} />
+              ) : shared.recovery ? (
+                <SharedRecovery snapshot={shared.recovery} />
+              ) : (
+                <p className="rounded-[20px] bg-flow-card p-5 text-base text-flow-muted">תוכנית ההבראה לא שותפה בקישור הזה.</p>
+              )}
+            </div>
+          ))
+        )}
+        {shared && (
+          <div className="flex flex-col gap-2.5 rounded-[20px] bg-flow-card p-4">
+            {confirming ? (
+              <>
+                <p className="text-[15px] font-bold">התשובות מהקישור יחליפו את התשובות שלכם בשאלון, אם יש. להמשיך?</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={takeIn} className="min-h-12 flex-1 rounded-full bg-flow-strong px-4 text-base font-extrabold text-flow-on-strong">
+                    כן, לפתוח אצלי
+                  </button>
+                  <button type="button" onClick={() => setConfirming(false)} className="min-h-12 rounded-full border-2 border-flow-ink px-4 text-base font-bold">
+                    ביטול
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirming(true)} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+                לפתוח את התשובות אצלי ולשנות
+              </button>
+            )}
+          </div>
+        )}
+        <a href="#/start" className="flex min-h-14 items-center justify-center rounded-full bg-flow-ink px-6 text-lg font-extrabold text-flow-ground">
+          שאלון משלי
+        </a>
+      </div>
     </div>
   );
 }

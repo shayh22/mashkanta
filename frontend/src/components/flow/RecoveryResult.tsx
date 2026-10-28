@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { RecoverySnapshot } from '../../engine/flow/share';
 import { decisionsOf, freedBy } from '../../engine/money/decisions';
 import { formatCurrency, formatSignedCurrency } from '../../lib/format';
 import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
@@ -8,11 +9,37 @@ import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
  * keeps — each a tick away from being left out — from its own statements and what it said about
  * its charges.
  */
-export function RecoveryResult({ onEdit, onDetails, hasReview }: { onEdit: (step: string) => void; onDetails: () => void; hasReview: boolean }) {
+export function RecoveryResult({
+  onEdit,
+  onDetails,
+  onSnapshot,
+  hasReview,
+}: {
+  onEdit: (step: string) => void;
+  onDetails: () => void;
+  /** The result's figures, for a shared link: the statements themselves never leave the device. */
+  onSnapshot: (snapshot: RecoverySnapshot | undefined) => void;
+  hasReview: boolean;
+}) {
   const picture = useMonthlyPicture();
   const explanations = useMoneyCategories((state) => state.explanations);
   const decisions = useMemo(() => (picture ? decisionsOf(picture, explanations) : []), [picture, explanations]);
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
+  const today = picture ? picture.income - picture.spending : 0;
+  const chosen = useMemo(() => new Set(decisions.map((decision) => decision.key).filter((key) => !left.has(key))), [decisions, left]);
+  const after = today + freedBy(decisions, chosen);
+  useEffect(() => {
+    onSnapshot(
+      picture
+        ? {
+            months: picture.months.length,
+            today: Math.round(today),
+            after: Math.round(after),
+            decisions: decisions.filter((decision) => chosen.has(decision.key)).map((decision) => ({ label: decision.label, monthly: Math.round(decision.monthly) })),
+          }
+        : undefined,
+    );
+  }, [picture, today, after, decisions, chosen, onSnapshot]);
 
   if (!picture) {
     // Statements are kept in memory only: a later visit has none until they are uploaded again.
@@ -29,9 +56,6 @@ export function RecoveryResult({ onEdit, onDetails, hasReview }: { onEdit: (step
     );
   }
 
-  const today = picture.income - picture.spending;
-  const chosen = new Set(decisions.map((decision) => decision.key).filter((key) => !left.has(key)));
-  const after = today + freedBy(decisions, chosen);
   const toggle = (key: string) =>
     setLeft((current) => {
       const next = new Set(current);
@@ -42,12 +66,6 @@ export function RecoveryResult({ onEdit, onDetails, hasReview }: { onEdit: (step
       }
       return next;
     });
-  const share = [
-    'תוכנית ההבראה שלי מ"מפתח כלכלי":',
-    `היום ${formatSignedCurrency(today)} בחודש, אחרי ההחלטות ${formatSignedCurrency(after)}`,
-    ...decisions.filter((decision) => chosen.has(decision.key)).map((decision) => `${decision.label}: +${formatCurrency(decision.monthly)}`),
-  ].join('\n');
-
   return (
     <section aria-label="תוכנית ההבראה" className="flex flex-col gap-3.5">
       <div className="flex flex-col gap-1">
@@ -96,22 +114,38 @@ export function RecoveryResult({ onEdit, onDetails, hasReview }: { onEdit: (step
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
-          כל הפרטים
-        </button>
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(share)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex min-h-[52px] items-center justify-center rounded-full border-2 border-flow-ink px-3 text-base font-extrabold"
-        >
-          שיתוף בוואטסאפ
-        </a>
-      </div>
+      <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+        כל הפרטים
+      </button>
       <p className="text-xs leading-relaxed text-flow-muted">
         לפי {picture.months.length} חודשים מלאים בדפי החשבון. הקבצים נקראו במכשיר ולא נשמרו.
       </p>
+    </section>
+  );
+}
+
+/** A recovery plan someone shared: its month today and after, and the decisions they kept. */
+export function SharedRecovery({ snapshot }: { snapshot: RecoverySnapshot }) {
+  return (
+    <section aria-label="תוכנית ההבראה" className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-1">
+        <span className="text-[15px] font-bold text-flow-muted">{snapshot.after >= 0 ? 'אחרי ההחלטות נשארים כל חודש' : 'אחרי ההחלטות עדיין חסרים כל חודש'}</span>
+        <h3 id="recovery-result" className={`text-[48px] font-black leading-none tracking-tight ${snapshot.after < 0 ? 'text-negative' : ''}`}>
+          {formatCurrency(Math.abs(snapshot.after))}
+        </h3>
+        <span className="text-[15px] text-flow-muted">היום {formatSignedCurrency(snapshot.today)} בחודש</span>
+      </div>
+      {snapshot.decisions.length > 0 && (
+        <ul aria-label="ההחלטות" className="flex flex-col overflow-hidden rounded-[20px] bg-flow-card">
+          {snapshot.decisions.map((decision) => (
+            <li key={decision.label} className="flex min-h-14 items-center justify-between gap-3 border-b border-flow-line px-4 last:border-b-0">
+              <span className="text-base font-bold">{decision.label}</span>
+              <span className="text-base font-extrabold tabular-nums">+{formatCurrency(decision.monthly)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs leading-relaxed text-flow-muted">לפי {snapshot.months} חודשים מלאים בדפי החשבון של מי ששיתף. דפי החשבון עצמם לא שותפו.</p>
     </section>
   );
 }

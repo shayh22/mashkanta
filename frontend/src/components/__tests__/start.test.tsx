@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StartPage } from '../../pages/StartPage';
+import { SharedPage, StartPage } from '../../pages/StartPage';
+import { decodeShared } from '../../engine/flow/share';
 import { DONE, START, useQuestionnaire } from '../../store/questionnaireStore';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
 import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements';
@@ -195,7 +196,9 @@ describe('the questionnaire', () => {
     expect(Number(payment.textContent!.replace(/[^\d]/g, ''))).toBeGreaterThan(3_000);
     expect(screen.getByRole('img', { name: /%/ })).toBeTruthy();
     expect(screen.getByText('סך הכל תשלמו')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    const whatsapp = screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!;
+    expect(whatsapp).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    expect(decodeURIComponent(whatsapp)).toContain(`${window.location.origin}/#/s/`);
     expect(screen.queryByRole('link', { name: 'לתמהיל לדירה' })).toBeNull();
 
     expect(screen.getByRole('heading', { name: 'זה מה שסיפרתם' })).toBeTruthy();
@@ -443,6 +446,15 @@ describe('the questionnaire', () => {
     await user.click(cancel);
     expect(document.getElementById('recovery-result')!.textContent).not.toBe(before);
 
+    // The link carries the month and the decisions, never a business's name or the statements.
+    const shared = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
+    const payload = decodeShared(shared.slice(shared.indexOf('#/s/') + 4).trim())!;
+    expect(payload.recovery!.decisions.map((decision) => decision.label)).not.toContain('לבטל את מה שסימנתם');
+    expect(JSON.stringify(payload)).not.toContain('חנות הדוגמאות');
+    await user.click(cancel);
+    const again = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
+    expect(decodeShared(again.slice(again.indexOf('#/s/') + 4).trim())!.recovery!.decisions.map((decision) => decision.label)).toContain('לבטל את מה שסימנתם');
+
     await user.click(within(result).getByRole('button', { name: 'כל הפרטים' }));
     expect(screen.getByRole('heading', { name: 'פרטי החשבון' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'לאן הולך הכסף, בחודש' })).toBeTruthy();
@@ -457,6 +469,53 @@ describe('the questionnaire', () => {
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'התוצאה שלכם' }));
     await user.click(screen.getByRole('button', { name: 'להעלות את דפי החשבון' }));
     expect(screen.getByRole('heading', { name: 'העלו את דפי העו״ש והאשראי' })).toBeTruthy();
+  });
+
+  it('shares a link that opens the result on its own page, and takes the answers in only when asked', async () => {
+    serve(false);
+    const answers = { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 25_000, hasObligations: 'NO', stability: 'BALANCED' };
+    useQuestionnaire.setState({ goals: ['BUY'], answers, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('החזר חודשי בהתחלה', {}, { timeout: 10_000 });
+    const href = decodeURIComponent(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')!);
+    const link = href.slice(href.indexOf(window.location.origin));
+    cleanup();
+
+    // Someone else, with a questionnaire of their own.
+    useQuestionnaire.setState({ goals: ['RECOVERY'], answers: { hasMortgage: 'NO' }, at: 'worry' });
+    window.history.replaceState(null, '', link.slice(window.location.origin.length + 1));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <SharedPage />
+      </QueryClientProvider>,
+    );
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'תוצאה ששותפה איתכם' }));
+    await screen.findByText('החזר חודשי בהתחלה', {}, { timeout: 10_000 });
+    expect(screen.queryByRole('button', { name: 'כל הפרטים' })).toBeNull();
+    expect(useQuestionnaire.getState().goals).toEqual(['RECOVERY']);
+
+    await user.click(screen.getByRole('button', { name: 'לפתוח את התשובות אצלי ולשנות' }));
+    expect(useQuestionnaire.getState().goals).toEqual(['RECOVERY']);
+    await user.click(screen.getByRole('button', { name: 'כן, לפתוח אצלי' }));
+    expect(useQuestionnaire.getState()).toMatchObject({ goals: ['BUY'], at: DONE, answers });
+    // The visitor's own answer is replaced, not mixed in.
+    expect(useQuestionnaire.getState().answers.hasMortgage).toBeUndefined();
+    expect(window.location.hash).toBe('#/start/done');
+  }, 30_000);
+
+  it('says when a shared link is not one', () => {
+    window.history.replaceState(null, '', '#/s/broken!');
+    const client = new QueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <SharedPage />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('heading', { name: 'הקישור לא תקין' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'שאלון משלי' }).getAttribute('href')).toBe('#/start');
   });
 
   it('offers to pick up where the household stopped, or to start again', async () => {
