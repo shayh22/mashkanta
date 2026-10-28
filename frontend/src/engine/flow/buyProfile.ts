@@ -11,11 +11,13 @@ import type { Answers } from './flow';
 const SEGMENTS: readonly BuyerSegment[] = ['FIRST_HOME', 'UPGRADER', 'INVESTOR'];
 
 /** "Stable or cheap?" as the engine's risk tolerance (1–10) and its split between prime, fixed and variable. */
-const STABILITY: Record<string, Pick<BorrowerProfileRequest, 'riskTolerance' | 'primePreference' | 'stablePreference' | 'dynamicPreference'>> = {
+export const STABILITY: Record<string, Pick<BorrowerProfileRequest, 'riskTolerance' | 'primePreference' | 'stablePreference' | 'dynamicPreference'>> = {
   STABLE: { riskTolerance: 3, primePreference: 0.15, stablePreference: 0.7, dynamicPreference: 0.15 },
   BALANCED: { riskTolerance: 5, primePreference: 0.25, stablePreference: 0.5, dynamicPreference: 0.25 },
   CHEAP: { riskTolerance: 8, primePreference: 0.45, stablePreference: 0.3, dynamicPreference: 0.25 },
 };
+
+export const stabilityOf = (answers: Answers) => STABILITY[answers.stability as string] ?? STABILITY.BALANCED!;
 
 export type BuyPlan =
   /** The equity covers the price: there is no mortgage to price. */
@@ -58,7 +60,7 @@ export function buyPlan(answers: Answers, defaults: BorrowerProfileRequest): Buy
       segment,
       monthlyNetIncome: income,
       existingMonthlyObligations: answers.hasObligations === 'YES' ? (num(answers.obligations) ?? 0) : 0,
-      ...(STABILITY[answers.stability as string] ?? STABILITY.BALANCED),
+      ...stabilityOf(answers),
       // Left to the engine: a share of what the income leaves after the payment.
       volatilityCapacity: 0,
       liquidityEvents: [],

@@ -11,7 +11,7 @@ describe('the questions for the goals chosen', () => {
 
   it('asks the shared sections once when goals are combined, in one order', () => {
     const steps = ids(['RECOVERY', 'REFINANCE'], { mortgageHow: 'UPLOAD', hasLoans: 'YES' });
-    expect(steps).toEqual(['mortgageHow', 'mortgageUpload', 'refinanceGoal', 'statementsUpload', 'worry', 'hasLoans', 'loansUpload']);
+    expect(steps).toEqual(['mortgageHow', 'mortgageUpload', 'homeValue', 'refinanceGoal', 'income', 'stability', 'statementsUpload', 'worry', 'hasLoans', 'loansUpload']);
     expect(new Set(steps).size).toBe(steps.length);
   });
 
@@ -19,6 +19,11 @@ describe('the questions for the goals chosen', () => {
     expect(ids(['RECOVERY'])).toEqual(['hasMortgage', 'statementsUpload', 'worry', 'hasLoans']);
     expect(ids(['RECOVERY'], { hasMortgage: 'YES' })).toContain('mortgageHow');
     expect(ids(['REFINANCE'])).not.toContain('hasMortgage');
+  });
+
+  it('asks a homeowner the home’s value and income for the new mix, and about other loans in their own section', () => {
+    expect(ids(['REFINANCE'], { mortgageHow: 'MANUAL' })).toEqual(['mortgageHow', 'homeValue', 'refinanceGoal', 'income', 'stability', 'hasLoans']);
+    expect(ids(['BUY', 'REFINANCE'], { mortgageHow: 'MANUAL' })).toContain('obligations');
   });
 
   it('asks for a document only when the household said it has one', () => {

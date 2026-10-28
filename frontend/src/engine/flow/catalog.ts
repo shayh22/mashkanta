@@ -19,7 +19,7 @@ export const CATALOG: Catalog = {
   sections: [
     { id: 'mortgage', label: 'המשכנתא שלכם', goals: ['REFINANCE', 'RECOVERY'] },
     { id: 'home', label: 'הדירה', goals: ['BUY'] },
-    { id: 'household', label: 'ההכנסה', goals: ['BUY'] },
+    { id: 'household', label: 'ההכנסה', goals: ['BUY', 'REFINANCE'] },
     { id: 'statements', label: 'החשבון', goals: ['RECOVERY'] },
     { id: 'loans', label: 'הלוואות', goals: ['REFINANCE', 'RECOVERY'] },
   ],
@@ -71,6 +71,14 @@ export const CATALOG: Catalog = {
       help: 'balanceReport',
       fields: [{ id: 'mortgageReport', label: 'דוח יתרות', kind: 'upload', upload: 'mortgage' }],
       when: (answers, goals) => hasMortgage(answers, goals) && answers.mortgageHow === 'UPLOAD',
+    },
+    {
+      id: 'homeValue',
+      section: 'mortgage',
+      title: 'כמה שווה הדירה היום, בערך?',
+      help: 'ltv',
+      fields: [{ id: 'homeValue', label: 'שווי הדירה', kind: 'money', unit: '₪', min: 100_000, max: 30_000_000 }],
+      when: (_answers, goals) => has(goals, 'REFINANCE'),
     },
     {
       id: 'refinanceGoal',
@@ -142,7 +150,7 @@ export const CATALOG: Catalog = {
       ],
     },
 
-    // The household's income, for a buyer
+    // The household's income: for a buyer's affordability, and for a refinance's new mix
     {
       id: 'income',
       section: 'household',
@@ -159,6 +167,8 @@ export const CATALOG: Catalog = {
         { id: 'hasObligations', label: 'יש החזרים חודשיים אחרים?', kind: 'choice', options: yesNo },
         { id: 'obligations', label: 'כמה בחודש, בסך הכל', kind: 'money', unit: '₪', min: 1, max: 200_000, when: (a) => a.hasObligations === 'YES' },
       ],
+      // A homeowner is asked about their other loans in their own section.
+      when: (_answers, goals) => has(goals, 'BUY'),
     },
     {
       id: 'stability',
