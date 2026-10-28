@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { BuyResult } from '../components/flow/BuyResult';
+import { RefinanceResult } from '../components/flow/RefinanceResult';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
@@ -118,29 +119,37 @@ function Results({
   onRestart: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  const buying = goals.includes('BUY');
+  // The goals whose result is worked out here; the others link to their pages for now.
+  const here: Goal[] = goals.filter((goal) => goal === 'BUY' || goal === 'REFINANCE');
+  const any = here.length > 0;
   useEffect(() => {
-    if (buying) {
+    if (any) {
       heading.current?.focus({ preventScroll: true });
     }
-  }, [buying]);
+  }, [any]);
+  const TITLES: Partial<Record<Goal, string>> = { BUY: 'הדירה', REFINANCE: 'המשכנתא' };
   return (
     <div className="flex flex-col gap-8">
-      {buying && (
-        <div className="flex flex-col gap-4">
+      {any && (
+        <div className="flex flex-col gap-6">
           <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
             התוצאה שלכם
           </h2>
-          <BuyResult answers={answers} onEdit={onEdit} />
+          {here.map((goal) => (
+            <div key={goal} className="flex flex-col gap-3">
+              {here.length > 1 && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
+              {goal === 'BUY' ? <BuyResult answers={answers} onEdit={onEdit} /> : <RefinanceResult answers={answers} onEdit={onEdit} />}
+            </div>
+          ))}
         </div>
       )}
       <AnswersSummary
         steps={steps}
         answers={answers}
-        goals={goals.filter((goal) => goal !== 'BUY')}
+        goals={goals.filter((goal) => !here.includes(goal))}
         onEdit={onEdit}
         onRestart={onRestart}
-        focus={!buying}
+        focus={!any}
       />
     </div>
   );

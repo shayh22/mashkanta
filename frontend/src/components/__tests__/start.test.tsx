@@ -88,7 +88,7 @@ describe('the questionnaire', () => {
     expect(useQuestionnaire.getState().answers).toMatchObject({ mortgageBalance: 820_000, mortgagePayment: 5_000, mortgageYears: 'TEN_20' });
 
     await user.click(next());
-    expect(screen.getByRole('heading', { name: 'מה הכי חשוב לכם במיחזור?' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'כמה שווה הדירה היום, בערך?' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'לשאלה הקודמת' }));
     expect(screen.getByRole('heading', { name: 'כמה נשאר לשלם על המשכנתא?' })).toBeTruthy();
     expect((screen.getByLabelText('יתרה לסילוק, בערך') as HTMLInputElement).value).toBe('820,000');
@@ -249,6 +249,84 @@ describe('the questionnaire', () => {
     expect(screen.getByRole('heading', { name: 'אין צורך במשכנתא' })).toBeTruthy();
     expect(screen.getByText(/ונשארים \u200f?200,000/)).toBeTruthy();
   });
+
+  const typedMortgage = {
+    mortgageHow: 'MANUAL',
+    mortgageBalance: 800_000,
+    mortgagePayment: 7_200,
+    mortgageYears: 'TEN_20',
+    homeValue: 2_400_000,
+    refinanceGoal: 'LOWER_PAYMENT',
+    netIncome: 28_000,
+    stability: 'BALANCED',
+    hasLoans: 'NO',
+  };
+
+  it('estimates a refinance from a typed-in mortgage, says it is an estimate, and points to the exact check', async () => {
+    serve(false);
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: typedMortgage, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    const user = userEvent.setup();
+    renderPage();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'התוצאה שלכם' }));
+    await screen.findByText('הערכה ממה שמילאתם', {}, { timeout: 10_000 });
+    expect(screen.getByText('ההחזר החודשי יורד ב-')).toBeTruthy();
+    expect(Number(document.getElementById('refinance-result')!.textContent!.replace(/[^\d]/g, ''))).toBeGreaterThan(0);
+    expect(screen.getByText('הריבית שלכם, בערך')).toBeTruthy();
+    expect(screen.getByRole('img', { name: /^היום .*אחרי/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'כל הפרטים' }).getAttribute('href')).toBe('#/own/result');
+    expect(screen.queryByRole('link', { name: 'לבדיקת המיחזור' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'להעלות את הדוח' }));
+    expect(screen.getByRole('heading', { name: 'כמה נשאר לשלם על המשכנתא?' })).toBeTruthy();
+  }, 20_000);
+
+  it('leads with what is saved over the loan when that is the goal', async () => {
+    serve(false);
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, refinanceGoal: 'LESS_INTEREST' }, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    await screen.findByText('הערכה ממה שמילאתם', {}, { timeout: 10_000 });
+    expect(screen.getByText('חוסכים לאורך כל התקופה')).toBeTruthy();
+  }, 20_000);
+
+  it('says when the typed-in figures cannot be one mortgage', async () => {
+    serve(false);
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, mortgagePayment: 2_000 }, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'ההחזר והיתרה לא מסתדרים' })).toBeTruthy();
+  });
+
+  it('checks the uploaded mortgage exactly — fees, route, payback — with the answers in it', async () => {
+    serve(false);
+    useRefinance.getState().setTracks([
+      { id: 'a', type: 'FIXED_UNLINKED', balance: 500_000, annualRate: 0.068, remainingMonths: 240, monthsElapsed: 60 },
+      { id: 'b', type: 'PRIME', balance: 300_000, annualRate: 0.0625, remainingMonths: 240, monthsElapsed: 60 },
+    ]);
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { mortgageHow: 'UPLOAD', homeValue: 2_400_000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28_000, stability: 'STABLE', hasLoans: 'NO' }, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    await screen.findByText('עלות המעבר, כולל עמלות', {}, { timeout: 10_000 });
+    expect(screen.getByText('הדרך המשתלמת')).toBeTruthy();
+    expect(screen.getByText('מחזיר את עצמו תוך')).toBeTruthy();
+    expect(screen.queryByText('הערכה ממה שמילאתם')).toBeNull();
+    expect(useRefinance.getState().propertyValue).toBe(2_400_000);
+    expect(useConsolidation.getState().netIncome).toBe(28_000);
+  }, 20_000);
+
+  it('shows each result under its own name when there are two', async () => {
+    serve(false);
+    useQuestionnaire.setState({
+      goals: ['REFINANCE', 'BUY'],
+      answers: { ...typedMortgage, propertyValue: 2_000_000, segment: 'UPGRADER', equity: 800_000, hasEligibility: 'NO', hasObligations: 'NO' },
+      at: DONE,
+    });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    await screen.findByText('החזר חודשי בהתחלה', {}, { timeout: 10_000 });
+    expect(screen.getByText('המשכנתא')).toBeTruthy();
+    expect(screen.getByText('הדירה', { selector: 'span' })).toBeTruthy();
+  }, 20_000);
 
   it('links each goal whose result is not here yet to its page', async () => {
     serve(false);
