@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import type { Answers } from '../../engine/flow/flow';
 import type { RefinanceSnapshot } from '../../engine/flow/share';
 import { VERDICT_LABELS } from '../../engine/refinance';
@@ -12,26 +11,9 @@ import { useRefinanceAnswers, useRefinanceEstimate } from './hooks';
  * fee, the switching costs and the better of the two routes. From figures typed in, an estimate —
  * said to be one — with the way to the exact check.
  */
-export function RefinanceResult({
-  answers,
-  onEdit,
-  onDetails,
-  onSnapshot,
-}: {
-  answers: Answers;
-  onEdit: (step: string) => void;
-  onDetails: () => void;
-  /** The exact result's figures, for a shared link: the report itself cannot travel in one. */
-  onSnapshot: (snapshot: RefinanceSnapshot | undefined) => void;
-}) {
+export function RefinanceResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
   const tracks = useRefinance((state) => state.tracks);
-  const exact = !isSampleTracks(tracks);
-  useEffect(() => {
-    if (!exact) {
-      onSnapshot(undefined);
-    }
-  }, [exact, onSnapshot]);
-  return exact ? <Exact answers={answers} onDetails={onDetails} onSnapshot={onSnapshot} /> : <Estimate answers={answers} onEdit={onEdit} onDetails={onDetails} />;
+  return !isSampleTracks(tracks) ? <Exact answers={answers} onDetails={onDetails} /> : <Estimate answers={answers} onEdit={onEdit} onDetails={onDetails} />;
 }
 
 /** A refinance someone shared: its figures as they were, or the estimate worked out again from the answers. */
@@ -127,24 +109,10 @@ function SnapshotView({ answers, snapshot }: { answers: Answers; snapshot: Refin
 }
 
 /** From the uploaded report: the homeowner path's own analysis, with the questionnaire's answers in it. */
-function Exact({ answers, onDetails, onSnapshot }: { answers: Answers; onDetails: () => void; onSnapshot: (snapshot: RefinanceSnapshot) => void }) {
+function Exact({ answers, onDetails }: { answers: Answers; onDetails: () => void }) {
   useRefinanceAnswers(answers);
   const { comparison } = useRefinanceAnalysis();
   const route = comparison ? bestRoute(comparison) : undefined;
-  useEffect(() => {
-    if (comparison && route) {
-      onSnapshot({
-        currentPayment: Math.round(route.currentPayment),
-        proposedPayment: Math.round(route.proposedPayment),
-        monthlySaving: Math.round(route.monthlySaving),
-        lifetimeSaving: Math.round(route.lifetimeSaving),
-        upfrontCost: Math.round(route.upfrontCost),
-        breakevenMonth: route.breakevenMonth,
-        verdict: route.verdict,
-        route: comparison.best,
-      });
-    }
-  }, [comparison, route, onSnapshot]);
   if (!comparison || !route) {
     return null;
   }

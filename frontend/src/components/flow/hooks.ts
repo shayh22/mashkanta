@@ -45,8 +45,11 @@ export function useRefinanceEstimate(answers: Answers) {
 }
 
 /** The answers the homeowner's analysis reads — the home's value, the income, the appetite for risk — entered once. */
-export function useRefinanceAnswers(answers: Answers) {
+export function useRefinanceAnswers(answers: Answers, refinancing = true) {
   useEffect(() => {
+    if (!refinancing) {
+      return;
+    }
     if (typeof answers.homeValue === 'number') {
       useRefinance.getState().setPropertyValue(answers.homeValue);
     }
@@ -57,5 +60,5 @@ export function useRefinanceAnswers(answers: Answers) {
     const wizard = useWizard.getState();
     wizard.setProfile({ riskTolerance: stability.riskTolerance });
     wizard.setPreferences(stability.primePreference, stability.stablePreference, stability.dynamicPreference);
-  }, [answers]);
+  }, [answers, refinancing]);
 }

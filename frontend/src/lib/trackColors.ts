@@ -10,3 +10,13 @@ export const TRACK_COLORS: Record<TrackType, string> = {
   ELIGIBILITY: '#8B5CF6',
 };
 
+
+/** Each track's name, short. */
+export const TRACK_NAMES: Record<TrackType, string> = {
+  PRIME: 'פריים',
+  FIXED_UNLINKED: 'קבועה לא צמודה',
+  FIXED_LINKED: 'קבועה צמודה',
+  VARIABLE_UNLINKED: 'משתנה לא צמודה',
+  VARIABLE_LINKED: 'משתנה צמודה',
+  ELIGIBILITY: 'זכאות',
+};
