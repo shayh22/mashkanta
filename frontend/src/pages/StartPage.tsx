@@ -200,13 +200,9 @@ export function SharedPage() {
   useEffect(() => heading.current?.focus({ preventScroll: true }), []);
   const TITLES: Record<Goal, string> = { BUY: 'הדירה', REFINANCE: 'המשכנתא', RECOVERY: 'החשבון' };
 
+  // In place of the visitor's own answers, as the confirmation says: nothing of theirs mixes in.
   const takeIn = () => {
-    const state = useQuestionnaire.getState();
-    state.setGoals(shared!.goals);
-    for (const [field, value] of Object.entries(shared!.answers)) {
-      state.answer(field, value);
-    }
-    state.go(DONE);
+    useQuestionnaire.setState({ goals: [...shared!.goals], answers: { ...shared!.answers }, at: DONE });
     window.location.hash = '#/start/done';
   };
 
