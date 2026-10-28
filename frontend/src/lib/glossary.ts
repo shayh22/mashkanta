@@ -12,7 +12,7 @@ export interface GlossaryEntry {
   readonly short: string;
   /** Optional second paragraph, shown only in the glossary. */
   readonly more?: string;
-  readonly group: 'tracks' | 'rules' | 'costs' | 'refinance' | 'consolidation' | 'general';
+  readonly group: 'tracks' | 'rules' | 'costs' | 'refinance' | 'consolidation' | 'general' | 'household';
 }
 
 export const GLOSSARY_GROUPS: Record<GlossaryEntry['group'], string> = {
@@ -22,6 +22,7 @@ export const GLOSSARY_GROUPS: Record<GlossaryEntry['group'], string> = {
   refinance: 'מיחזור',
   consolidation: 'איחוד הלוואות',
   general: 'כללי',
+  household: 'משק הבית',
 };
 
 export const GLOSSARY = {
@@ -182,6 +183,51 @@ export const GLOSSARY = {
   relief: {
     term: 'חמצן תזרימי',
     short: 'כמה כסף מתפנה לכם כל חודש אחרי האיחוד.',
+    group: 'consolidation',
+  },
+  balance: {
+    term: 'יתרה לסילוק',
+    short: 'הסכום שהבנק יבקש אם תסגרו את המשכנתא היום.',
+    more: 'מופיעה בדוח היתרות, או באפליקציה של הבנק תחת "משכנתא". אם אין לכם אותה, מספיק סכום בערך.',
+    group: 'refinance',
+  },
+  balanceReport: {
+    term: 'דוח יתרות',
+    short: 'מסמך מהבנק עם כל מסלולי המשכנתא: יתרה, ריבית והחודשים שנותרו בכל אחד.',
+    more: 'מורידים אותו מאתר הבנק או מהאפליקציה, בדרך כלל תחת "משכנתא" ← "מסמכים", כקובץ PDF.',
+    group: 'refinance',
+  },
+  equity: {
+    term: 'הון עצמי',
+    short: 'הכסף שלכם שנכנס לקנייה, בלי ההלוואה: חסכונות, מתנה מהמשפחה, מכירת דירה.',
+    more: 'בדירה ראשונה צריך לפחות 25% ממחיר הדירה, במשפרת 30%, ובדירה להשקעה 50%.',
+    group: 'household',
+  },
+  netIncome: {
+    term: 'הכנסה נטו',
+    short: 'מה שנכנס לחשבון כל חודש, אחרי מס, של כל מי שלוקח את ההלוואה יחד.',
+    group: 'household',
+  },
+  obligations: {
+    term: 'התחייבויות קיימות',
+    short: 'החזרים חודשיים שכבר יש לכם: הלוואות, ליסינג, עסקאות קרדיט. הבנק מוריד אותם מההכנסה.',
+    group: 'household',
+  },
+  overdraft: {
+    term: 'מינוס (משיכת יתר)',
+    short: 'יתרה שלילית בעו״ש. הבנק גובה עליה ריבית גבוהה, בדרך כלל יותר מכל הלוואה.',
+    group: 'household',
+  },
+  statements: {
+    term: 'דפי חשבון',
+    short: 'פירוט התנועות בעו״ש ובכרטיס האשראי, כקובץ Excel או CSV מאתר הבנק וחברת האשראי.',
+    more: 'כדאי שלושה חודשים לפחות. הקבצים נקראים אצלכם במכשיר ולא נשלחים לשום מקום.',
+    group: 'household',
+  },
+  balloon: {
+    term: 'בלון',
+    short: 'הלוואה שבה משלמים כל חודש רק ריבית, ואת הקרן מחזירים בבת אחת בסוף.',
+    more: 'ההחזר החודשי יורד מאוד, אבל העלות הכוללת עולה וצריך תוכנית לסכום שבסוף.',
     group: 'consolidation',
   },
 } as const satisfies Record<string, GlossaryEntry>;

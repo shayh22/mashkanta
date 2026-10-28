@@ -22,7 +22,11 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 /** Every screen of both paths. Each opens every folded section, so all of it is checked. */
-const SCREENS = ['own', 'own-debts', 'own-result', 'buy', 'buy-results', 'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary'];
+const SCREENS = [
+  'own', 'own-debts', 'own-result', 'buy', 'buy-results',
+  'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
+  'start', 'start-question', 'start-help',
+];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
   'money-flow': 'שלב 2: נכנס ויוצא',
@@ -108,6 +112,24 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
       }
       if (screen.startsWith('money')) {
         await page.goto(`${base}/#/money`);
+      }
+      if (screen.startsWith('start')) {
+        await page.goto(`${base}/#/start`);
+        await page.getByRole('heading', { name: 'מה נסדר היום?' }).waitFor();
+      }
+      if (screen === 'start-question' || screen === 'start-help') {
+        // The questionnaire is kept on the device: start it afresh for each screen.
+        if ((await page.getByRole('button', { name: 'להתחיל מחדש' }).count()) > 0) {
+          await page.getByRole('button', { name: 'להתחיל מחדש' }).click();
+        }
+        await page.getByRole('checkbox', { name: /למחזר את המשכנתא/ }).check({ force: true });
+        await page.getByRole('checkbox', { name: /לצאת מהמינוס/ }).check({ force: true });
+        await page.getByRole('button', { name: /בואו נתחיל/ }).click();
+        await page.getByRole('radio', { name: 'אמלא בעצמי, בערך' }).click();
+        if (screen === 'start-help') {
+          await page.getByRole('button', { name: 'הסבר על השאלה' }).click();
+          await page.getByRole('dialog').waitFor();
+        }
       }
       if (MONEY_STEPS[screen]) {
         // The statements live in memory: upload them again if this page has none.
