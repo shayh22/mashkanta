@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react';
 import { LATER, type AnswerValue, type Field } from '../../engine/flow/flow';
 import { useMoney } from '../../store/moneyStore';
-import { DebtImporter } from '../consolidation/DebtImporter';
+import { LoansUpload } from './LoansUpload';
 import { StatementImporter } from '../refinance/StatementImporter';
 
 /**
@@ -176,7 +176,7 @@ function Upload({ field, value, onChange }: { field: Field; value: AnswerValue |
   return (
     <div className="flex flex-col gap-3">
       {field.upload === 'mortgage' && <StatementImporter />}
-      {field.upload === 'loans' && <DebtImporter />}
+      {field.upload === 'loans' && <LoansUpload />}
       {field.upload === 'statements' && <StatementsUpload />}
       {value !== true && (
         <button

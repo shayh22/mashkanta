@@ -79,8 +79,10 @@ describe('importing loans from a document', () => {
     await user.click(within(table).getByRole('checkbox', { name: 'להוסיף את אחרת' }));
     await user.click(screen.getByRole('button', { name: 'הוספה לרשימה' }));
 
+    // Added in place of the illustrative loans, never beside them.
     const debts = useConsolidation.getState().debts;
-    expect(debts).toHaveLength(before + 1);
+    expect(before).toBeGreaterThan(1);
+    expect(debts).toHaveLength(1);
     expect(debts.at(-1)).toMatchObject({ kind: 'CAR', balance: 84_500, annualRate: 0.089, remainingMonths: 41 });
     expect(screen.getByText(/נוספו 1 הלוואות מהמסמך/)).toBeTruthy();
   });
