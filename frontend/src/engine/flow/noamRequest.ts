@@ -79,7 +79,7 @@ export const NOAM_INSTRUCTIONS = `You are נועם (Noam), a warm, plain-spoken 
 Do what the message calls for:
 - Explain the question or a term in it, simply.
 - If they ask what to choose, recommend one option for them, from what they answered, in a sentence.
-- If the message states facts that answer fields of this question, put them in fill: field = the field's id; value = an option's id for a choice, option ids separated by commas for a multi, or a plain number (ILS; monthly when the label says so) for money or a number. Only fields of this question, only facts they stated — never a guess. Leave fill empty otherwise.
+- If the message states facts that answer fields of this question, put them in fill: field = the field's id; value = an option's id for a choice, option ids separated by commas for a multi, or a plain number (ILS; monthly when the label says so) for money or a number. Only fields of this question, only facts they stated — never a guess. Some fields open only after an option of the first field (say, filling in by hand); fill that option too. Leave fill empty otherwise.
 
 reply: one to three short Hebrew sentences, addressing them in the plural (אתם). When you filled answers, say which, so they can confirm. Do not invent figures. Do not recommend specific banks, lenders or products. Never repeat names, identity or account numbers. If the message is not about their money or this questionnaire, say so briefly. Return only the JSON the schema asks for.`;
 
@@ -233,9 +233,10 @@ export function noamRequestFor(
 /**
  * The answers the AI read, as values the screen takes: an option's id (or its words) for a choice,
  * ids for a multi, a number for a figure. Anything that is not a valid answer to a field of this
- * screen is dropped.
+ * screen is dropped. Follow-ups filled without the answer that opens them get it, when exactly one
+ * option of the screen's question opens them all.
  */
-export function fillsFor(step: Step, fill: NoamAnswer['fill']): Record<string, AnswerValue> {
+export function fillsFor(step: Step, fill: NoamAnswer['fill'], answers: Answers = {}): Record<string, AnswerValue> {
   const out: Record<string, AnswerValue> = {};
   for (const { field: id, value } of fill) {
     const field = step.fields.find((each) => each.id === id);
@@ -255,6 +256,14 @@ export function fillsFor(step: Step, fill: NoamAnswer['fill']): Record<string, A
     }
     if (parsed !== undefined && isAnswered(field, parsed)) {
       out[field.id] = parsed;
+    }
+  }
+  const question = step.fields[0];
+  const hidden = (with_: Answers) => Object.keys(out).some((id) => step.fields.find((field) => field.id === id)!.when?.(with_) === false);
+  if (question?.kind === 'choice' && hidden({ ...answers, ...out })) {
+    const opening = question.options!.filter((option) => !hidden({ ...answers, ...out, [question.id]: option.id }));
+    if (opening.length === 1) {
+      out[question.id] = opening[0]!.id;
     }
   }
   return out;

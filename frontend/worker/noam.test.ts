@@ -84,6 +84,13 @@ describe('what נועם fills in', () => {
     expect(fillsFor(mortgage, [{ field: 'mortgageBalance', value: '5' }])).toEqual({});
   });
 
+  it('opens the follow-ups it filled, by the one answer that shows them all', () => {
+    const fills = fillsFor(mortgage, [{ field: 'mortgagePayment', value: '4800' }, { field: 'mortgageBalance', value: '700000' }]);
+    expect(fills).toEqual({ mortgagePayment: 4_800, mortgageBalance: 700_000, mortgageHow: 'MANUAL' });
+    // Already opened: nothing to add.
+    expect(fillsFor(mortgage, [{ field: 'mortgagePayment', value: '4800' }], { mortgageHow: 'MANUAL' })).toEqual({ mortgagePayment: 4_800 });
+  });
+
   it('reads a multi as ids separated by commas, all or none', () => {
     const worry = CATALOG.steps.find((step) => step.id === 'worry')!;
     expect(fillsFor(worry, [{ field: 'worries', value: 'OVERDRAFT, LOANS' }])).toEqual({ worries: ['OVERDRAFT', 'LOANS'] });

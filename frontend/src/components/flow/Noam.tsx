@@ -85,7 +85,7 @@ export function HelpSheet({
     setThinking(true);
     try {
       const reply = await askNoam(noamRequestFor(CATALOG, goals, step, answers, text, history));
-      const fills = fillsFor(step, reply.fill);
+      const fills = fillsFor(step, reply.fill, answers);
       setTurns((all) => [...all, { from: 'noam', text: reply.reply, ...(Object.keys(fills).length > 0 ? { fills } : {}) }]);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'לא התקבלה תשובה. נסו שוב.');
