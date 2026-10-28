@@ -55,6 +55,14 @@ describe('what to do now', () => {
     expect(ids({ goals: ['BUY'], answers: {}, offers: [{ goal: 'REFINANCE', best: 'בנק ב', count: 1 }] })).toEqual([]);
   });
 
+  it('takes the cheapest loan offer, and asks for the market rate when it is well above', () => {
+    expect(tasksFor({ goals: ['RECOVERY'], answers: {}, loanOffer: { best: 'מלווה א', count: 2, rate: 0.12, average: 0.079 } }).map((task) => task.text)).toEqual([
+      'לקחת את ההלוואה ממלווה א, הזולה מבין 2 ההצעות',
+      'לבקש ממלווה א ריבית קרובה לממוצע השוק, 7.9%',
+    ]);
+    expect(ids({ goals: ['RECOVERY'], answers: {}, loanOffer: { best: 'מלווה א', count: 1, rate: 0.08, average: 0.079 } })).toEqual(['loan-offer']);
+  });
+
   it('has nothing for a goal not chosen, or a result not yet worked out', () => {
     expect(ids({ goals: ['BUY'], answers: {}, refinance: { exact: false } })).toEqual([]);
     expect(ids({ goals: ['BUY', 'REFINANCE'], answers: {} })).toEqual([]);
