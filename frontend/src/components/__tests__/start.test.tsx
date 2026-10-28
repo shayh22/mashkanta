@@ -15,7 +15,7 @@ import { scheduleText } from '../../engine/__fixtures__/schedule';
 beforeEach(() => {
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [] });
   useMoney.setState({ files: [], reading: false, pending: 0 });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
@@ -201,6 +201,25 @@ describe('the questionnaire', () => {
     expect(decodeURIComponent(whatsapp)).toContain(`${window.location.origin}/#/s/`);
     expect(screen.queryByRole('link', { name: 'לתמהיל לדירה' })).toBeNull();
 
+    // What to do now: ticked off on the device.
+    const tasks = screen.getByRole('region', { name: 'מה עושים עכשיו' });
+    expect(within(tasks).getByText(/להציג לבנקים את התמהיל: .*%/)).toBeTruthy();
+    expect(within(tasks).queryByText(/הון עצמי/)).toBeNull();
+    const approval = within(tasks).getByRole('checkbox', { name: 'לבקש אישור עקרוני מ-3 בנקים לפחות' }) as HTMLInputElement;
+    const count = within(tasks).getByText(/^נשארו/).textContent;
+    await user.click(approval);
+    expect(approval.checked).toBe(true);
+    expect(useQuestionnaire.getState().done).toContain('buy-approval');
+    expect(within(tasks).getByText(/^נשארו/).textContent).not.toBe(count);
+
+    // The report: the results alone, through the browser's print.
+    const print = vi.fn(() => expect(document.body.dataset.print).toBe('report'));
+    window.print = print;
+    await user.click(screen.getByRole('button', { name: 'דוח PDF' }));
+    expect(print).toHaveBeenCalledOnce();
+    window.dispatchEvent(new Event('afterprint'));
+    expect(document.body.dataset.print).toBeUndefined();
+
     expect(screen.getByRole('heading', { name: 'זה מה שסיפרתם' })).toBeTruthy();
     expect(screen.getByText('2,000,000 ₪')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /כמה עולה הדירה\?/ }));
@@ -286,6 +305,7 @@ describe('the questionnaire', () => {
     expect(screen.getByText('הריבית שלכם, בערך')).toBeTruthy();
     expect(screen.getByRole('img', { name: /^היום .*אחרי/ })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'לבדיקת המיחזור' })).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('להוריד דוח יתרות מאתר הבנק ולהעלות אותו לבדיקה מדויקת')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'כל הפרטים' }));
     expect(screen.getByRole('heading', { name: 'פרטי ההערכה' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'המשכנתא כמו שמילאתם' })).toBeTruthy();
@@ -442,6 +462,7 @@ describe('the questionnaire', () => {
     const result = screen.getByRole('region', { name: 'תוכנית ההבראה' });
     const cancel = within(result).getByRole('checkbox', { name: /לבטל את מה שסימנתם/ }) as HTMLInputElement;
     expect(cancel.checked).toBe(true);
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByRole('checkbox', { name: 'לבטל: חנות הדוגמאות' })).toBeTruthy();
     const before = document.getElementById('recovery-result')!.textContent;
     await user.click(cancel);
     expect(document.getElementById('recovery-result')!.textContent).not.toBe(before);

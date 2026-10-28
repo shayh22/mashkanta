@@ -1,0 +1,93 @@
+import { useMemo } from 'react';
+import type { Answers, Goal } from '../../engine/flow/flow';
+import type { RefinanceSnapshot } from '../../engine/flow/share';
+import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
+import { decisionsOf } from '../../engine/money/decisions';
+import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
+import { useQuestionnaire } from '../../store/questionnaireStore';
+import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
+import { useBuyResult } from './hooks';
+
+/**
+ * What to do now, under the results: the next steps, each ticked off on the device. The charges
+ * marked to cancel are named here — on the device only; a shared link never carries them.
+ */
+export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[]; answers: Answers; refinance?: RefinanceSnapshot }) {
+  const buy = useBuyTasks(goals, answers);
+  const recovery = useRecoveryTasks(goals);
+  const exact = !isSampleTracks(useRefinance((state) => state.tracks));
+  const done = useQuestionnaire((state) => state.done);
+  const toggle = useQuestionnaire((state) => state.toggleDone);
+
+  const tasks = tasksFor({
+    goals,
+    answers,
+    ...(buy ? { buy } : {}),
+    // The exact result's verdict, once it is worked out; without the report, the way to it.
+    ...(!exact ? { refinance: { exact: false } } : refinance ? { refinance: { exact: true, verdict: refinance.verdict, route: refinance.route } } : {}),
+    ...(recovery ? { recovery } : {}),
+  });
+  if (tasks.length === 0) {
+    return null;
+  }
+  const left = tasks.filter((task) => !done.includes(task.id)).length;
+  return (
+    <section aria-labelledby="tasks-title" className="flex flex-col gap-2 rounded-[20px] bg-flow-card p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 id="tasks-title" className="text-base font-extrabold">
+          מה עושים עכשיו
+        </h3>
+        <span className="text-sm text-flow-muted">{left === 0 ? 'הכל בוצע ✓' : `נשארו ${left} מתוך ${tasks.length}`}</span>
+      </div>
+      <ul className="flex flex-col">
+        {tasks.map((task) => {
+          const checked = done.includes(task.id);
+          return (
+            <li key={task.id} className="border-b border-flow-line last:border-b-0">
+              <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-[15px]">
+                <input type="checkbox" checked={checked} onChange={() => toggle(task.id)} className="h-5 w-5 shrink-0 accent-[rgb(var(--flow-strong))]" />
+                <span className={checked ? 'text-flow-muted line-through' : 'font-bold'}>{task.text}</span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function useBuyTasks(goals: readonly Goal[], answers: Answers): TaskInput['buy'] {
+  const { plan, result } = useBuyResult(goals.includes('BUY') ? answers : {});
+  if (!goals.includes('BUY') || plan?.kind !== 'LOAN' || !result.data) {
+    return undefined;
+  }
+  const cheapest = [...result.data.bankQuotes].sort((a, b) => a.rank - b.rank)[0];
+  const mix = result.data.recommended.summary.allocations
+    .filter((track) => track.share > 0.0005)
+    .map((track) => `${track.hebrewName} ${Math.round(track.share * 100)}%`)
+    .join(', ');
+  return { equityShort: plan.equityShort, ...(cheapest ? { cheapestBank: cheapest.hebrewName } : {}), ...(mix ? { mix } : {}) };
+}
+
+function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
+  const picture = useMonthlyPicture();
+  const explanations = useMoneyCategories((state) => state.explanations);
+  return useMemo(() => {
+    if (!goals.includes('RECOVERY')) {
+      return undefined;
+    }
+    if (!picture) {
+      return { hasStatements: false, cancel: [], reduce: [], overdraft: false, fees: false };
+    }
+    const payees = picture.spendingLines.flatMap((line) => line.payees.map((payee) => payee.description));
+    const marked = (flexibility: 'CANCEL' | 'REDUCE') => [...new Set(payees.filter((payee) => explanations[payee]?.flexibility === flexibility))];
+    const decisions = decisionsOf(picture, explanations);
+    return {
+      hasStatements: true,
+      cancel: marked('CANCEL'),
+      reduce: marked('REDUCE'),
+      overdraft: decisions.some((decision) => decision.key === 'overdraft'),
+      fees: decisions.some((decision) => decision.key === 'fees'),
+    };
+  }, [goals, picture, explanations]);
+}

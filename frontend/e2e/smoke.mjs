@@ -114,7 +114,8 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         await page.goto(`${base}/#/money`);
       }
       if (screen === 'start' || screen === 'start-question' || screen === 'start-help') {
-        await page.goto(`${base}/#/start`);
+        // The home page is the questionnaire.
+        await page.goto(screen === 'start' ? `${base}/?home=${Date.now()}` : `${base}/#/start`);
         await page.getByRole('heading', { name: 'מה נסדר היום?' }).waitFor();
       }
       if (screen === 'start-question' || screen === 'start-help') {
@@ -145,6 +146,7 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         );
         await page.goto(`${base}/?fresh=${Date.now()}#/start/done`);
         await page.getByText(screen !== 'start-refinance' ? 'החזר חודשי בהתחלה' : 'הערכה ממה שמילאתם').waitFor({ timeout: 20_000 });
+        await page.getByRole('region', { name: 'מה עושים עכשיו' }).waitFor({ timeout: 20_000 });
         if (screen === 'start-details') {
           await page.getByRole('button', { name: 'כל הפרטים' }).click();
           await page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }).waitFor({ timeout: 20_000 });

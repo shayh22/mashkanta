@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { APP_NAME, Logo } from './components/Logo';
 import { Splash } from './components/Splash';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,6 @@ import { useTheme } from './lib/theme';
 import { useWizard } from './store/wizardStore';
 import { useGlossary } from './store/glossaryStore';
 import { GlossaryPanel, Term } from './components/Glossary';
-import { GLIDE_CLASS, useGlide } from './lib/glide';
 import type { ManualShares } from './engine/manualMix';
 import { useRefinance } from './store/refinanceStore';
 import { useConsolidation } from './store/consolidationStore';
@@ -20,6 +19,8 @@ import { MarketStatus } from './components/MarketStatus';
 import { SinceLastVisit } from './components/SinceLastVisit';
 import { useVisits } from './store/visitStore';
 import { useMarket } from './store/marketStore';
+import { useMoney, useMoneyCategories } from './store/moneyStore';
+import { useQuestionnaire } from './store/questionnaireStore';
 
 // The homeowner's path carries the charting library; loading it on demand keeps it off a visit
 // that only buys.
@@ -28,7 +29,11 @@ const MoneyPage = lazy(() => import('./pages/MoneyPage').then((module) => ({ def
 const StartPage = lazy(() => import('./pages/StartPage').then((module) => ({ default: module.StartPage })));
 const SharedPage = lazy(() => import('./pages/StartPage').then((module) => ({ default: module.SharedPage })));
 
-/** The jobs the platform does. Each is addressable by URL hash so it can be linked to. */
+/**
+ * The questionnaire (`#/start`) is the home page. The full tools behind it — every setting, the
+ * track playground, a bank's offer checked against the market — stay at their own addresses, linked
+ * from the footer as the advanced tools, with the way back to the questionnaire.
+ */
 type Mode = 'own' | 'buy' | 'money' | 'start' | 'shared';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
@@ -49,12 +54,12 @@ function modeFromHash(): Mode {
     window.history.replaceState(null, '', `#/${LEGACY[hash]}`);
     return LEGACY[hash]!;
   }
-  // The questionnaire (`#/start`) has no tab while it is built; it is reached by its address.
   // A shared result (`#/s/<result>`) opens on its own page.
   if (hash === 's') {
     return 'shared';
   }
-  return hash === 'start' ? 'start' : MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'own';
+  // The questionnaire is the home page; the full tools stay at their own addresses.
+  return MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'start';
 }
 
 export default function App() {
@@ -77,13 +82,6 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-
-  const navigate = (next: Mode) => {
-    setMode(next);
-    if (modeFromHash() !== next) {
-      window.history.replaceState(null, '', `#/${next}`);
-    }
-  };
 
   // Live market figures are read on every load; the last good set is cached, so the app starts on
   // it and only the numbers change when the fresh one arrives.
@@ -139,6 +137,9 @@ export default function App() {
     reset();
     useRefinance.getState().reset();
     useConsolidation.getState().reset();
+    useQuestionnaire.getState().reset();
+    useMoney.setState({ files: [], notes: {}, loans: {}, loanLinks: {}, refinance: false });
+    useMoneyCategories.setState({ explanations: {} });
   };
 
   return (
@@ -151,7 +152,7 @@ export default function App() {
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
       <GlossaryPanel />
-      {mode !== 'start' && mode !== 'shared' && <ModeNav mode={mode} onSelect={navigate} />}
+      {mode !== 'start' && mode !== 'shared' && <ToolsBar title={MODES.find((each) => each.id === mode)!.title} />}
       {mode !== 'start' && mode !== 'shared' && <SinceLastVisit />}
 
       <main id="main" className="flex-1 px-4 pb-10 pt-6" tabIndex={-1}>
@@ -279,7 +280,7 @@ export default function App() {
 
 function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
   const ref = useRef<HTMLElement>(null);
-  const brand = useRef<HTMLDivElement>(null);
+  const brand = useRef<HTMLAnchorElement>(null);
   // The opening animation lands on the header's mark; until it does, the header's own stays hidden.
   const [landed, setLanded] = useState(false);
   const onLanded = useCallback(() => setLanded(true), []);
@@ -301,10 +302,10 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
     <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
       <Splash target={brand} onDone={onLanded} />
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
-        <div ref={brand} className={`flex min-w-0 items-center gap-2.5 ${landed ? '' : 'invisible'}`}>
+        <a ref={brand} href="#/start" aria-label={`${APP_NAME} · לדף הבית`} className={`flex min-w-0 items-center gap-2.5 ${landed ? '' : 'invisible'}`}>
           <Logo size={32} />
           <h1 className="truncate text-sm font-semibold text-ink">{APP_NAME}</h1>
-        </div>
+        </a>
         <div className="flex shrink-0 items-center gap-2">
           <MarketStatus />
           <button
@@ -333,63 +334,17 @@ function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleThe
   );
 }
 
-/**
- * The three modes as an ARIA tablist. Arrow keys move between tabs; in a right-to-left layout the
- * left arrow moves forward, which is where the next tab visually is.
- */
-function ModeNav({ mode, onSelect }: { mode: Mode; onSelect: (mode: Mode) => void }) {
-  const { items: refs, style: thumb } = useGlide<HTMLButtonElement>(
-    Math.max(0, MODES.findIndex((item) => item.id === mode)),
-  );
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const step = event.key === 'ArrowLeft' ? 1 : event.key === 'ArrowRight' ? -1 : 0;
-    let target = index + step;
-    if (event.key === 'Home') {
-      target = 0;
-    } else if (event.key === 'End') {
-      target = MODES.length - 1;
-    } else if (step === 0) {
-      return;
-    }
-    event.preventDefault();
-    target = (target + MODES.length) % MODES.length;
-    onSelect(MODES[target]!.id);
-    refs.current[target]?.focus();
-  };
-
+/** Above an advanced tool: which one it is, and the way back to the questionnaire. */
+function ToolsBar({ title }: { title: string }) {
   return (
-    <nav className="no-print px-4 pt-5" aria-label="מצבי עבודה">
-      <div
-        role="tablist"
-        aria-label="מצב עבודה"
-        className="relative mx-auto grid w-full max-w-lg grid-cols-3 gap-1 rounded-xl bg-surface-sunken p-1"
-      >
-        {thumb && <span aria-hidden className={`rounded-lg border border-line bg-surface shadow-card ${GLIDE_CLASS}`} style={thumb} />}
-        {MODES.map((item, index) => {
-          const selected = item.id === mode;
-          return (
-            <button
-              key={item.id}
-              ref={(element) => {
-                refs.current[index] = element;
-              }}
-              id={`tab-${item.id}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`panel-${item.id}`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => onSelect(item.id)}
-              onKeyDown={(event) => onKeyDown(event, index)}
-              className={`relative z-10 rounded-lg px-2 py-2.5 text-sm transition-colors ${
-                selected ? 'font-semibold text-ink' : 'font-medium text-ink-soft hover:text-ink'
-              }`}
-            >
-              {item.title}
-            </button>
-          );
-        })}
+    <nav aria-label="כלים מתקדמים" className="no-print px-4 pt-4">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
+        <span className="text-sm text-ink-soft">
+          כלים מתקדמים · <span className="font-semibold text-ink">{title}</span>
+        </span>
+        <a href="#/start" className="flex min-h-10 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-muted">
+          <span aria-hidden>→</span> חזרה לשאלון
+        </a>
       </div>
     </nav>
   );
@@ -402,6 +357,14 @@ function Footer({ onReset }: { onReset: () => void }) {
         <p className="text-xs text-ink-soft">
           נתוני בנק ישראל · כללי <Term id="directive329">הוראה 329</Term> (1.10.2026) · אינו ייעוץ פיננסי
         </p>
+        <nav aria-label="הכלים המלאים" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="text-ink-soft">כלים מתקדמים:</span>
+          {MODES.map((item) => (
+            <a key={item.id} href={`#/${item.id}`} className="font-medium text-brand-700 hover:underline">
+              {item.title}
+            </a>
+          ))}
+        </nav>
         <button type="button" className="text-xs font-medium text-brand-700" onClick={onReset}>
           איפוס הנתונים
         </button>
