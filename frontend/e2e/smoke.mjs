@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
+  'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -132,18 +132,26 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('dialog').waitFor();
         }
       }
-      if (['start-result', 'start-today-mortgage', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
+      if (['start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
         // Invented answers, straight to a result screen: written while the questionnaire is not
         // open (it would write its own state over them), then read by a fresh load.
-        const refinancing = screen === 'start-refinance' || screen === 'start-today-mortgage';
+        const refinancing = ['start-refinance', 'start-today-mortgage', 'start-improve-loans'].includes(screen);
         const answers = !refinancing
           ? { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' }
           : { mortgageHow: 'MANUAL', mortgageBalance: 800000, mortgagePayment: 7200, mortgageYears: 'TEN_20', homeValue: 2400000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28000, stability: 'BALANCED', hasLoans: 'NO' };
         const at = { 'start-result': 'DONE', 'start-today-mortgage': 'DONE', 'start-compare': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
         await page.goto(`${base}/#/buy`);
+        const loans = screen === 'start-improve-loans';
         await page.evaluate(
-          ({ goals, answers, at }) => localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, answers }, version: 1 })),
-          { goals: [refinancing ? 'REFINANCE' : 'BUY'], answers, at },
+          ({ goals, answers, at, loans }) => {
+            localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, answers: loans ? { ...answers, hasLoans: 'YES' } : answers }, version: 1 }));
+            if (loans) {
+              // An invented loan, as a lender's report would give it.
+              const debts = [{ id: 'e2e', kind: 'CAR', label: 'הלוואת רכב לדוגמה', balance: 60000, annualRate: 0.08, monthlyPayment: 1500, remainingMonths: 48, include: false }];
+              localStorage.setItem('mashkanta:consolidation', JSON.stringify({ state: { debts, netIncome: 28000 }, version: 2 }));
+            }
+          },
+          { goals: [refinancing ? 'REFINANCE' : 'BUY'], answers, at, loans },
         );
         await page.goto(`${base}/?fresh=${Date.now()}#/start/${at === 'DONE' ? 'done' : at}`);
         const ready = {
@@ -152,8 +160,13 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           'start-compare': page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }),
           'start-plan': page.getByRole('region', { name: 'מה עושים עכשיו' }),
           'start-refinance': page.getByText('הערכה ממה שמילאתם'),
+          'start-improve-loans': page.getByRole('radiogroup', { name: 'מה לעשות עם הלוואת רכב לדוגמה' }),
         }[screen] ?? page.getByText('החזר חודשי בהתחלה');
         await ready.waitFor({ timeout: 20_000 });
+        if (loans) {
+          await page.getByRole('radio', { name: /^לפרוס/ }).click();
+          await page.getByRole('checkbox', { name: /הלוואת רכב לדוגמה: פריסה/ }).waitFor();
+        }
         if (screen === 'start-details') {
           await page.getByRole('button', { name: 'כל הפרטים' }).click();
           await page.getByRole('region', { name: 'אם הריבית או המדד יעלו' }).waitFor({ timeout: 20_000 });

@@ -23,6 +23,10 @@ export interface TaskInput {
     readonly reduce: readonly string[];
     readonly overdraft: boolean;
     readonly fees: boolean;
+    /** The loans' moves kept, as the decisions name them. */
+    readonly loanMoves?: readonly { readonly key: string; readonly label: string }[];
+    /** Refinancing the mortgage kept among the decisions, where refinancing is not the goal itself. */
+    readonly mortgage?: boolean;
   };
 }
 
@@ -64,7 +68,8 @@ export function tasksFor(input: TaskInput): Task[] {
     }
   }
 
-  if (goals.includes('RECOVERY') && input.recovery) {
+  // The account and the loans: for a recovery plan, and for any household that added its statements or loans.
+  if (input.recovery) {
     const recovery = input.recovery;
     if (!recovery.hasStatements) {
       add('rec-statements', 'להעלות דפי עו״ש ואשראי של 3 חודשים לפחות');
@@ -80,6 +85,12 @@ export function tasksFor(input: TaskInput): Task[] {
     }
     if (recovery.fees) {
       add('rec-fees', 'לבקש מהבנק מסלול עמלות בסיסי, ולוותר על דמי כרטיס');
+    }
+    for (const move of recovery.loanMoves ?? []) {
+      add(move.key, `לבקש מהמלווה: ${move.label}`);
+    }
+    if (recovery.mortgage && !goals.includes('REFINANCE')) {
+      add('rec-mortgage', 'לבקש הצעת מיחזור למשכנתא, לפי התמהיל החדש');
     }
   }
   return tasks;

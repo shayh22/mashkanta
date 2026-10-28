@@ -41,6 +41,12 @@ describe('what to do now', () => {
     expect(ids({ goals: ['RECOVERY'], answers: {}, recovery: { hasStatements: false, cancel: [], reduce: [], overdraft: false, fees: false } })).toEqual(['rec-statements']);
   });
 
+  it('asks the lender for each loan move kept, and for a refinance kept where it is not the goal', () => {
+    const recovery = { hasStatements: true, cancel: [], reduce: [], overdraft: false, fees: false, loanMoves: [{ key: 'loan:car', label: 'רכב: בלון' }], mortgage: true };
+    expect(tasksFor({ goals: ['BUY'], answers: {}, recovery }).map((task) => task.text)).toEqual(['לבקש מהמלווה: רכב: בלון', 'לבקש הצעת מיחזור למשכנתא, לפי התמהיל החדש']);
+    expect(ids({ goals: ['REFINANCE'], answers: {}, recovery })).toEqual(['loan:car']);
+  });
+
   it('has nothing for a goal not chosen, or a result not yet worked out', () => {
     expect(ids({ goals: ['BUY'], answers: {}, refinance: { exact: false } })).toEqual([]);
     expect(ids({ goals: ['BUY', 'REFINANCE'], answers: {} })).toEqual([]);

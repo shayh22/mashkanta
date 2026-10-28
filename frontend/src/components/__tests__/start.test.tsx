@@ -22,7 +22,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [] });
-  useMoney.setState({ files: [], reading: false, pending: 0 });
+  useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
   useWizard.getState().reset();
@@ -604,6 +604,74 @@ describe('the questionnaire', () => {
     await user.click(decisions().getByRole('button', { name: 'כל הפרטים' }));
     expect(screen.getByRole('heading', { name: 'פרטי החשבון' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'לאן הולך הכסף, בחודש' })).toBeTruthy();
+  }, 30_000);
+
+  it('lets a buyer who added the statements go through the expenses charge by charge, and cancel what can go', async () => {
+    serve(false);
+    if (!Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+        return new Promise<ArrayBuffer>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+    useMoneyCategories.setState({ explanations: {} });
+    await useMoney.getState().addFiles([new File([BANK_CSV], 'bank.csv', { type: 'text/csv' }), cardFile()]);
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED', statementsOffer: 'YES', statementsFiles: true },
+    });
+    openAt(DONE);
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.getByRole('region', { name: 'החשבון' })).toBeTruthy();
+
+    await go('איפה משפרים');
+    const expenses = screen.getByRole('region', { name: 'ההוצאות, חיוב אחר חיוב' });
+    // Open the categories until the café's charge shows.
+    for (const category of within(expenses).getAllByRole('button', { expanded: false })) {
+      await user.click(category);
+      if (within(expenses).queryByRole('radiogroup', { name: 'קפה דוגמה' })) {
+        break;
+      }
+    }
+    await user.click(within(within(expenses).getByRole('radiogroup', { name: 'קפה דוגמה' })).getByRole('radio', { name: 'לבטל' }));
+    expect(useMoneyCategories.getState().explanations['קפה דוגמה']).toMatchObject({ flexibility: 'CANCEL' });
+    const cancel = screen.getByRole('checkbox', { name: /לבטל את מה שסימנתם/ }) as HTMLInputElement;
+    expect(cancel.checked).toBe(true);
+    expect(cancel.closest('label')!.textContent).toContain('150');
+
+    await go('השוואה בין בנקים');
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByRole('checkbox', { name: 'לבטל: קפה דוגמה' })).toBeTruthy();
+  }, 30_000);
+
+  it('prices each loan’s moves, and a move chosen frees its payment, becomes a decision and a task', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [{ id: 'l1', kind: 'CAR', label: 'הלוואה לרכב', balance: 60_000, annualRate: 0.08, monthlyPayment: 1_500, remainingMonths: 48, include: false }],
+    });
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, hasLoans: 'YES' } });
+    openAt('improve');
+    const user = userEvent.setup();
+    renderPage();
+    const moves = screen.getByRole('radiogroup', { name: 'מה לעשות עם הלוואה לרכב' });
+    expect(within(moves).getByRole('radio', { name: /^להשאיר/ }).getAttribute('aria-checked')).toBe('true');
+    const balloon = within(moves).getByRole('radio', { name: /^בלון/ });
+    // Interest only: eight percent of sixty thousand, a twelfth of it a month.
+    expect(balloon.textContent!.replace(/\u200f/g, '')).toContain('400');
+    await user.click(balloon);
+    expect(balloon.getAttribute('aria-checked')).toBe('true');
+    const decision = screen.getByRole('checkbox', { name: /הלוואה לרכב: בלון/ }) as HTMLInputElement;
+    expect(decision.checked).toBe(true);
+    expect(decision.closest('label')!.textContent!.replace(/\u200f/g, '')).toContain('1,100');
+    expect(screen.getByText('ההחלטות מפנות כל חודש')).toBeTruthy();
+
+    await go('השוואה בין בנקים');
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByRole('checkbox', { name: 'לבקש מהמלווה: הלוואה לרכב: בלון' })).toBeTruthy();
   }, 30_000);
 
   it('asks for the statements again on a later visit, since they are never kept', async () => {
