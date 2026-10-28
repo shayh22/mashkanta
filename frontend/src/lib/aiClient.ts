@@ -4,6 +4,7 @@ import { toExplanation, type ExplainRequest, type MixExplanation } from '../engi
 import { toAdvice, type Advice, type AdviceRequest } from '../engine/money/adviceRequest';
 import { toCategories, type AiCategory } from '../engine/money/categorizeRequest';
 import { toConsultAnswer, type ConsultAnswer, type ConsultRequest } from '../engine/money/consultRequest';
+import { toNoamAnswer, type NoamAnswer, type NoamRequest } from '../engine/flow/noamRequest';
 import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
 /** Served by the Worker in production and by a Vite middleware in development. */
@@ -163,6 +164,30 @@ export async function consultStep(request: ConsultRequest): Promise<ConsultAnswe
     );
   }
   const answer = toConsultAnswer(((await response.json()) as { answer?: unknown }).answer);
+  if (!answer) {
+    throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
+  }
+  return answer;
+}
+
+/** נועם's answer to a message on one screen of the questionnaire. */
+export async function askNoam(request: NoamRequest): Promise<NoamAnswer> {
+  const response = await fetch('/api/noam', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 429
+        ? 'הגעתם למכסת השאלות לשעה. נסו שוב מאוחר יותר.'
+        : response.status === 503
+          ? 'נועם לא זמין כרגע.'
+          : `לא התקבלה תשובה (${response.status}). נסו שוב.`,
+    );
+  }
+  const answer = toNoamAnswer(((await response.json()) as { answer?: unknown }).answer);
   if (!answer) {
     throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
   }

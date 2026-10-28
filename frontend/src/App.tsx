@@ -25,9 +25,10 @@ import { useMarket } from './store/marketStore';
 // that only buys.
 const OwnPage = lazy(() => import('./pages/OwnPage').then((module) => ({ default: module.OwnPage })));
 const MoneyPage = lazy(() => import('./pages/MoneyPage').then((module) => ({ default: module.MoneyPage })));
+const StartPage = lazy(() => import('./pages/StartPage').then((module) => ({ default: module.StartPage })));
 
 /** The jobs the platform does. Each is addressable by URL hash so it can be linked to. */
-type Mode = 'own' | 'buy' | 'money';
+type Mode = 'own' | 'buy' | 'money' | 'start';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; title: string }[] = [
@@ -47,7 +48,8 @@ function modeFromHash(): Mode {
     window.history.replaceState(null, '', `#/${LEGACY[hash]}`);
     return LEGACY[hash]!;
   }
-  return MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'own';
+  // The questionnaire (`#/start`) has no tab while it is built; it is reached by its address.
+  return hash === 'start' ? 'start' : MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'own';
 }
 
 export default function App() {
@@ -144,11 +146,11 @@ export default function App() {
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
       <GlossaryPanel />
-      <ModeNav mode={mode} onSelect={navigate} />
-      <SinceLastVisit />
+      {mode !== 'start' && <ModeNav mode={mode} onSelect={navigate} />}
+      {mode !== 'start' && <SinceLastVisit />}
 
       <main id="main" className="flex-1 px-4 pb-10 pt-6" tabIndex={-1}>
-        <div role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`}>
+        <div {...(mode === 'start' ? {} : { role: 'tabpanel', id: `panel-${mode}`, 'aria-labelledby': `tab-${mode}` })}>
           {mode === 'buy' && (
             <div className="space-y-5">
 
@@ -224,6 +226,18 @@ export default function App() {
               }
             >
               <OwnPage />
+            </Suspense>
+          )}
+
+          {mode === 'start' && (
+            <Suspense
+              fallback={
+                <div className="mx-auto w-full max-w-3xl">
+                  <LoadingCard message="טוען…" />
+                </div>
+              }
+            >
+              <StartPage />
             </Suspense>
           )}
 

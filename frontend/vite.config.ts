@@ -6,6 +6,7 @@ import { handleExtract } from './worker/extract';
 import { handleAdvise } from './worker/advise';
 import { handleCategorize } from './worker/categorize';
 import { handleConsult } from './worker/consult';
+import { handleNoam } from './worker/noam';
 import { handlePlan } from './worker/plan';
 import { readMarket } from './worker/market';
 
@@ -41,6 +42,7 @@ function marketApi(): Plugin {
     '/api/categorize': handleCategorize,
     '/api/advise': handleAdvise,
     '/api/consult': handleConsult,
+    '/api/noam': handleNoam,
   };
   const extract: Connect.NextHandleFunction = (request, response, next) => {
     const route = Object.entries(ROUTES).find(([path]) => request.url?.startsWith(path))?.[1];

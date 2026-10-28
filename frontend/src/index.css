@@ -33,6 +33,16 @@
     --chart-1: #0f766e;
     --chart-2: #d97706;
     --chart-3: #6366f1;
+    /* The questionnaire: a mint ground, deep-teal ink and buttons, amber for the one warm accent. */
+    --flow-ground: 242 247 245;
+    --flow-card: 255 255 255;
+    --flow-ink: 10 47 43;
+    --flow-muted: 74 97 93;
+    --flow-line: 213 229 223;
+    --flow-pick: 225 240 234;
+    --flow-strong: 15 95 87;
+    --flow-on-strong: 255 255 255;
+    --flow-accent: 242 184 75;
   }
 
   .dark {
@@ -61,6 +71,15 @@
     --chart-1: #2dd4bf;
     --chart-2: #f59e0b;
     --chart-3: #818cf8;
+    --flow-ground: 8 22 20;
+    --flow-card: 16 36 33;
+    --flow-ink: 226 240 236;
+    --flow-muted: 160 186 180;
+    --flow-line: 38 64 59;
+    --flow-pick: 20 62 56;
+    --flow-strong: 94 220 200;
+    --flow-on-strong: 8 22 20;
+    --flow-accent: 242 184 75;
   }
 
   html {
@@ -197,6 +216,16 @@ input[type='range']::-moz-range-thumb {
     --chart-1: #0f766e;
     --chart-2: #d97706;
     --chart-3: #6366f1;
+    /* The questionnaire: a mint ground, deep-teal ink and buttons, amber for the one warm accent. */
+    --flow-ground: 242 247 245;
+    --flow-card: 255 255 255;
+    --flow-ink: 10 47 43;
+    --flow-muted: 74 97 93;
+    --flow-line: 213 229 223;
+    --flow-pick: 225 240 234;
+    --flow-strong: 15 95 87;
+    --flow-on-strong: 255 255 255;
+    --flow-accent: 242 184 75;
   }
 
   body {

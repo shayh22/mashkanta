@@ -45,6 +45,17 @@ export default {
           800: token('brand-800'),
         },
         'on-brand': token('on-brand'),
+        flow: {
+          ground: token('flow-ground'),
+          card: token('flow-card'),
+          ink: token('flow-ink'),
+          muted: token('flow-muted'),
+          line: token('flow-line'),
+          pick: token('flow-pick'),
+          strong: token('flow-strong'),
+          'on-strong': token('flow-on-strong'),
+          accent: token('flow-accent'),
+        },
       },
       boxShadow: {
         // Quiet surfaces: a hairline does the work, the shadow only lifts a card off the canvas.
