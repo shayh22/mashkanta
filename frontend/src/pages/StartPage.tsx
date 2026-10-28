@@ -4,8 +4,10 @@ import { BuyDetails, RecoveryDetails, RefinanceDetails } from '../components/flo
 import { RecoveryResult, SharedRecovery } from '../components/flow/RecoveryResult';
 import { RefinanceResult, SharedRefinance } from '../components/flow/RefinanceResult';
 import { ShareBar } from '../components/flow/Share';
+import { TasksCard } from '../components/flow/Tasks';
 import { decodeShared, type RecoverySnapshot, type RefinanceSnapshot } from '../engine/flow/share';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
+import { APP_NAME } from '../components/Logo';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { DONE, START, useAnswer, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../store/questionnaireStore';
@@ -123,6 +125,17 @@ export function StartPage() {
   );
 }
 
+/** The results alone, on white paper, through the browser's print — where "save as PDF" is one choice away. */
+function printReport() {
+  document.body.dataset.print = 'report';
+  const done = () => {
+    delete document.body.dataset.print;
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+}
+
 /** After the last question: each goal's result that is ready here, then what was answered. */
 function Results({
   steps,
@@ -156,7 +169,10 @@ function Results({
   return (
     <div className="flex flex-col gap-8">
       {any && (
-        <div className="flex flex-col gap-6">
+        <div className="report flex flex-col gap-6">
+          <p className="hidden text-sm font-bold text-flow-muted print:block">
+            {APP_NAME} · דוח מ-{new Date().toLocaleDateString('he-IL')}
+          </p>
           <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
             התוצאה שלכם
           </h2>
@@ -172,7 +188,13 @@ function Results({
               )}
             </div>
           ))}
-          <ShareBar result={{ goals, answers, ...(refinance ? { refinance } : {}), ...(recovery ? { recovery } : {}) }} />
+          <TasksCard goals={goals} answers={answers} {...(refinance ? { refinance } : {})} />
+          <div className="no-print flex flex-col gap-2.5">
+            <button type="button" onClick={printReport} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+              דוח PDF
+            </button>
+            <ShareBar result={{ goals, answers, ...(refinance ? { refinance } : {}), ...(recovery ? { recovery } : {}) }} />
+          </div>
         </div>
       )}
       <AnswersSummary
