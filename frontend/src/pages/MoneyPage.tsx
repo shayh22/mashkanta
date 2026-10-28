@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { DebtsStep } from '../components/money/Debts';
 import { DocumentsBar, FilesStep } from '../components/money/FilesStep';
 import { FlowStep, SavingsStep, SpendingStep, SummaryStep } from '../components/money/Steps';
@@ -26,16 +27,30 @@ export function MoneyPage() {
   const picture = useMonthlyPicture();
   const current: StepId = ready && picture ? step : 'files';
   const index = STEPS.findIndex((item) => item.id === current);
+  // Moving to a step takes the reader there: the page to its top, and the focus — off a button the
+  // step swap removes — to the step's name, so a keyboard or screen reader starts on the new screen.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const moved = useRef(false);
   const go = (next: StepId) => {
     setStep(next);
+    moved.current = true;
     window.scrollTo({ top: 0 });
   };
+  useEffect(() => {
+    if (moved.current) {
+      moved.current = false;
+      heading.current?.focus({ preventScroll: true });
+    }
+  }, [current]);
   const previous = STEPS[index - 1];
   const next = STEPS[index + 1];
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5">
       <JourneyProgress current={index} ready={ready} onSelect={go} />
+      <h2 ref={heading} tabIndex={-1} className="sr-only">
+        שלב {index + 1} מתוך {STEPS.length}: {STEPS[index]!.label}
+      </h2>
       {current === 'files' || !picture ? (
         <FilesStep onDone={() => go('flow')} />
       ) : (

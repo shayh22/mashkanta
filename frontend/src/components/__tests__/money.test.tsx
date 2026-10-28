@@ -150,6 +150,18 @@ describe('my money, step by step', () => {
     expect(screen.queryByRole('heading', { name: 'היום ואחרי' })).toBeNull();
   });
 
+  it('takes the focus to the new step’s name, off the button the step swap removed', async () => {
+    serve(false);
+    const user = userEvent.setup();
+    renderPage();
+    await upload(user, [bankFile()]);
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'שלב 2 מתוך 6: נכנס ויוצא' }));
+    await next(user);
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'שלב 3 מתוך 6: לאן הולך הכסף' }));
+    await user.click(screen.getByRole('button', { name: 'שלב 6: הסיכום' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'שלב 6 מתוך 6: הסיכום' }));
+  });
+
   it('says what is wrong with a file it cannot read', async () => {
     serve(false);
     const user = userEvent.setup();
