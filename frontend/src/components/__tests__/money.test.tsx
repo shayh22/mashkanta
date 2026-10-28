@@ -30,7 +30,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/money');
-  useMoney.setState({ files: [], reading: false, notes: {}, loans: {}, loanLinks: {}, refinance: false });
+  useMoney.setState({ files: [], reading: false, pending: 0, notes: {}, loans: {}, loanLinks: {}, refinance: false });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
   useMoneyCategories.setState({ explanations: {} });
@@ -344,6 +344,8 @@ describe('my money, step by step', () => {
 
   it('counts a report loan once: linked to its charge, or on its own when paid elsewhere', async () => {
     serve(false);
+    // A pension loan, charged under the insurer.
+    useMoneyCategories.setState({ explanations: { 'חנות הדוגמאות': { category: 'INSURANCE' } } });
     useConsolidation.setState({
       debts: [{ id: 'r1', kind: 'OTHER', label: 'הלוואה מהפנסיה', balance: 20_000, annualRate: 0.05, monthlyPayment: 690, remainingMonths: 30, include: true }],
     });
@@ -352,7 +354,7 @@ describe('my money, step by step', () => {
     await upload(user, [bankFile(), cardFile()]);
     await user.click(screen.getByRole('button', { name: 'שלב 4: הלוואות ומשכנתא' }));
     let cards = [...screen.getByRole('list', { name: 'ההלוואות' }).children] as HTMLElement[];
-    // Found under "other" by its payment: one card, the statements' charge with the report's terms.
+    // Found under insurance by its payment: one card, the statements' charge with the report's terms.
     expect(cards).toHaveLength(1);
     const link = within(cards[0]!).getByRole('combobox', { name: 'איפה ההחזר של הלוואה מהפנסיה בדפי החשבון' }) as HTMLSelectElement;
     expect(link.value).toBe('חנות הדוגמאות');

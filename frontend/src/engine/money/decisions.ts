@@ -1,8 +1,8 @@
 import { CATEGORY_LABELS, type CategoryId } from './categories';
 import type { Explanations } from './explanations';
-import type { MonthlyPicture } from './picture';
+import { OVERDRAFT_INTEREST, type MonthlyPicture, type Payee, type CategoryLine } from './picture';
 import { loanMoves, validTerms, type LoanMoveKind } from './loanMoves';
-import { savingIdeas } from './savings';
+import { savingIdeas, type SavingKind } from './savings';
 
 /**
  * The moves the summary offers to choose from, each with what it frees a month: the savings the
@@ -43,20 +43,23 @@ const shekel = (value: number) => `${Math.round(value).toLocaleString('he-IL')} 
 export const defaultExtendYears = (remainingMonths: number) => Math.min(40, Math.max(1, Math.ceil((remainingMonths * 2) / 12)));
 
 /** A loan's chosen move, priced; undefined while it is kept or its terms are missing. */
-export function loanDecision(payee: string, statedMonthly: number, plan: LoanPlan | undefined): Decision | undefined {
+export function loanDecision(
+  loan: { readonly key: string; readonly name: string; readonly monthly: number },
+  plan: LoanPlan | undefined,
+): Decision | undefined {
   const terms = { balance: plan?.balance, annualRate: plan?.annualRate, remainingMonths: plan?.remainingMonths };
   if (!plan || plan.move === 'KEEP' || !validTerms(terms)) {
     return undefined;
   }
-  const moves = loanMoves(terms, (plan.extendYears ?? defaultExtendYears(terms.remainingMonths)) * 12, statedMonthly);
+  const moves = loanMoves(terms, (plan.extendYears ?? defaultExtendYears(terms.remainingMonths)) * 12, loan.monthly);
   const move = moves[plan.move];
   const freed = moves.KEEP.monthly - move.monthly;
   if (freed < 1) {
     return undefined;
   }
   return {
-    key: `loan:${payee}`,
-    label: `${payee}: ${plan.move === 'BALLOON' ? 'בלון' : `פריסה ל-${Math.round(move.months / 12)} שנים`}`,
+    key: `loan:${loan.key}`,
+    label: `${loan.name}: ${plan.move === 'BALLOON' ? 'בלון' : `פריסה ל-${Math.round(move.months / 12)} שנים`}`,
     monthly: freed,
     source: 'debts',
     note:
@@ -88,33 +91,44 @@ export interface CategoryTarget {
 
 export function decisionsOf(picture: MonthlyPicture, explanations: Explanations, targets: readonly CategoryTarget[] = []): Decision[] {
   const targeted = new Set(targets.map((target) => target.category));
+  const ideas = savingIdeas(picture, explanations);
+  const idea = (kind: SavingKind) => ideas.find((item) => item.kind === kind);
   const decisions: Decision[] = [];
 
+  // Fees and overdraft interest have their own decisions, unless the advisor took the category over.
+  const overdraft = targeted.has('FEES') ? 0 : (idea('OVERDRAFT')?.monthly ?? 0);
+  const isInterest = (line: CategoryLine, payee: Payee) => overdraft >= 1 && line.id === 'FEES' && OVERDRAFT_INTEREST.test(payee.description);
+  const cancelledIn = (line: CategoryLine) =>
+    line.payees
+      .filter((payee) => explanations[payee.description]?.flexibility === 'CANCEL' && !isInterest(line, payee))
+      .reduce((sum, payee) => sum + Math.max(0, payee.monthly), 0);
+
   // What was marked to cancel, outside the categories the advisor took over.
-  let cancel = 0;
-  for (const line of picture.spendingLines) {
-    if (targeted.has(line.id)) {
-      continue;
-    }
-    cancel += line.payees.filter((payee) => explanations[payee.description]?.flexibility === 'CANCEL').reduce((sum, payee) => sum + Math.max(0, payee.monthly), 0);
-  }
+  const cancel = picture.spendingLines.filter((line) => !targeted.has(line.id)).reduce((sum, line) => sum + cancelledIn(line), 0);
   if (cancel >= 1) {
     decisions.push({ key: 'cancel', label: 'לבטל את מה שסימנתם', monthly: cancel, source: 'statements' });
   }
-
-  for (const idea of savingIdeas(picture, explanations)) {
-    if (idea.monthly === undefined || idea.monthly < 1) {
+  if (overdraft >= 1) {
+    decisions.push({ key: 'overdraft', label: 'לצאת מהמינוס (בלי ריבית)', monthly: overdraft, source: 'statements' });
+  }
+  const feesLine = picture.spendingLines.find((line) => line.id === 'FEES');
+  const fees = targeted.has('FEES') || !feesLine
+    ? 0
+    : (idea('FEES')?.items ?? [])
+        .filter((payee) => explanations[payee.description]?.flexibility !== 'CANCEL' && !isInterest(feesLine, payee))
+        .reduce((sum, payee) => sum + payee.monthly, 0);
+  if (fees >= 1) {
+    decisions.push({ key: 'fees', label: 'לבטל עמלות ודמי כרטיס', monthly: fees, source: 'statements' });
+  }
+  // Back to the average, less what is cancelled there anyway; fees are counted above.
+  for (const rising of ideas.filter((item) => item.kind === 'RISING')) {
+    const line = picture.spendingLines.find((l) => rising.title.startsWith(l.label));
+    if (!line || line.id === 'FEES' || targeted.has(line.id)) {
       continue;
     }
-    if (idea.kind === 'OVERDRAFT') {
-      decisions.push({ key: 'overdraft', label: 'לצאת מהמינוס (בלי ריבית)', monthly: idea.monthly, source: 'statements' });
-    } else if (idea.kind === 'FEES' && !targeted.has('FEES')) {
-      decisions.push({ key: 'fees', label: 'לבטל עמלות ודמי כרטיס', monthly: idea.monthly, source: 'statements' });
-    } else if (idea.kind === 'RISING') {
-      const line = picture.spendingLines.find((l) => idea.title.startsWith(l.label));
-      if (line && !targeted.has(line.id)) {
-        decisions.push({ key: `rising:${line.id}`, label: `${line.label}: חזרה לממוצע`, monthly: idea.monthly, source: 'statements' });
-      }
+    const monthly = (rising.monthly ?? 0) - cancelledIn(line);
+    if (monthly >= 1) {
+      decisions.push({ key: `rising:${line.id}`, label: `${line.label}: חזרה לממוצע`, monthly, source: 'statements' });
     }
   }
 

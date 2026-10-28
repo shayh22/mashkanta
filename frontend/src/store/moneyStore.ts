@@ -23,6 +23,26 @@ export interface MoneyFile {
   readonly error?: string;
 }
 
+/** A statement's lines, as one string: the same export uploaded twice, under any name, reads the same. */
+const fingerprintOf = (statement: Statement) =>
+  `${statement.source}\n${statement.transactions.map((t) => `${t.date}|${t.description}|${t.amount}|${t.balance ?? ''}`).join('\n')}`;
+
+/** The newly read files, with any statement already among the uploaded ones marked as such rather than counted twice. */
+export function withoutRepeats(existing: readonly MoneyFile[], read: readonly MoneyFile[]): MoneyFile[] {
+  const seen = new Set(existing.flatMap((file) => (file.statement ? [fingerprintOf(file.statement)] : [])));
+  return read.map((file) => {
+    if (!file.statement) {
+      return file;
+    }
+    const fingerprint = fingerprintOf(file.statement);
+    if (seen.has(fingerprint)) {
+      return { id: file.id, name: file.name, error: 'הקובץ הזה כבר הועלה, ולא נספר פעמיים.' };
+    }
+    seen.add(fingerprint);
+    return file;
+  });
+}
+
 const isZip = (bytes: Uint8Array) => bytes[0] === 0x50 && bytes[1] === 0x4b;
 const isOldExcel = (bytes: Uint8Array) => bytes[0] === 0xd0 && bytes[1] === 0xcf;
 
@@ -45,7 +65,9 @@ export async function readMoneyFile(file: File): Promise<MoneyFile> {
 
 interface MoneyState {
   files: MoneyFile[];
+  /** Whether any upload is still being read; `pending` counts them, so one finishing early does not clear it. */
   reading: boolean;
+  pending: number;
   /** What the household told the AI on each screen; in memory, like the files. */
   notes: Partial<Record<ConsultStep, string>>;
   setNote: (step: ConsultStep, note: string) => void;
@@ -65,6 +87,7 @@ interface MoneyState {
 export const useMoney = create<MoneyState>()((set) => ({
   files: [],
   reading: false,
+  pending: 0,
   notes: {},
   setNote: (step, note) => set((state) => ({ notes: { ...state.notes, [step]: note } })),
   loans: {},
@@ -74,9 +97,9 @@ export const useMoney = create<MoneyState>()((set) => ({
   refinance: false,
   setRefinance: (refinance) => set({ refinance }),
   addFiles: async (files) => {
-    set({ reading: true });
+    set((state) => ({ pending: state.pending + 1, reading: true }));
     const read = await Promise.all(files.map(readMoneyFile));
-    set((state) => ({ files: [...state.files, ...read], reading: false }));
+    set((state) => ({ files: [...state.files, ...withoutRepeats(state.files, read)], pending: state.pending - 1, reading: state.pending > 1 }));
   },
   remove: (id) => set((state) => ({ files: state.files.filter((file) => file.id !== id) })),
 }));
