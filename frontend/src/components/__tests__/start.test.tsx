@@ -8,6 +8,7 @@ import { useMoney } from '../../store/moneyStore';
 import { useRefinance } from '../../store/refinanceStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useWizard } from '../../store/wizardStore';
+import { scheduleText } from '../../engine/__fixtures__/schedule';
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/start');
@@ -218,24 +219,30 @@ describe('the questionnaire', () => {
     expect(screen.getByRole('heading', { name: 'כמה הון עצמי יש לכם?' })).toBeTruthy();
   }, 20_000);
 
-  it('hands the answers to the full mix screen, for every detail and setting', async () => {
+  it('opens the mix’s details in the questionnaire’s own screen, where the term and the risk can be tried', async () => {
     serve(false);
     useQuestionnaire.setState({
       goals: ['BUY'],
-      answers: { propertyValue: 2_000_000, segment: 'UPGRADER', equity: 500_000, hasEligibility: 'NO', netIncome: 25_000, hasObligations: 'YES', obligations: 900, stability: 'STABLE' },
+      answers: { propertyValue: 2_000_000, segment: 'UPGRADER', equity: 600_000, hasEligibility: 'NO', netIncome: 30_000, hasObligations: 'NO', stability: 'BALANCED' },
       at: DONE,
     });
     window.history.replaceState(null, '', '#/start/done');
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'כל הפרטים' }, { timeout: 10_000 }));
-    expect(window.location.hash).toBe('#/buy');
-    // The loan asked for is kept; the wizard shows it within the upgrader's ceiling.
-    expect(useWizard.getState()).toMatchObject({
-      requestedLoanAmount: 1_500_000,
-      profile: { propertyValue: 2_000_000, loanAmount: 1_400_000, monthlyNetIncome: 25_000, existingMonthlyObligations: 900, segment: 'UPGRADER', riskTolerance: 3 },
-    });
-  }, 20_000);
+    expect(window.location.hash).toBe('#/start/details-buy');
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'פרטי התמהיל' }));
+    for (const panel of ['המסלולים', 'אם הריבית או המדד יעלו', 'הבנקים, לתמהיל הזה']) {
+      expect(await screen.findByRole('region', { name: panel }, { timeout: 10_000 })).toBeTruthy();
+    }
+    await user.click(screen.getByRole('radio', { name: '20 שנים' }));
+    expect(useQuestionnaire.getState().answers.termYears).toBe(20);
+    await user.click(screen.getByRole('radio', { name: 'יציבות' }));
+    expect(useQuestionnaire.getState().answers.stability).toBe('STABLE');
+    await user.click(screen.getAllByRole('button', { name: 'חזרה לתוצאה' })[0]!);
+    expect(window.location.hash).toBe('#/start/done');
+    expect(screen.getByRole('heading', { name: 'התוצאה שלכם' })).toBeTruthy();
+  }, 30_000);
 
   it('needs no mortgage when the equity covers the price', async () => {
     serve(false);
@@ -274,8 +281,10 @@ describe('the questionnaire', () => {
     expect(Number(document.getElementById('refinance-result')!.textContent!.replace(/[^\d]/g, ''))).toBeGreaterThan(0);
     expect(screen.getByText('הריבית שלכם, בערך')).toBeTruthy();
     expect(screen.getByRole('img', { name: /^היום .*אחרי/ })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'כל הפרטים' }).getAttribute('href')).toBe('#/own/result');
     expect(screen.queryByRole('link', { name: 'לבדיקת המיחזור' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'כל הפרטים' }));
+    expect(screen.getByRole('heading', { name: 'פרטי ההערכה' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'המשכנתא כמו שמילאתם' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'להעלות את הדוח' }));
     expect(screen.getByRole('heading', { name: 'כמה נשאר לשלם על המשכנתא?' })).toBeTruthy();
   }, 20_000);
@@ -312,6 +321,14 @@ describe('the questionnaire', () => {
     expect(screen.queryByText('הערכה ממה שמילאתם')).toBeNull();
     expect(useRefinance.getState().propertyValue).toBe(2_400_000);
     expect(useConsolidation.getState().netIncome).toBe(28_000);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'כל הפרטים' }));
+    expect(window.location.hash).toBe('#/start/details-refinance');
+    expect(screen.getByRole('region', { name: 'שתי הדרכים' })).toBeTruthy();
+    const today = screen.getByRole('region', { name: 'המסלולים שלכם היום' });
+    expect(within(today).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(screen.getByRole('region', { name: 'מה עולה המעבר' })).getByText('עמלת פירעון מוקדם')).toBeTruthy();
   }, 20_000);
 
   it('shows each result under its own name when there are two', async () => {
@@ -327,6 +344,45 @@ describe('the questionnaire', () => {
     expect(screen.getByText('המשכנתא')).toBeTruthy();
     expect(screen.getByText('הדירה', { selector: 'span' })).toBeTruthy();
   }, 20_000);
+
+  it('lists every loan read, adds each new document to the list, and keeps the same loan once', async () => {
+    serve(false);
+    if (!Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+        return new Promise<ArrayBuffer>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { mortgageHow: 'MANUAL', hasLoans: 'YES' }, at: 'loansUpload' });
+    window.history.replaceState(null, '', '#/start/loansUpload');
+    const user = userEvent.setup();
+    renderPage();
+    const car = new File([scheduleText('bank', 'שיעור ריבית 6%', 80_000)], 'car.txt', { type: 'text/plain' });
+    const renovation = new File([scheduleText('bank', 'שיעור ריבית 6%', 40_000)], 'renovation.txt', { type: 'text/plain' });
+    await user.upload(screen.getByLabelText('בחירת מסמכי הלוואות'), [car, renovation]);
+    const list = await screen.findByRole('region', { name: 'ההלוואות שלכם' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(next().disabled).toBe(false);
+
+    await user.upload(screen.getByLabelText('בחירת מסמכי הלוואות'), car);
+    await screen.findByText('ההלוואה הזו כבר ברשימה');
+    expect(within(screen.getByRole('region', { name: 'ההלוואות שלכם' })).getAllByRole('listitem')).toHaveLength(2);
+
+    await user.click(within(list).getAllByRole('button', { name: /^הסרת/ })[0]!);
+    expect(within(screen.getByRole('region', { name: 'ההלוואות שלכם' })).getAllByRole('listitem')).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'הוספת הלוואה ידנית' }));
+    await user.type(screen.getByLabelText('מה ההלוואה'), 'כרטיס');
+    await user.type(screen.getByLabelText('יתרה ₪'), '12000');
+    await user.type(screen.getByLabelText('החזר בחודש ₪'), '600');
+    await user.click(screen.getByRole('button', { name: 'הוספה' }));
+    const loans = within(screen.getByRole('region', { name: 'ההלוואות שלכם' })).getAllByRole('listitem');
+    expect(loans).toHaveLength(2);
+    expect(useConsolidation.getState().debts.find((debt) => debt.label === 'כרטיס')).toMatchObject({ balance: 12_000, monthlyPayment: 600, remainingMonths: 20 });
+  });
 
   it('links each goal whose result is not here yet to its page', async () => {
     serve(false);

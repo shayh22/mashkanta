@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-refinance',
+  'start', 'start-question', 'start-help', 'start-result', 'start-refinance', 'start-details',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -131,20 +131,24 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('dialog').waitFor();
         }
       }
-      if (screen === 'start-result' || screen === 'start-refinance') {
+      if (screen === 'start-result' || screen === 'start-refinance' || screen === 'start-details') {
         // Invented answers, straight to the result: written while the questionnaire is not open (it
         // would write its own state over them), then read by a fresh load.
         const answers =
-          screen === 'start-result'
+          screen !== 'start-refinance'
             ? { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' }
             : { mortgageHow: 'MANUAL', mortgageBalance: 800000, mortgagePayment: 7200, mortgageYears: 'TEN_20', homeValue: 2400000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28000, stability: 'BALANCED', hasLoans: 'NO' };
         await page.goto(`${base}/#/buy`);
         await page.evaluate(
           ({ goals, answers }) => localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at: 'DONE', answers }, version: 1 })),
-          { goals: [screen === 'start-result' ? 'BUY' : 'REFINANCE'], answers },
+          { goals: [screen !== 'start-refinance' ? 'BUY' : 'REFINANCE'], answers },
         );
         await page.goto(`${base}/?fresh=${Date.now()}#/start/done`);
-        await page.getByText(screen === 'start-result' ? 'החזר חודשי בהתחלה' : 'הערכה ממה שמילאתם').waitFor({ timeout: 20_000 });
+        await page.getByText(screen !== 'start-refinance' ? 'החזר חודשי בהתחלה' : 'הערכה ממה שמילאתם').waitFor({ timeout: 20_000 });
+        if (screen === 'start-details') {
+          await page.getByRole('button', { name: 'כל הפרטים' }).click();
+          await page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }).waitFor({ timeout: 20_000 });
+        }
       }
       if (MONEY_STEPS[screen]) {
         // The statements live in memory: upload them again if this page has none.

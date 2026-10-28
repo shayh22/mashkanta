@@ -1,31 +1,16 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { buyPlan } from '../../engine/flow/buyProfile';
 import type { Answers } from '../../engine/flow/flow';
 import { SEGMENT_MAX_LTV } from '../../engine/regulatory';
-import { optimize } from '../../lib/api';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import type { BorrowerProfileRequest, OptimizationResponse } from '../../lib/types';
-import { useMarket } from '../../store/marketStore';
-import { DEFAULT_PROFILE, useWizard } from '../../store/wizardStore';
 import { TRACK_COLORS } from '../../lib/trackColors';
+import { useBuyResult } from './hooks';
 
 /**
  * The buyer's result, straight from the answers: one number — the first monthly payment — the mix
  * as one bar, the few facts that matter, and what stands in the way when something does.
  */
-export function BuyResult({ answers, onEdit }: { answers: Answers; onEdit: (step: string) => void }) {
-  const macro = useWizard((state) => state.macro);
-  const market = useMarket((state) => state.version);
-  const plan = useMemo(() => buyPlan(answers, DEFAULT_PROFILE), [answers]);
-  const profile = plan?.kind === 'LOAN' ? plan.profile : undefined;
-  const result = useQuery({
-    queryKey: ['flow-buy', profile, macro, market],
-    queryFn: () => optimize(profile!, macro, 0.5),
-    enabled: !!profile,
-    staleTime: Infinity,
-    retry: false,
-  });
+export function BuyResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
+  const { plan, result } = useBuyResult(answers);
 
   if (!plan) {
     return null;
@@ -56,7 +41,7 @@ export function BuyResult({ answers, onEdit }: { answers: Answers; onEdit: (step
           החישוב לא הצליח. {result.error instanceof Error ? result.error.message : ''}
         </p>
       )}
-      {result.data && <Mix data={result.data} profile={plan.profile} needed={plan.needed} equityShort={plan.equityShort} onEdit={onEdit} />}
+      {result.data && <Mix data={result.data} profile={plan.profile} equityShort={plan.equityShort} onEdit={onEdit} onDetails={onDetails} />}
     </section>
   );
 }
@@ -64,15 +49,15 @@ export function BuyResult({ answers, onEdit }: { answers: Answers; onEdit: (step
 function Mix({
   data,
   profile,
-  needed,
   equityShort,
   onEdit,
+  onDetails,
 }: {
   data: OptimizationResponse;
   profile: BorrowerProfileRequest;
-  needed: number;
   equityShort: number;
   onEdit: (step: string) => void;
+  onDetails: () => void;
 }) {
   const mix = data.recommended;
   const { summary, compliance, stress } = mix;
@@ -90,22 +75,6 @@ function Mix({
       ...tracks.map((track) => `${track.hebrewName} ${Math.round(track.share * 100)}%`),
     ].join('\n'),
   );
-
-  const openDetails = () => {
-    const wizard = useWizard.getState();
-    wizard.setSegment(profile.segment);
-    wizard.setProfile({
-      propertyValue: profile.propertyValue,
-      loanAmount: needed,
-      monthlyNetIncome: profile.monthlyNetIncome,
-      existingMonthlyObligations: profile.existingMonthlyObligations,
-      riskTolerance: profile.riskTolerance,
-      eligibilityAmount: profile.eligibilityAmount,
-    });
-    wizard.setPreferences(profile.primePreference, profile.stablePreference, profile.dynamicPreference);
-    wizard.setMixMode('AUTO');
-    window.location.hash = '#/buy';
-  };
 
   return (
     <>
@@ -173,7 +142,7 @@ function Mix({
       </dl>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <button type="button" onClick={openDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+        <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
           כל הפרטים
         </button>
         <a

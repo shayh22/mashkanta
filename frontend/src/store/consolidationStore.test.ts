@@ -27,6 +27,19 @@ describe('consolidation store', () => {
     expect(after.filter((debt) => debt.remainingMonths <= 18).every((debt) => !debt.include)).toBe(true);
   });
 
+  it('adds imported loans in place of the illustrative ones, and keeps the same loan once', () => {
+    const loan = (id: string, balance: number) => ({ id, kind: 'CAR' as const, label: 'רכב', balance, annualRate: 0.07, monthlyPayment: 1_000, remainingMonths: 30, include: true });
+    const { importDebts } = useConsolidation.getState();
+    importDebts([loan('a', 20_000)], false);
+    expect(useConsolidation.getState().debts.map((debt) => debt.id)).toEqual(['a']);
+    importDebts([loan('b', 30_000), loan('c', 20_000)], false);
+    expect(useConsolidation.getState().debts.map((debt) => debt.id)).toEqual(['a', 'b']);
+    importDebts([loan('d', 40_000), loan('e', 40_000)], false);
+    expect(useConsolidation.getState().debts.map((debt) => debt.id)).toEqual(['a', 'b', 'd']);
+    importDebts([loan('f', 50_000)], true);
+    expect(useConsolidation.getState().debts.map((debt) => debt.id)).toEqual(['f']);
+  });
+
   it('keeps the variable part of the mortgage within its balance', () => {
     useConsolidation.getState().setProperty({ mortgageBalance: 100_000 });
     expect(useConsolidation.getState().property.mortgageBalance).toBe(100_000);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { BuyResult } from '../components/flow/BuyResult';
+import { BuyDetails, RefinanceDetails } from '../components/flow/Details';
 import { RefinanceResult } from '../components/flow/RefinanceResult';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { CATALOG } from '../engine/flow/catalog';
@@ -11,6 +12,10 @@ import { DONE, START, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../
  * Each screen has its own address (`#/start/<screen>`), so the browser's Back goes to the previous
  * question; the place is also kept on the device, so a later visit picks up where this one stopped.
  */
+
+/** A result's details, under the questionnaire's own address. */
+const DETAILS_BUY = 'details-buy';
+const DETAILS_REFINANCE = 'details-refinance';
 
 const hashOf = (at: string) => (at === START ? '#/start' : at === DONE ? '#/start/done' : `#/start/${at}`);
 const atOfHash = () => {
@@ -52,7 +57,8 @@ export function StartPage() {
   }, [go]);
 
   // A screen the answers no longer ask, or no goals at all: back to where the questionnaire stands.
-  const known = at === START || at === DONE || steps.some((step) => step.id === at);
+  const details = (at === DETAILS_BUY && goals.includes('BUY')) || (at === DETAILS_REFINANCE && goals.includes('REFINANCE'));
+  const known = at === START || at === DONE || details || steps.some((step) => step.id === at);
   const current = goals.length === 0 ? START : known ? at : (firstOpen(steps, answers) ?? DONE);
   const step = steps.find((each) => each.id === current);
 
@@ -64,13 +70,18 @@ export function StartPage() {
   return (
     <div dir="rtl" className="-mx-4 -mt-6 min-h-[calc(100vh-4rem)] bg-flow-ground px-5 pb-10 pt-5 text-flow-ink">
       <div className="mx-auto w-full max-w-md">
-        {current === START || !step ? (
+        {current === DETAILS_BUY ? (
+          <BuyDetails answers={answers} onAnswer={answer} onBack={() => navigate(DONE)} />
+        ) : current === DETAILS_REFINANCE ? (
+          <RefinanceDetails answers={answers} onEdit={navigate} onBack={() => navigate(DONE)} />
+        ) : current === START || !step ? (
           current === DONE && goals.length > 0 ? (
             <Results
               steps={steps}
               answers={answers}
               goals={goals}
               onEdit={navigate}
+              onDetails={(goal) => navigate(goal === 'BUY' ? DETAILS_BUY : DETAILS_REFINANCE)}
               onRestart={() => {
                 reset();
                 navigate(START);
@@ -110,12 +121,14 @@ function Results({
   answers,
   goals,
   onEdit,
+  onDetails,
   onRestart,
 }: {
   steps: readonly Step[];
   answers: Answers;
   goals: readonly Goal[];
   onEdit: (step: string) => void;
+  onDetails: (goal: Goal) => void;
   onRestart: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -138,7 +151,11 @@ function Results({
           {here.map((goal) => (
             <div key={goal} className="flex flex-col gap-3">
               {here.length > 1 && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
-              {goal === 'BUY' ? <BuyResult answers={answers} onEdit={onEdit} /> : <RefinanceResult answers={answers} onEdit={onEdit} />}
+              {goal === 'BUY' ? (
+                <BuyResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('BUY')} />
+              ) : (
+                <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} />
+              )}
             </div>
           ))}
         </div>
