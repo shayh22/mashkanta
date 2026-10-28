@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-refinance', 'start-details',
+  'start', 'start-question', 'start-help', 'start-result', 'start-refinance', 'start-details', 'start-recovery',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -149,6 +149,20 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('button', { name: 'כל הפרטים' }).click();
           await page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }).waitFor({ timeout: 20_000 });
         }
+      }
+      if (screen === 'start-recovery') {
+        // A recovery plan from the invented statement: uploaded, then the next question.
+        await page.goto(`${base}/#/buy`);
+        await page.evaluate(() =>
+          localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals: ['RECOVERY'], at: 'statementsUpload', answers: { hasMortgage: 'NO' } }, version: 1 })),
+        );
+        await page.goto(`${base}/?fresh=${Date.now()}#/start/statementsUpload`);
+        await page
+          .getByLabel('בחירת קבצי עו״ש או כרטיס אשראי')
+          .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_BANK) });
+        await page.getByText('עו״ש · נקרא').waitFor({ timeout: 15_000 });
+        await page.getByRole('button', { name: 'הבא', exact: true }).click();
+        await page.getByRole('progressbar').waitFor();
       }
       if (MONEY_STEPS[screen]) {
         // The statements live in memory: upload them again if this page has none.

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { BuyResult } from '../components/flow/BuyResult';
-import { BuyDetails, RefinanceDetails } from '../components/flow/Details';
+import { BuyDetails, RecoveryDetails, RefinanceDetails } from '../components/flow/Details';
+import { RecoveryResult } from '../components/flow/RecoveryResult';
 import { RefinanceResult } from '../components/flow/RefinanceResult';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
-import { DONE, START, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../store/questionnaireStore';
+import { DONE, START, useAnswer, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../store/questionnaireStore';
 
 /**
  * The questionnaire, at `#/start`: the goals, then one question a screen, then what was answered.
@@ -16,6 +17,8 @@ import { DONE, START, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../
 /** A result's details, under the questionnaire's own address. */
 const DETAILS_BUY = 'details-buy';
 const DETAILS_REFINANCE = 'details-refinance';
+const DETAILS_RECOVERY = 'details-recovery';
+const DETAILS: Record<Goal, string> = { BUY: DETAILS_BUY, REFINANCE: DETAILS_REFINANCE, RECOVERY: DETAILS_RECOVERY };
 
 const hashOf = (at: string) => (at === START ? '#/start' : at === DONE ? '#/start/done' : `#/start/${at}`);
 const atOfHash = () => {
@@ -24,7 +27,8 @@ const atOfHash = () => {
 };
 
 export function StartPage() {
-  const { goals, at, setGoals, answer, go, reset } = useQuestionnaire();
+  const { goals, at, setGoals, go, reset } = useQuestionnaire();
+  const answer = useAnswer();
   const answers = useFlowAnswers();
   const steps = useFlowSteps(answers);
 
@@ -57,7 +61,7 @@ export function StartPage() {
   }, [go]);
 
   // A screen the answers no longer ask, or no goals at all: back to where the questionnaire stands.
-  const details = (at === DETAILS_BUY && goals.includes('BUY')) || (at === DETAILS_REFINANCE && goals.includes('REFINANCE'));
+  const details = goals.some((goal) => DETAILS[goal] === at);
   const known = at === START || at === DONE || details || steps.some((step) => step.id === at);
   const current = goals.length === 0 ? START : known ? at : (firstOpen(steps, answers) ?? DONE);
   const step = steps.find((each) => each.id === current);
@@ -74,6 +78,8 @@ export function StartPage() {
           <BuyDetails answers={answers} onAnswer={answer} onBack={() => navigate(DONE)} />
         ) : current === DETAILS_REFINANCE ? (
           <RefinanceDetails answers={answers} onEdit={navigate} onBack={() => navigate(DONE)} />
+        ) : current === DETAILS_RECOVERY ? (
+          <RecoveryDetails onBack={() => navigate(DONE)} />
         ) : current === START || !step ? (
           current === DONE && goals.length > 0 ? (
             <Results
@@ -81,7 +87,7 @@ export function StartPage() {
               answers={answers}
               goals={goals}
               onEdit={navigate}
-              onDetails={(goal) => navigate(goal === 'BUY' ? DETAILS_BUY : DETAILS_REFINANCE)}
+              onDetails={(goal) => navigate(DETAILS[goal])}
               onRestart={() => {
                 reset();
                 navigate(START);
@@ -132,15 +138,14 @@ function Results({
   onRestart: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  // The goals whose result is worked out here; the others link to their pages for now.
-  const here: Goal[] = goals.filter((goal) => goal === 'BUY' || goal === 'REFINANCE');
+  const here: Goal[] = [...goals];
   const any = here.length > 0;
   useEffect(() => {
     if (any) {
       heading.current?.focus({ preventScroll: true });
     }
   }, [any]);
-  const TITLES: Partial<Record<Goal, string>> = { BUY: 'הדירה', REFINANCE: 'המשכנתא' };
+  const TITLES: Record<Goal, string> = { BUY: 'הדירה', REFINANCE: 'המשכנתא', RECOVERY: 'החשבון' };
   return (
     <div className="flex flex-col gap-8">
       {any && (
@@ -153,8 +158,10 @@ function Results({
               {here.length > 1 && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
               {goal === 'BUY' ? (
                 <BuyResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('BUY')} />
-              ) : (
+              ) : goal === 'REFINANCE' ? (
                 <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} />
+              ) : (
+                <RecoveryResult onEdit={onEdit} onDetails={() => onDetails('RECOVERY')} hasReview={steps.some((step) => step.id === 'canGo')} />
               )}
             </div>
           ))}

@@ -188,8 +188,18 @@ export function QuestionScreen({
         </button>
       </div>
 
-      <FieldInput field={fields[0]!} value={answers[fields[0]!.id]} onChange={(value) => onAnswer(fields[0]!.id, value)} primary />
-      {fields.length > 1 && (
+      {step.list ? (
+        <ul className="flex flex-col gap-2.5">
+          {fields.map((field) => (
+            <li key={field.id} className="rounded-[20px] bg-flow-card p-4">
+              <FieldInput field={field} value={answers[field.id]} onChange={(value) => onAnswer(field.id, value)} primary={false} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <FieldInput field={fields[0]!} value={answers[fields[0]!.id]} onChange={(value) => onAnswer(fields[0]!.id, value)} primary />
+      )}
+      {!step.list && fields.length > 1 && (
         <div className="flex animate-fade-up flex-col gap-3.5 rounded-[20px] border border-flow-line bg-flow-card p-4">
           {fields.slice(1).map((field) => (
             <FieldInput key={field.id} field={field} value={answers[field.id]} onChange={(value) => onAnswer(field.id, value)} primary={false} />
