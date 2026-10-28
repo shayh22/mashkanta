@@ -6,17 +6,20 @@ constraints a proposal has to satisfy, stress tests it against rate and inflatio
 it against a market baseline built from public Bank of Israel data (the Java service can also blend in
 anonymously contributed offers; the browser app collects nothing).
 
-It has two paths, each two screens and a deep link:
+The app ("מפתח כלכלי") is one questionnaire (`#/start`, the home page): pick any of three goals —
+refinance the mortgage, buy a home, get the account out of the red — answer a question a screen
+(each with a "?" that explains it, and נועם, the AI helper, beside it), and get the result in four
+screens:
 
-| Path | Link | Screens |
-| --- | --- | --- |
-| 🏠 I have a mortgage | `#/own` → `#/own/result` | **My data** — the mortgage (bank statement or by hand), other loans if any, income and risk. **The result** — should I move, the new mix chosen for me, the consolidation loan when there are other loans, then everything else (action plan, editing the mix, fees and breakeven, track by track, consolidation rules and cash flow, switching costs, market) folded away underneath. |
-| 🔑 Buying a home | `#/buy` | The wizard, then the optimal (or hand-built) mix on top of the result with the evidence folded underneath; an offer from a bank can be checked against the market from there. |
+| Screen | What it holds |
+| --- | --- |
+| **המצב היום** — today | The purchase as a split of the price, the mortgage from today to its end, the account month by month and day by day, the loans, and how much of the income goes to repayments. |
+| **איפה משפרים** — improve | The engine's mix (or one built by hand, track by track on a refinance), every charge on the statements marked a must, to cut or to cancel, each loan's moves, folding the loans into the mortgage with the Bank of Israel's tests, נועם's targets, and one list of decisions with before and after. Each has its details, with a what-if on prime and inflation. |
+| **השוואה בין בנקים** — the banks | Every bank for the mix, the real offers and approvals in principle side by side, loan offers against the market and the mortgage, and the rates over time. |
+| **התוכנית** — the plan | Before and after, what to do now (ticked off on the device), a PDF report of every screen, and a link to share the result. |
 
-Refinance alone, or refinance with debt consolidation, follows from the inputs rather than from a
-choice of mode, and the refinance result shows the mix the engine chose for the household by default
-(the same mix re-priced at market, or a quote typed in, are one click away). Old links
-(`#/refinance`, `#/consolidation`, `#/combined`, `#/mortgage`) lead to the path that replaced them.
+Everything stays on the device. Old links (`#/own`, `#/buy`, `#/money`, `#/refinance`,
+`#/consolidation`, `#/combined`, `#/mortgage`) lead to the questionnaire with their goal chosen.
 
 Research behind the new modes — the regulation as read from the circular itself, the fee table, the
 market and competitor survey — is in [docs/MARKET_AND_REGULATION_RESEARCH.md](docs/MARKET_AND_REGULATION_RESEARCH.md).
@@ -263,9 +266,9 @@ exactly which line breaks it — that is the whole point of an independent compa
 Colours are CSS-variable tokens with a separately tuned dark palette; the theme follows the system
 until toggled, is applied before first paint by `public/theme-init.js` (an external script, because
 the CSP forbids inline ones), and printing always uses the light palette. Chart series were checked
-for colour-vision-deficiency separation against both surfaces. The two paths form an ARIA tablist
-with right-to-left arrow-key handling; details sit in disclosure sections that mount their content
-(and the charting library) only when opened, and all open for printing.
+for colour-vision-deficiency separation against both surfaces. Each questionnaire and result screen
+has its own address, so the browser's Back walks them; the charting library loads only with the
+first screen that draws a chart, and the PDF report lays every result screen out before it prints.
 
 **Visual language.** Quiet and monochrome: neutral greys, hairline borders, and one teal accent for the
 primary action and the figures that matter. Buttons have a 2px edge the face sinks into on press;
@@ -428,7 +431,7 @@ where the advisor set a target for a category, its cancellations and return-to-a
 on top.
 
 
-A third path, **"תוכנית הבראה"** — the recovery plan, "oxygen for the cash flow, step by step" (`#/money`) — is for the household rather than the mortgage. The
+The recovery plan, **"תוכנית הבראה"** — "oxygen for the cash flow, step by step" — is for the household rather than the mortgage. The
 borrower uploads the current-account export from their bank and the transaction export from their
 card company (Excel or CSV), and gets one monthly picture: what comes in, what goes out and on what.
 
