@@ -45,7 +45,7 @@ function BankRanking({ title, data }: { title: string; data: OptimizationRespons
           </li>
         ))}
       </ul>
-      <p className="text-xs leading-relaxed text-flow-muted">ריבית משוקללת והחזר ראשון, לפי הריביות שכל בנק דיווח לבנק ישראל. ההצעה בפועל נקבעת מול הבנק.</p>
+      <p className="text-xs leading-relaxed text-flow-muted">הערכה: ריבית ממוצעת שבנק ישראל מפרסם, ועליה הפרש משוער לכל בנק, כי אין נתונים רשמיים לפי בנק. ההצעה בפועל נקבעת מול הבנק, ולכן כדאי להשוות הצעות אמיתיות למטה.</p>
     </Panel>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CATALOG } from '../engine/flow/catalog';
+import type { MortgageOffer } from '../engine/flow/offers';
 import type { Advice } from '../engine/money/adviceRequest';
 import { GOALS, stepsFor, type AnswerValue, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { isSampleDebts, useConsolidation } from './consolidationStore';
@@ -52,6 +53,10 @@ interface QuestionnaireState {
    */
   advice?: { readonly for: string; readonly goal: string; readonly advice: Advice };
   setAdvice: (advice: QuestionnaireState['advice']) => void;
+  /** The offers from the banks, read or typed in: tracks and rates, no names. */
+  offers: MortgageOffer[];
+  addOffer: (offer: MortgageOffer) => void;
+  removeOffer: (id: string) => void;
   reset: () => void;
 }
 
@@ -79,13 +84,16 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       toggleSkipped: (decision) =>
         set((state) => ({ skipped: state.skipped.includes(decision) ? state.skipped.filter((each) => each !== decision) : [...state.skipped, decision] })),
       setAdvice: (advice) => set({ advice }),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined }),
+      offers: [],
+      addOffer: (offer) => set((state) => ({ offers: [...state.offers, offer] })),
+      removeOffer: (id) => set((state) => ({ offers: state.offers.filter((offer) => offer.id !== id) })),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [] }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers }),
     },
   ),
 );

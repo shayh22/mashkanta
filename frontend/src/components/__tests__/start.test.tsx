@@ -21,7 +21,7 @@ beforeEach(() => {
   } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [] });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined });
   useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
@@ -269,6 +269,54 @@ describe('the questionnaire', () => {
     expect(screen.getByText('2,000,000 ₪')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /כמה עולה הדירה\?/ }));
     expect(screen.getByRole('heading', { name: 'כמה עולה הדירה?' })).toBeTruthy();
+  }, 30_000);
+
+  it('puts the banks’ offers side by side — one read from an approval, one typed in — against the calculator’s mix', async () => {
+    serve(false);
+    if (!Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+        return new Promise<ArrayBuffer>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+    useQuestionnaire.setState({
+      offers: [],
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED' },
+    });
+    openAt('compare');
+    const user = userEvent.setup();
+    renderPage();
+    const offers = screen.getByRole('region', { name: 'ההצעות שקיבלתם מהבנקים' });
+
+    // A synthetic approval in principle, as a bank's text.
+    const approval = ['אישור עקרוני אחיד — בנק מזרחי טפחות', 'קבועה לא צמודה 4.65% 700,000 ₪ 25 שנים', 'פריים מינוס 0.5 · 700,000 ₪ · 300 חודשים'].join('\n');
+    await user.upload(within(offers).getByLabelText('בחירת אישור עקרוני'), new File([approval], 'approval.txt', { type: 'text/plain' }));
+    expect(await within(offers).findByText('נקראו 2 מסלולים ממזרחי טפחות.', {}, { timeout: 10_000 })).toBeTruthy();
+
+    await user.click(within(offers).getByRole('button', { name: 'הקלדת הצעה' }));
+    await user.selectOptions(within(offers).getByLabelText('הבנק'), 'בנק לאומי');
+    await user.type(within(offers).getByLabelText('מסלול 1: סכום ₪'), '1400000');
+    await user.type(within(offers).getByLabelText('מסלול 1: ריבית %'), '6.5');
+    await user.click(within(offers).getByRole('button', { name: 'הוספת ההצעה' }));
+
+    const list = await within(offers).findByRole('list', { name: 'ההצעות, מהזולה ליקרה' });
+    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(3), { timeout: 10_000 });
+    const names = within(list).getAllByRole('listitem').map((item) => item.textContent!);
+    // The dear one last, the cheapest of the two offers marked, the calculator's mix among them.
+    expect(names.at(-1)).toContain('בנק לאומי');
+    expect(names.find((name) => name.includes('הזולה'))).toContain('מזרחי טפחות');
+    expect(names.some((name) => name.includes('התמהיל של המחשבון'))).toBe(true);
+    expect(useQuestionnaire.getState().offers.map((offer) => offer.bank)).toEqual(['מזרחי טפחות', 'בנק לאומי']);
+
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('להתקדם עם מזרחי טפחות, הזולה מבין 2 ההצעות, או להציג אותה לבנקים האחרים')).toBeTruthy();
+    await user.click(within(screen.getByRole('navigation', { name: 'שלבי התוצאה' })).getByRole('button', { name: 'השוואה בין בנקים' }));
+    await user.click(screen.getByRole('button', { name: 'הסרת ההצעה של בנק לאומי' }));
+    expect(useQuestionnaire.getState().offers).toHaveLength(1);
   }, 30_000);
 
   it('walks back through the result screens, and from the first to the questions', async () => {
