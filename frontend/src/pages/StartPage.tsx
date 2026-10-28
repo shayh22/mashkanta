@@ -5,12 +5,14 @@ import { RecoveryResult, SharedRecovery } from '../components/flow/RecoveryResul
 import { RefinanceResult, SharedRefinance } from '../components/flow/RefinanceResult';
 import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
+import { SinceLastVisitCard } from '../components/flow/SinceLastVisit';
 import { PlanSummary } from '../components/flow/PlanSummary';
-import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
+import { BuyBanks, RatesOverTime, RefinanceBanks } from '../components/flow/Compare';
 import { MortgageOffers } from '../components/flow/Offers';
 import { LoanOffersPanel } from '../components/flow/LoanOffers';
 import { useImprovement, useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
 import { ExpensesByCategory, LoanMovesPanel, NoamAdvisor } from '../components/flow/Improve';
+import { ConsolidationPanel } from '../components/flow/Consolidation';
 import { useMonthlyPicture } from '../store/moneyStore';
 import { chartsReady } from '../components/flow/chartsLoader';
 import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } from '../components/flow/Today';
@@ -87,7 +89,8 @@ export function StartPage() {
 
   return (
     <div dir="rtl" className="-mx-4 -mt-6 min-h-[calc(100vh-4rem)] bg-flow-ground px-5 pb-10 pt-5 text-flow-ink">
-      <div className="mx-auto w-full max-w-md">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-5">
+        {(current === START || current === DONE) && <SinceLastVisitCard />}
         {current === DETAILS_BUY ? (
           <BuyDetails answers={answers} onAnswer={answer} onBack={() => navigate('improve')} />
         ) : current === DETAILS_REFINANCE ? (
@@ -318,6 +321,7 @@ function ScreenBody({
         {goals.includes('REFINANCE') && <RefinanceBanks answers={answers} />}
         {goals.includes('REFINANCE') && <MortgageOffers goal="REFINANCE" answers={answers} />}
         {(goals.includes('RECOVERY') || answers.hasLoans === 'YES') && <LoanOffersPanel answers={answers} goals={goals} />}
+        {(goals.includes('BUY') || goals.includes('REFINANCE')) && <RatesOverTime />}
       </div>
     );
   }
@@ -355,6 +359,7 @@ function ScreenBody({
           {picture && <ExpensesByCategory picture={picture} />}
           {picture && <NoamAdvisor picture={picture} />}
           <LoanMovesPanel />
+          <ConsolidationPanel answers={answers} goals={goals} />
         </div>
       )}
     </div>

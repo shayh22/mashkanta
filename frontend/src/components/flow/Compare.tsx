@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import type { Answers } from '../../engine/flow/flow';
 import type { RefinanceComparison } from '../../engine/refinance';
 import { VERDICT_LABELS } from '../../engine/refinance';
@@ -6,7 +7,9 @@ import { bestRoute, ROUTE_NAME } from '../../lib/routes';
 import type { OptimizationResponse } from '../../lib/types';
 import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
 import { useBuyResult, useRefinanceEstimate } from './hooks';
+import { loadCharts } from './chartsLoader';
 import { Panel, Rows } from './parts';
+import { useMarket } from '../../store/marketStore';
 
 /**
  * The banks side by side: for the mix the engine chose, what each bank's rates make of it — the
@@ -125,6 +128,45 @@ export function RoutesPanel({ comparison }: { comparison: RefinanceComparison })
         })}
       </div>
       <span className="self-start rounded-full bg-flow-pick px-3 py-1 text-sm font-bold text-flow-strong">{VERDICT_LABELS[route.verdict]}</span>
+    </Panel>
+  );
+}
+
+const RatesTrend = lazy(() => loadCharts().then((module) => ({ default: module.RatesTrendChart })));
+
+/** How the market's rates moved: the Bank of Israel's averages, over the months it has published. */
+export function RatesOverTime() {
+  const history = useMarket((state) => state.market?.history);
+  if (!history || history.length < 3) {
+    return null;
+  }
+  const first = history.find((month) => month.fixedUnlinked !== undefined);
+  const last = [...history].reverse().find((month) => month.fixedUnlinked !== undefined);
+  const moved = first && last ? last.fixedUnlinked! - first.fixedUnlinked! : undefined;
+  return (
+    <Panel title="הריביות לאורך זמן">
+      <Suspense fallback={<div className="h-56" />}>
+        <RatesTrend history={history} />
+      </Suspense>
+      <ul aria-hidden className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        {[
+          ['קבועה לא צמודה', 'var(--chart-1)'],
+          ['קבועה צמודה', 'var(--chart-2)'],
+          ['משתנה צמודה', 'var(--chart-3)'],
+          ['פריים', 'rgb(var(--flow-muted))'],
+        ].map(([label, color]) => (
+          <li key={label} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+            {label}
+          </li>
+        ))}
+      </ul>
+      {moved !== undefined && Math.abs(moved) >= 0.0005 && (
+        <p className="text-[15px] font-bold">
+          הריבית הקבועה הלא צמודה {moved < 0 ? 'ירדה' : 'עלתה'} ב-{formatPercent(Math.abs(moved))} בתקופה הזו.
+        </p>
+      )}
+      <p className="text-xs text-flow-muted">ממוצעי בנק ישראל למשכנתאות חדשות, לפי חודש.</p>
     </Panel>
   );
 }

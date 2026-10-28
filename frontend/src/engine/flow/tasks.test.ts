@@ -45,6 +45,7 @@ describe('what to do now', () => {
     const recovery = { hasStatements: true, cancel: [], reduce: [], overdraft: false, fees: false, loanMoves: [{ key: 'loan:car', label: 'רכב: בלון' }], mortgage: true };
     expect(tasksFor({ goals: ['BUY'], answers: {}, recovery }).map((task) => task.text)).toEqual(['לבקש מהמלווה: רכב: בלון', 'לבקש הצעת מיחזור למשכנתא, לפי התמהיל החדש']);
     expect(ids({ goals: ['REFINANCE'], answers: {}, recovery })).toEqual(['loan:car']);
+    expect(ids({ goals: ['REFINANCE'], answers: {}, recovery: { ...recovery, loanMoves: [], consolidate: true } })).toEqual(['rec-consolidate']);
   });
 
   it('takes the cheapest offer forward, or a single one to the other banks', () => {

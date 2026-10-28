@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import { CATALOG } from '../engine/flow/catalog';
 import type { LoanOffer } from '../engine/flow/loanOffers';
 import type { MortgageOffer } from '../engine/flow/offers';
+import type { ManualShares } from '../engine/manualMix';
 import type { Advice } from '../engine/money/adviceRequest';
 import { GOALS, stepsFor, type AnswerValue, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { isSampleDebts, useConsolidation } from './consolidationStore';
@@ -63,6 +64,12 @@ interface QuestionnaireState {
   addLoanOffer: (offer: LoanOffer) => void;
   removeLoanOffer: (id: string) => void;
   setLoanAmount: (amount: number | undefined) => void;
+  /** A purchase's mix built by hand, share per track; the calculator's while undefined. */
+  manualShares?: ManualShares;
+  setManualShares: (shares: ManualShares | undefined) => void;
+  /** Folding the loans marked into the mortgage, counted among the decisions. */
+  consolidate: boolean;
+  setConsolidate: (consolidate: boolean) => void;
   reset: () => void;
 }
 
@@ -97,13 +104,16 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       addLoanOffer: (offer) => set((state) => ({ loanOffers: [...state.loanOffers, offer] })),
       removeLoanOffer: (id) => set((state) => ({ loanOffers: state.loanOffers.filter((offer) => offer.id !== id) })),
       setLoanAmount: (loanAmount) => set({ loanAmount }),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [], loanOffers: [], loanAmount: undefined }),
+      setManualShares: (manualShares) => set({ manualShares }),
+      consolidate: false,
+      setConsolidate: (consolidate) => set({ consolidate }),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [], loanOffers: [], loanAmount: undefined, manualShares: undefined, consolidate: false }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers, loanOffers: state.loanOffers, loanAmount: state.loanAmount }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers, loanOffers: state.loanOffers, loanAmount: state.loanAmount, manualShares: state.manualShares, consolidate: state.consolidate }),
     },
   ),
 );

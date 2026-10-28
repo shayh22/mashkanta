@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SharedPage, StartPage } from '../../pages/StartPage';
@@ -10,6 +10,7 @@ import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements'
 import { useRefinance } from '../../store/refinanceStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useWizard } from '../../store/wizardStore';
+import { useTrackPlanStore } from '../../store/trackPlanStore';
 import { scheduleText } from '../../engine/__fixtures__/schedule';
 
 beforeEach(() => {
@@ -21,7 +22,8 @@ beforeEach(() => {
   } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined, manualShares: undefined, consolidate: false });
+  useTrackPlanStore.setState({ actions: {}, answer: undefined, goal: '' });
   useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
@@ -398,6 +400,36 @@ describe('the questionnaire', () => {
     expect(screen.getByRole('region', { name: 'ההלוואות: מה אפשר לעשות' }).classList.contains('no-print')).toBe(true);
   });
 
+  it('folds the loans into the mortgage in full — the relief, the cost, the Bank of Israel’s tests — as one decision', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [
+        { id: 'l1', kind: 'CAR', label: 'הלוואה לרכב', balance: 60_000, annualRate: 0.09, monthlyPayment: 1_500, remainingMonths: 48, include: false },
+        { id: 'l2', kind: 'CREDIT_CARD', label: 'כרטיס', balance: 20_000, annualRate: 0.14, monthlyPayment: 950, remainingMonths: 24, include: false },
+      ],
+    });
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, hasLoans: 'YES' }, consolidate: false });
+    openAt('improve');
+    const user = userEvent.setup();
+    renderPage();
+    const panel = await screen.findByRole('region', { name: 'לאחד את ההלוואות לתוך המשכנתא' });
+    // The home and the mortgage, as the questionnaire has them.
+    expect(useConsolidation.getState().property).toMatchObject({ value: 2_400_000, mortgageBalance: 800_000 });
+    await user.click(within(panel).getByRole('checkbox', { name: /הלוואה לרכב/ }));
+    await user.click(within(panel).getByRole('checkbox', { name: /כרטיס/ }));
+    expect(within(panel).getByText('אחרי האיחוד')).toBeTruthy();
+    expect(within(within(panel).getByRole('region', { name: 'כללי בנק ישראל' })).getByRole('status').textContent).toMatch(/כללי בנק ישראל|40%/);
+    const relief = Number(within(panel).getByText('פנוי כל חודש').nextSibling!.textContent!.replace(/[^\d]/g, ''));
+    expect(relief).toBeGreaterThan(0);
+
+    await user.click(within(panel).getByRole('checkbox', { name: 'לכלול את האיחוד בהחלטות' }));
+    const decision = screen.getByRole('checkbox', { name: /^לאחד את ההלוואות לתוך המשכנתא/ }) as HTMLInputElement;
+    expect(decision.checked).toBe(true);
+    await go('השוואה בין בנקים');
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('לבקש מהבנק הלוואה לכל מטרה בשעבוד הדירה, לאיחוד ההלוואות שסימנתם')).toBeTruthy();
+  }, 30_000);
+
   it('walks back through the result screens, and from the first to the questions', async () => {
     serve(false);
     useQuestionnaire.setState({
@@ -444,6 +476,24 @@ describe('the questionnaire', () => {
     for (const panel of ['המסלולים', 'אם הריבית או המדד יעלו']) {
       expect(await screen.findByRole('region', { name: panel }, { timeout: 10_000 })).toBeTruthy();
     }
+    // A mix of their own, from a preset: the result follows it.
+    await user.click(screen.getByRole('radio', { name: 'לבנות בעצמי' }));
+    // With prime in the mix, what if prime rose three points a year from now: a dearer payment then.
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'המסלולים' })).getByText(/פריים/)).toBeTruthy(), { timeout: 10_000 });
+    const whatIf = screen.getByRole('region', { name: 'מה אם' });
+    const then = () => within(whatIf).getByText('ההחזר בעוד שנה').nextSibling!.textContent!;
+    fireEvent.change(within(whatIf).getByLabelText('כמה הפריים עולה'), { target: { value: '0' } });
+    expect(then()).toContain('בלי שינוי');
+    fireEvent.change(within(whatIf).getByLabelText('כמה הפריים עולה'), { target: { value: '0.03' } });
+    expect(then()).toMatch(/\(\+/);
+    await user.click(screen.getByRole('button', { name: 'הכל בקבועה לא צמודה' }));
+    expect(useQuestionnaire.getState().manualShares).toEqual({ FIXED_UNLINKED: 1 });
+    expect(screen.getByText(/^עומד בכללי בנק ישראל/)).toBeTruthy();
+    await user.clear(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'));
+    await user.type(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'), '90');
+    expect(screen.getByRole('alert').textContent).toContain('90%');
+    await user.clear(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'));
+    await user.type(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'), '100');
     await user.click(screen.getByRole('radio', { name: '20 שנים' }));
     expect(useQuestionnaire.getState().answers.termYears).toBe(20);
     await user.click(screen.getByRole('radio', { name: 'יציבות' }));
@@ -451,6 +501,8 @@ describe('the questionnaire', () => {
     await user.click(screen.getAllByRole('button', { name: 'חזרה לתוצאה' })[0]!);
     expect(window.location.hash).toBe('#/start/improve');
     expect(screen.getByRole('heading', { name: 'איפה משפרים' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'התמהיל שלכם' }, { timeout: 10_000 })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'קבועה לא צמודה (קל"צ) 100%' })).toBeTruthy();
   }, 30_000);
 
   it('needs no mortgage when the equity covers the price, and has no banks to compare', async () => {
@@ -571,6 +623,14 @@ describe('the questionnaire', () => {
     expect(window.location.hash).toBe('#/start/details-refinance');
     expect(within(screen.getByRole('region', { name: 'המסלולים שלכם היום' })).getAllByRole('listitem')).toHaveLength(2);
     expect(within(screen.getByRole('region', { name: 'מה עולה המעבר' })).getByText('עמלת פירעון מוקדם')).toBeTruthy();
+
+    // Track by track: put savings into the prime track, priced beside refinancing it all.
+    const byTrack = screen.getByRole('region', { name: 'מסלול אחר מסלול' });
+    await user.click(within(within(byTrack).getByRole('radiogroup', { name: 'מה לעשות במסלול פריים' })).getByRole('radio', { name: 'לפרוע חלק' }));
+    const effect = within(byTrack).getByRole('region', { name: 'מה התוכנית עושה' });
+    expect(within(effect).getByText('החזר בחודש')).toBeTruthy();
+    expect(within(effect).getByText(/מיחזור של הכל|על מיחזור של הכל/)).toBeTruthy();
+    await user.click(within(byTrack).getByRole('button', { name: 'חזרה להמלצה לכל מסלול' }));
   }, 30_000);
 
   it('shows each result under its own name when there are two', async () => {
