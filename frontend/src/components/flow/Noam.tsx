@@ -1,18 +1,38 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { CATALOG } from '../../engine/flow/catalog';
 import type { AnswerValue, Answers, Goal, Step } from '../../engine/flow/flow';
 import { answerText, fillsFor, glossaryAnswer, MAX_MESSAGE_LENGTH, noamRequestFor } from '../../engine/flow/noamRequest';
 import { askNoam, useAiEnabled } from '../../lib/aiClient';
 import { GLOSSARY, type TermId } from '../../lib/glossary';
 
-/** נועם's face: drawn, not a photo of anyone. */
+/** נועם: a drawn adviser in a jacket and tie — a person, not a photo of anyone. */
 export function NoamAvatar({ size = 40 }: { size?: number }) {
+  const clip = useId();
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden focusable="false" className="shrink-0">
-      <circle cx="20" cy="20" r="20" fill="#0F5F57" />
-      <circle cx="14.5" cy="17" r="2.2" fill="#fff" />
-      <circle cx="25.5" cy="17" r="2.2" fill="#fff" />
-      <path d="M13 24c2 3.5 12 3.5 14 0" stroke="#F2B84B" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden focusable="false" className="shrink-0">
+      <defs>
+        <clipPath id={clip}>
+          <circle cx="32" cy="32" r="32" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect width="64" height="64" fill="#DCEBE5" />
+        <g transform="translate(-4.8 -5.2) scale(1.15)">
+          <path d="M8 66c0-13 10-20 24-20s24 7 24 20z" fill="#0A2F2B" />
+          <path d="M25.5 46.5 32 56l6.5-9.5c-2-.7-4.2-1-6.5-1s-4.5.3-6.5 1z" fill="#fff" />
+          <path d="M31 50.5h2l1 7.5-2 2.2-2-2.2z" fill="#0F5F57" />
+          <path d="M27.5 37h9v9.5c-1.3 1.2-2.8 1.8-4.5 1.8s-3.2-.6-4.5-1.8z" fill="#DFA982" />
+          <ellipse cx="19.8" cy="29" rx="2.4" ry="3.4" fill="#EDBE9A" />
+          <ellipse cx="44.2" cy="29" rx="2.4" ry="3.4" fill="#EDBE9A" />
+          <ellipse cx="32" cy="28" rx="12" ry="13.6" fill="#F3CBA8" />
+          <path d="M20 27C19 15.5 25 10 32.5 10S45.5 15 44.2 27C43 21.5 40.5 18.6 36 18c-5-.6-9 1.5-12.5.6-1.9 2-3.1 4.8-3.5 8.4z" fill="#3A2A21" />
+          <path d="M24.8 24.6c1.4-.9 3.2-1.1 4.8-.6M34.4 24c1.6-.5 3.4-.3 4.8.6" stroke="#3A2A21" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <circle cx="27.6" cy="28.4" r="1.35" fill="#2A1F19" />
+          <circle cx="36.4" cy="28.4" r="1.35" fill="#2A1F19" />
+          <path d="M32 30v3.4l-1.3.5" stroke="#D6A07C" strokeWidth="1.1" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M29.2 36.3c1.8 1 3.8 1 5.6 0" stroke="#A85A44" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+        </g>
+      </g>
     </svg>
   );
 }
@@ -118,7 +138,7 @@ export function HelpSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" dir="rtl">
-      <button type="button" aria-label="סגירת ההסבר" tabIndex={-1} className="absolute inset-0 cursor-default bg-flow-ink/45" onClick={onClose} />
+      <button type="button" aria-label="סגירת ההסבר" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/45" onClick={onClose} />
       <section
         role="dialog"
         aria-modal="true"
@@ -200,7 +220,7 @@ export function HelpSheet({
           </p>
         )}
 
-        <form onSubmit={submit} className="flex min-h-[52px] items-center gap-2 rounded-full border border-flow-line bg-flow-card ps-4 pe-1.5">
+        <form onSubmit={submit} className="flex min-h-[52px] items-center gap-2 rounded-full border-2 border-flow-line bg-flow-card ps-4 pe-1.5 focus-within:border-flow-strong">
           <label htmlFor="noam-message" className="sr-only">
             שאלה לנועם
           </label>
@@ -212,7 +232,7 @@ export function HelpSheet({
             onChange={(event) => setMessage(event.target.value)}
             placeholder={'כתבו לנועם… למשל "משלמים 4,800 בחודש"'}
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-base text-flow-ink outline-none placeholder:text-flow-muted"
+            className="min-w-0 flex-1 bg-transparent text-base text-flow-ink outline-none focus-visible:ring-0 placeholder:text-flow-muted"
           />
           <button
             type="submit"
