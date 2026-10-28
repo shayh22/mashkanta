@@ -169,22 +169,52 @@ export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; on
 }
 
 /** A homeowner's refinance: both routes, each track today, the new mix and what the switch costs. */
-export function RefinanceDetails({ answers, onEdit, onBack }: { answers: Answers; onEdit: (step: string) => void; onBack: () => void }) {
+export function RefinanceDetails({
+  answers,
+  onAnswer,
+  onEdit,
+  onBack,
+}: {
+  answers: Answers;
+  onAnswer: (field: string, value: AnswerValue) => void;
+  onEdit: (step: string) => void;
+  onBack: () => void;
+}) {
   const tracks = useRefinance((state) => state.tracks);
+  const tryOther = <StabilityPanel answers={answers} onAnswer={onAnswer} />;
   return isSampleTracks(tracks) ? (
-    <EstimateDetails answers={answers} onEdit={onEdit} onBack={onBack} />
+    <EstimateDetails answers={answers} onEdit={onEdit} onBack={onBack} tryOther={tryOther} />
   ) : (
-    <ExactDetails answers={answers} onBack={onBack} />
+    <ExactDetails answers={answers} onBack={onBack} tryOther={tryOther} />
   );
 }
 
-function ExactDetails({ answers, onBack }: { answers: Answers; onBack: () => void }) {
+/** The appetite for risk, tried right here: the new mix is worked out again for it. */
+function StabilityPanel({ answers, onAnswer }: { answers: Answers; onAnswer: (field: string, value: AnswerValue) => void }) {
+  return (
+    <Panel title="לנסות אחרת">
+      <Pills
+        label="מה חשוב לכם"
+        value={(answers.stability as string) ?? 'BALANCED'}
+        options={[
+          { id: 'STABLE', label: 'יציבות' },
+          { id: 'BALANCED', label: 'איזון' },
+          { id: 'CHEAP', label: 'הכי זול' },
+        ]}
+        onPick={(stability) => onAnswer('stability', stability)}
+      />
+    </Panel>
+  );
+}
+
+function ExactDetails({ answers, onBack, tryOther }: { answers: Answers; onBack: () => void; tryOther: ReactNode }) {
   useRefinanceAnswers(answers);
   const tracks = useRefinance((state) => state.tracks);
   const { comparison, perTrack, proposal } = useRefinanceAnalysis();
   const route = comparison ? bestRoute(comparison) : undefined;
   return (
     <Shell title="פרטי המיחזור" onBack={onBack}>
+      {tryOther}
       {comparison && route && (
         <>
           <RoutesPanel comparison={comparison} />
@@ -253,11 +283,12 @@ function ExactDetails({ answers, onBack }: { answers: Answers; onBack: () => voi
   );
 }
 
-function EstimateDetails({ answers, onEdit, onBack }: { answers: Answers; onEdit: (step: string) => void; onBack: () => void }) {
+function EstimateDetails({ answers, onEdit, onBack, tryOther }: { answers: Answers; onEdit: (step: string) => void; onBack: () => void; tryOther: ReactNode }) {
   const { estimate, result } = useRefinanceEstimate(answers);
   const proposed = result.data?.recommended.summary;
   return (
     <Shell title="פרטי ההערכה" onBack={onBack}>
+      {tryOther}
       {estimate?.kind === 'ESTIMATE' && proposed && (
         <>
           <Panel title="המשכנתא כמו שמילאתם">

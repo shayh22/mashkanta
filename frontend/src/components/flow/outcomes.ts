@@ -6,7 +6,9 @@ import { existingSpecs } from '../../engine/refinance';
 import { trackFromRate } from '../../engine/tracks';
 import { scenarioOf } from '../../lib/api';
 import type { RecoverySnapshot, RefinanceSnapshot } from '../../engine/flow/share';
-import { decisionsOf, freedBy, loanDecision, mortgageDecision, type Decision } from '../../engine/money/decisions';
+import { adviceRequestOf, type AdviceRequest } from '../../engine/money/adviceRequest';
+import { decisionsOf, freedBy, loanDecision, mortgageDecision, type CategoryTarget, type Decision } from '../../engine/money/decisions';
+import type { MonthlyPicture } from '../../engine/money/picture';
 import { bestRoute } from '../../lib/routes';
 import { planOf, useJourneyLoans } from '../../store/journeyLoans';
 import { useMoney, useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
@@ -36,20 +38,43 @@ export function useImprovement() {
   const { route } = useMortgageMove();
   const skipped = useQuestionnaire((state) => state.skipped);
   const toggle = useQuestionnaire((state) => state.toggleSkipped);
+  const targets = useAdviceTargets(picture);
   const decisions = useMemo(
     () =>
       [
         ...(route ? [mortgageDecision(route)] : []),
         ...loans.map((loan) => loanDecision(loan, planOf(loan, plans))),
-        ...(picture ? decisionsOf(picture, explanations) : []),
+        ...(picture ? decisionsOf(picture, explanations, targets) : []),
       ].filter((decision): decision is Decision => !!decision),
-    [route, loans, plans, picture, explanations],
+    [route, loans, plans, picture, explanations, targets],
   );
   const chosen = useMemo(() => new Set(decisions.map((decision) => decision.key).filter((key) => !skipped.includes(key))), [decisions, skipped]);
   const freed = freedBy(decisions, chosen);
   const today = picture ? picture.income - picture.spending : 0;
   const after = today + freed;
   return { picture, explanations, loans, decisions, chosen, freed, today, after, toggle };
+}
+
+/** The totals נועם is asked about, as a key: a plan made for other totals is set aside. */
+export const adviceKey = (request: AdviceRequest) => JSON.stringify({ ...request, goal: '', notes: [] });
+
+/** נועם's category targets, each against what is spent there now; none once the statements changed. */
+export function useAdviceTargets(picture: MonthlyPicture | undefined): CategoryTarget[] {
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const advice = useQuestionnaire((state) => state.advice);
+  return useMemo(() => {
+    if (!picture || !advice) {
+      return [];
+    }
+    const request = adviceRequestOf(picture, '', explanations);
+    if (adviceKey(request) !== advice.for) {
+      return [];
+    }
+    const spent = new Map(request.categories.map((category) => [category.id as string, category.monthly]));
+    // One target per category: the last word on it counts.
+    const byCategory = new Map(advice.advice.steps.flatMap((step) => (step.target ? [[step.target.category, step.target] as const] : [])));
+    return [...byCategory.values()].map((target) => ({ category: target.category, current: spent.get(target.category) ?? 0, target: target.monthly }));
+  }, [picture, advice, explanations]);
 }
 
 /** The recovery plan's figures, for a shared link: the statements themselves never leave the device. */

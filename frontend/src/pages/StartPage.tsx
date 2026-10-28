@@ -7,7 +7,7 @@ import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
 import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
 import { useImprovement, useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
-import { ExpensesByCategory, LoanMovesPanel } from '../components/flow/Improve';
+import { ExpensesByCategory, LoanMovesPanel, NoamAdvisor } from '../components/flow/Improve';
 import { useMonthlyPicture } from '../store/moneyStore';
 import { chartsReady } from '../components/flow/chartsLoader';
 import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } from '../components/flow/Today';
@@ -88,7 +88,7 @@ export function StartPage() {
         {current === DETAILS_BUY ? (
           <BuyDetails answers={answers} onAnswer={answer} onBack={() => navigate('improve')} />
         ) : current === DETAILS_REFINANCE ? (
-          <RefinanceDetails answers={answers} onEdit={navigate} onBack={() => navigate('improve')} />
+          <RefinanceDetails answers={answers} onAnswer={answer} onEdit={navigate} onBack={() => navigate('improve')} />
         ) : current === DETAILS_RECOVERY ? (
           <RecoveryDetails onBack={() => navigate('improve')} />
         ) : current === START || !step ? (
@@ -345,6 +345,7 @@ function ScreenBody({
             hasReview={steps.some((step) => step.id === 'canGo')}
           />
           {picture && <ExpensesByCategory picture={picture} />}
+          {picture && <NoamAdvisor picture={picture} />}
           <LoanMovesPanel />
         </div>
       )}
