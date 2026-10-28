@@ -145,7 +145,9 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         const loans = screen === 'start-improve-loans';
         await page.evaluate(
           ({ goals, answers, at, loans }) => {
-            localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, answers: loans ? { ...answers, hasLoans: 'YES' } : answers }, version: 1 }));
+            // An invented offer, so the banks screen shows them side by side.
+            const offers = at === 'compare' ? [{ id: 'e2e', for: 'BUY', bank: 'בנק לדוגמה', tracks: [{ type: 'FIXED_UNLINKED', amount: 1400000, annualRate: 0.05, termMonths: 300 }] }] : [];
+            localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, offers, answers: loans ? { ...answers, hasLoans: 'YES' } : answers }, version: 1 }));
             if (loans) {
               // An invented loan, as a lender's report would give it.
               const debts = [{ id: 'e2e', kind: 'CAR', label: 'הלוואת רכב לדוגמה', balance: 60000, annualRate: 0.08, monthlyPayment: 1500, remainingMonths: 48, include: false }];
@@ -158,7 +160,7 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         const ready = {
           'start-result': page.getByText('צריך ללוות'),
           'start-today-mortgage': page.getByRole('img', { name: /^היתרה יורדת/ }),
-          'start-compare': page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }),
+          'start-compare': page.getByRole('list', { name: 'ההצעות, מהזולה ליקרה' }),
           'start-plan': page.getByRole('region', { name: 'מה עושים עכשיו' }),
           'start-refinance': page.getByText('הערכה ממה שמילאתם'),
           'start-improve-loans': page.getByRole('radiogroup', { name: 'מה לעשות עם הלוואת רכב לדוגמה' }),
