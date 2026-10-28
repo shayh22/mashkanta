@@ -5,7 +5,7 @@ import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
 import { useQuestionnaire } from '../../store/questionnaireStore';
 import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
 import { useBuyResult } from './hooks';
-import { useRecoveryOutcome } from './outcomes';
+import { useImprovement } from './outcomes';
 
 /**
  * What to do now, under the results: the next steps, each ticked off on the device. The charges
@@ -69,13 +69,16 @@ function useBuyTasks(goals: readonly Goal[], answers: Answers): TaskInput['buy']
 }
 
 function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
-  const { picture, explanations, chosen } = useRecoveryOutcome();
+  const { picture, explanations, loans, decisions, chosen } = useImprovement();
   return useMemo(() => {
-    if (!goals.includes('RECOVERY')) {
-      return undefined;
-    }
+    const kept = decisions.filter((decision) => chosen.has(decision.key));
+    const loanMoves = kept.filter((decision) => decision.key.startsWith('loan:')).map((decision) => ({ key: decision.key, label: decision.label }));
+    const mortgage = kept.some((decision) => decision.key === 'mortgage');
     if (!picture) {
-      return { hasStatements: false, cancel: [], reduce: [], overdraft: false, fees: false };
+      // A recovery plan needs the statements; any household with loans has their moves.
+      return goals.includes('RECOVERY') || loans.length > 0
+        ? { hasStatements: !goals.includes('RECOVERY'), cancel: [], reduce: [], overdraft: false, fees: false, loanMoves, mortgage }
+        : undefined;
     }
     // Only the decisions the household kept: a cancellation left out on the result is not a task.
     const payees = picture.spendingLines.flatMap((line) => line.payees.map((payee) => payee.description));
@@ -86,6 +89,8 @@ function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
       reduce: marked('REDUCE'),
       overdraft: chosen.has('overdraft'),
       fees: chosen.has('fees'),
+      loanMoves,
+      mortgage,
     };
-  }, [goals, picture, explanations, chosen]);
+  }, [goals, picture, explanations, loans, decisions, chosen]);
 }

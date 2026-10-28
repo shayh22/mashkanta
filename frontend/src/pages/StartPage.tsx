@@ -6,7 +6,9 @@ import { RefinanceResult, SharedRefinance } from '../components/flow/RefinanceRe
 import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
 import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
-import { useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
+import { useImprovement, useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
+import { ExpensesByCategory, LoanMovesPanel } from '../components/flow/Improve';
+import { useMonthlyPicture } from '../store/moneyStore';
 import { chartsReady } from '../components/flow/chartsLoader';
 import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } from '../components/flow/Today';
 import { decodeShared } from '../engine/flow/share';
@@ -289,6 +291,9 @@ function ScreenBody({
   onEdit: (step: string) => void;
   onDetails: (goal: Goal) => void;
 }) {
+  const picture = useMonthlyPicture();
+  const { loans } = useImprovement();
+  const hasAccount = !!picture || loans.length > 0;
   if (screen === DONE) {
     return (
       <div className="flex flex-col gap-4">
@@ -311,20 +316,38 @@ function ScreenBody({
   if (screen === 'plan') {
     return null;
   }
+  // The account and the loans, for every goal: a recovery plan's own result, and for the others
+  // where the statements or the loans were added.
+  const account = goals.includes('RECOVERY') || hasAccount;
   return (
     <div className="flex flex-col gap-6">
-      {goals.map((goal) => (
-        <div key={goal} className="flex flex-col gap-3">
-          {goals.length > 1 && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
-          {goal === 'BUY' ? (
-            <BuyResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('BUY')} />
-          ) : goal === 'REFINANCE' ? (
-            <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} />
-          ) : (
-            <RecoveryResult onEdit={onEdit} onDetails={() => onDetails('RECOVERY')} hasReview={steps.some((step) => step.id === 'canGo')} />
+      {goals
+        .filter((goal) => goal !== 'RECOVERY')
+        .map((goal) => (
+          <div key={goal} className="flex flex-col gap-3">
+            {(goals.length > 1 || account) && <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{TITLES[goal]}</span>}
+            {goal === 'BUY' ? (
+              <BuyResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('BUY')} />
+            ) : (
+              <RefinanceResult answers={answers} onEdit={onEdit} onDetails={() => onDetails('REFINANCE')} />
+            )}
+          </div>
+        ))}
+      {account && (
+        <div className="flex flex-col gap-3">
+          {(goals.length > 1 || !goals.includes('RECOVERY')) && (
+            <span className="text-sm font-bold uppercase tracking-wide text-flow-muted">{picture ? TITLES.RECOVERY : 'ההלוואות'}</span>
           )}
+          <RecoveryResult
+            recovering={goals.includes('RECOVERY')}
+            onEdit={onEdit}
+            onDetails={() => onDetails('RECOVERY')}
+            hasReview={steps.some((step) => step.id === 'canGo')}
+          />
+          {picture && <ExpensesByCategory picture={picture} />}
+          <LoanMovesPanel />
         </div>
-      ))}
+      )}
     </div>
   );
 }
