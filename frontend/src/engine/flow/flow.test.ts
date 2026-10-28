@@ -6,7 +6,7 @@ const ids = (goals: Parameters<typeof stepsFor>[1], answers = {}) => stepsFor(CA
 
 describe('the questions for the goals chosen', () => {
   it('asks a buyer about the home and the income, nothing about a mortgage they do not have', () => {
-    expect(ids(['BUY'])).toEqual(['price', 'buyer', 'equity', 'eligibility', 'income', 'obligations', 'stability']);
+    expect(ids(['BUY'])).toEqual(['price', 'buyer', 'equity', 'eligibility', 'income', 'obligations', 'stability', 'statementsOffer']);
   });
 
   it('asks the shared sections once when goals are combined, in one order', () => {
@@ -22,8 +22,15 @@ describe('the questions for the goals chosen', () => {
   });
 
   it('asks a homeowner the home’s value and income for the new mix, and about other loans in their own section', () => {
-    expect(ids(['REFINANCE'], { mortgageHow: 'MANUAL' })).toEqual(['mortgageHow', 'homeValue', 'refinanceGoal', 'income', 'stability', 'hasLoans']);
+    expect(ids(['REFINANCE'], { mortgageHow: 'MANUAL' })).toEqual(['mortgageHow', 'homeValue', 'refinanceGoal', 'income', 'stability', 'statementsOffer', 'hasLoans']);
     expect(ids(['BUY', 'REFINANCE'], { mortgageHow: 'MANUAL' })).toContain('obligations');
+  });
+
+  it('offers the statements to every goal, and asks for them only when wanted; a recovery plan needs them', () => {
+    expect(ids(['BUY'], { statementsOffer: 'NO' })).not.toContain('statementsUpload');
+    expect(ids(['BUY'], { statementsOffer: 'YES' }).slice(-2)).toEqual(['statementsOffer', 'statementsUpload']);
+    expect(ids(['BUY'], { statementsOffer: 'YES' })).not.toContain('worry');
+    expect(ids(['RECOVERY', 'BUY'])).not.toContain('statementsOffer');
   });
 
   it('asks for a document only when the household said it has one', () => {
@@ -91,14 +98,14 @@ describe('where the household is', () => {
   const steps = stepsFor(CATALOG, ['BUY'], {});
 
   it('counts the screens and names the section', () => {
-    expect(progressOf(CATALOG, steps, 'income')).toMatchObject({ index: 4, total: 7, section: { label: 'ההכנסה' } });
-    expect(progressOf(CATALOG, steps, 'nowhere')).toEqual({ index: -1, total: 7 });
+    expect(progressOf(CATALOG, steps, 'income')).toMatchObject({ index: 4, total: 8, section: { label: 'ההכנסה' } });
+    expect(progressOf(CATALOG, steps, 'nowhere')).toEqual({ index: -1, total: 8 });
   });
 
   it('picks up at the first screen not answered', () => {
     expect(firstOpen(steps, {})).toBe('price');
     expect(firstOpen(steps, { propertyValue: 2_000_000, segment: 'FIRST_HOME' })).toBe('equity');
-    const all = { propertyValue: 2e6, segment: 'FIRST_HOME', equity: 6e5, hasEligibility: 'NO', netIncome: 2e4, hasObligations: 'NO', stability: 'BALANCED' };
+    const all = { propertyValue: 2e6, segment: 'FIRST_HOME', equity: 6e5, hasEligibility: 'NO', netIncome: 2e4, hasObligations: 'NO', stability: 'BALANCED', statementsOffer: 'NO' };
     expect(firstOpen(steps, all)).toBeUndefined();
   });
 
@@ -106,7 +113,8 @@ describe('where the household is', () => {
     expect(neighbour(steps, 'price', 1)).toBe('buyer');
     expect(neighbour(steps, 'buyer', -1)).toBe('price');
     expect(neighbour(steps, 'price', -1)).toBeUndefined();
-    expect(neighbour(steps, 'stability', 1)).toBeUndefined();
+    expect(neighbour(steps, 'stability', 1)).toBe('statementsOffer');
+    expect(neighbour(steps, 'statementsOffer', 1)).toBeUndefined();
   });
 });
 
