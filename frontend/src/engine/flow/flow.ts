@@ -56,6 +56,8 @@ export interface Step {
   /** The glossary entry the "?" opens first, before anyone asks the AI. */
   readonly help?: TermId;
   readonly fields: readonly Field[];
+  /** A list of like questions, each its own row, rather than one question and its follow-ups. */
+  readonly list?: boolean;
   /** Asked only when this holds. */
   readonly when?: (answers: Answers, goals: ReadonlySet<Goal>) => boolean;
 }
