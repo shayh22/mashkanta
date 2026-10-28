@@ -180,7 +180,16 @@ export const useConsolidation = create<ConsolidationState>()(
           debts: state.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)),
         })),
       removeDebt: (id) => set((state) => ({ debts: state.debts.filter((debt) => debt.id !== id) })),
-      importDebts: (debts, replace) => set((state) => ({ debts: replace ? debts : [...state.debts, ...debts] })),
+      // Added loans join the household's own, never the illustrative ones; the same loan read twice
+      // (the same document uploaded again) is kept once.
+      importDebts: (debts, replace) =>
+        set((state) => {
+          const base = replace || isSampleDebts(state.debts) ? [] : state.debts;
+          const same = (a: ConsumerDebt, b: ConsumerDebt) =>
+            a.label === b.label && a.balance === b.balance && a.monthlyPayment === b.monthlyPayment && a.remainingMonths === b.remainingMonths;
+          const added = debts.filter((debt, index) => !base.some((each) => same(each, debt)) && debts.findIndex((each) => same(each, debt)) === index);
+          return { debts: [...base, ...added] };
+        }),
       applyRecommendations: (blendedRate) =>
         set((state) => ({
           debts: state.debts.map((debt) => ({

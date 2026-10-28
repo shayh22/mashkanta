@@ -57,6 +57,10 @@ export function buyPlan(answers: Answers, defaults: BorrowerProfileRequest): Buy
       ...defaults,
       propertyValue: price,
       loanAmount,
+      // Changed on the details screen; the engine's default until then.
+      ...(num(answers.termYears) !== undefined && num(answers.termYears)! >= 4 && num(answers.termYears)! <= 30
+        ? { termMonths: Math.round(num(answers.termYears)!) * 12 }
+        : {}),
       segment,
       monthlyNetIncome: income,
       existingMonthlyObligations: answers.hasObligations === 'YES' ? (num(answers.obligations) ?? 0) : 0,

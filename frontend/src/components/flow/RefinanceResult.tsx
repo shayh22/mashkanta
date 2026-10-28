@@ -1,25 +1,18 @@
-import { useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { stabilityOf } from '../../engine/flow/buyProfile';
 import type { Answers } from '../../engine/flow/flow';
-import { refinanceEstimate } from '../../engine/flow/refinancePlan';
 import { VERDICT_LABELS } from '../../engine/refinance';
-import { optimize } from '../../lib/api';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../../lib/format';
 import { bestRoute, ROUTE_NAME } from '../../lib/routes';
-import { useConsolidation } from '../../store/consolidationStore';
-import { useMarket } from '../../store/marketStore';
 import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
-import { DEFAULT_PROFILE, useWizard } from '../../store/wizardStore';
+import { useRefinanceAnswers, useRefinanceEstimate } from './hooks';
 
 /**
  * The homeowner's result. From the bank's report, the real thing: every track, the early-repayment
  * fee, the switching costs and the better of the two routes. From figures typed in, an estimate —
  * said to be one — with the way to the exact check.
  */
-export function RefinanceResult({ answers, onEdit }: { answers: Answers; onEdit: (step: string) => void }) {
+export function RefinanceResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
   const tracks = useRefinance((state) => state.tracks);
-  return isSampleTracks(tracks) ? <Estimate answers={answers} onEdit={onEdit} /> : <Exact answers={answers} />;
+  return isSampleTracks(tracks) ? <Estimate answers={answers} onEdit={onEdit} onDetails={onDetails} /> : <Exact answers={answers} onDetails={onDetails} />;
 }
 
 /** The headline the household asked for: what the payment drops by, or what is saved over the loan. */
@@ -82,12 +75,12 @@ function Facts({ rows }: { rows: readonly (readonly [string, string])[] }) {
   );
 }
 
-function Actions({ share }: { share: string }) {
+function Actions({ share, onDetails }: { share: string; onDetails: () => void }) {
   return (
     <div className="grid grid-cols-2 gap-2.5">
-      <a href="#/own/result" className="flex min-h-[52px] items-center justify-center rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+      <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
         כל הפרטים
-      </a>
+      </button>
       <a
         href={`https://wa.me/?text=${encodeURIComponent(share)}`}
         target="_blank"
@@ -101,20 +94,8 @@ function Actions({ share }: { share: string }) {
 }
 
 /** From the uploaded report: the homeowner path's own analysis, with the questionnaire's answers in it. */
-function Exact({ answers }: { answers: Answers }) {
-  // The answers are the household's, entered once: the home's value, the income and the appetite for risk.
-  useEffect(() => {
-    if (typeof answers.homeValue === 'number') {
-      useRefinance.getState().setPropertyValue(answers.homeValue);
-    }
-    if (typeof answers.netIncome === 'number') {
-      useConsolidation.getState().setNetIncome(answers.netIncome);
-    }
-    const stability = stabilityOf(answers);
-    const wizard = useWizard.getState();
-    wizard.setProfile({ riskTolerance: stability.riskTolerance });
-    wizard.setPreferences(stability.primePreference, stability.stablePreference, stability.dynamicPreference);
-  }, [answers]);
+function Exact({ answers, onDetails }: { answers: Answers; onDetails: () => void }) {
+  useRefinanceAnswers(answers);
   const { comparison } = useRefinanceAnalysis();
   if (!comparison) {
     return null;
@@ -134,6 +115,7 @@ function Exact({ answers }: { answers: Answers }) {
         ]}
       />
       <Actions
+        onDetails={onDetails}
         share={[
           'בדיקת המיחזור שלי מ"מפתח כלכלי":',
           `החזר היום ${formatCurrency(route.currentPayment)}, אחרי ${formatCurrency(route.proposedPayment)}`,
@@ -146,18 +128,8 @@ function Exact({ answers }: { answers: Answers }) {
 }
 
 /** From figures typed in: the rate they imply, against the engine's mix for the same balance and term. */
-function Estimate({ answers, onEdit }: { answers: Answers; onEdit: (step: string) => void }) {
-  const macro = useWizard((state) => state.macro);
-  const market = useMarket((state) => state.version);
-  const estimate = useMemo(() => refinanceEstimate(answers, DEFAULT_PROFILE), [answers]);
-  const profile = estimate?.kind === 'ESTIMATE' ? estimate.profile : undefined;
-  const result = useQuery({
-    queryKey: ['flow-refinance', profile, macro, market],
-    queryFn: () => optimize(profile!, macro, 0.5),
-    enabled: !!profile,
-    staleTime: Infinity,
-    retry: false,
-  });
+function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
+  const { estimate, result } = useRefinanceEstimate(answers);
 
   if (!estimate) {
     // Typed in nothing to estimate from: the report was put off.
@@ -221,6 +193,7 @@ function Estimate({ answers, onEdit }: { answers: Answers; onEdit: (step: string
             </button>
           </div>
           <Actions
+            onDetails={onDetails}
             share={[
               'הערכת המיחזור שלי מ"מפתח כלכלי":',
               `החזר היום ${formatCurrency(current.payment)}, בתמהיל חדש ${formatCurrency(proposed.initialPayment)}`,

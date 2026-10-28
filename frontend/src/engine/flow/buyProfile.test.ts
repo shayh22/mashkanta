@@ -62,6 +62,15 @@ describe('a buyer’s answers as the engine’s input', () => {
     expect(tolerance('STABLE')!.stablePreference).toBeGreaterThan(tolerance('CHEAP')!.stablePreference);
   });
 
+  it('takes the term chosen on the details screen, within four to thirty years', () => {
+    const term = (termYears: number) => {
+      const plan = buyPlan({ ...answers, termYears }, DEFAULT_PROFILE);
+      return plan?.kind === 'LOAN' ? plan.profile.termMonths : undefined;
+    };
+    expect(term(20)).toBe(240);
+    expect(term(31)).toBe(DEFAULT_PROFILE.termMonths);
+  });
+
   it('waits for the price, the kind of home, the equity and the income', () => {
     for (const missing of ['propertyValue', 'segment', 'equity', 'netIncome']) {
       const partial: Record<string, unknown> = { ...answers };
