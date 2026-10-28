@@ -7,7 +7,8 @@ import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
 import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
 import { useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
-import { BuyToday, LoansToday, RecoveryToday, RefinanceToday } from '../components/flow/Today';
+import { chartsReady } from '../components/flow/chartsLoader';
+import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } from '../components/flow/Today';
 import { decodeShared } from '../engine/flow/share';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { APP_NAME } from '../components/Logo';
@@ -183,8 +184,19 @@ function Results({
     };
     window.addEventListener('afterprint', done, { once: true });
     document.body.dataset.print = 'report';
-    window.print();
-    return () => window.removeEventListener('afterprint', done);
+    // The charts drawn first: the report is laid out off screen, so they have a width to fill.
+    let cancelled = false;
+    void chartsReady().then(() =>
+      window.setTimeout(() => {
+        if (!cancelled) {
+          window.print();
+        }
+      }, 400),
+    );
+    return () => {
+      cancelled = true;
+      window.removeEventListener('afterprint', done);
+    };
   }, [printing]);
 
   const body = (shown: ResultScreen) => <ScreenBody screen={shown} steps={steps} answers={answers} goals={goals} onEdit={onEdit} onDetails={onDetails} />;
@@ -242,7 +254,7 @@ function Results({
       </div>
 
       {printing && (
-        <div className="report hidden flex-col gap-6 print:flex">
+        <div aria-hidden className="report pointer-events-none fixed left-[-10000px] top-0 flex w-[720px] flex-col gap-6 print:absolute print:left-0 print:right-0 print:w-auto">
           <p className="text-sm font-bold text-flow-muted">
             {APP_NAME} · דוח מ-{new Date().toLocaleDateString('he-IL')}
           </p>
@@ -281,9 +293,10 @@ function ScreenBody({
     return (
       <div className="flex flex-col gap-4">
         {goals.includes('BUY') && <BuyToday answers={answers} />}
-        {goals.includes('REFINANCE') && <RefinanceToday answers={answers} onEdit={onEdit} />}
-        {goals.includes('RECOVERY') && <RecoveryToday onEdit={onEdit} />}
+        <MortgageToday answers={answers} refinancing={goals.includes('REFINANCE')} onEdit={onEdit} />
+        <AccountToday recovering={goals.includes('RECOVERY')} onEdit={onEdit} />
         <LoansToday />
+        <CommitmentsMeter answers={answers} goals={goals} />
       </div>
     );
   }

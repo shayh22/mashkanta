@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
+  'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -54,7 +54,7 @@ const problems = [];
 
 // The first screen of either path has no charts. Recharts is over 100KB gzipped; it must arrive
 // only with a page that draws one.
-for (const first of ['own', 'buy']) {
+for (const first of ['own', 'buy', 'start']) {
   const page = await browser.newPage();
   const scripts = [];
   page.on('request', (request) => request.resourceType() === 'script' && scripts.push(request.url()));
@@ -132,14 +132,14 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('dialog').waitFor();
         }
       }
-      if (['start-result', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
+      if (['start-result', 'start-today-mortgage', 'start-improve', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
         // Invented answers, straight to a result screen: written while the questionnaire is not
         // open (it would write its own state over them), then read by a fresh load.
-        const refinancing = screen === 'start-refinance';
+        const refinancing = screen === 'start-refinance' || screen === 'start-today-mortgage';
         const answers = !refinancing
           ? { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' }
           : { mortgageHow: 'MANUAL', mortgageBalance: 800000, mortgagePayment: 7200, mortgageYears: 'TEN_20', homeValue: 2400000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28000, stability: 'BALANCED', hasLoans: 'NO' };
-        const at = { 'start-result': 'DONE', 'start-compare': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
+        const at = { 'start-result': 'DONE', 'start-today-mortgage': 'DONE', 'start-compare': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
         await page.goto(`${base}/#/buy`);
         await page.evaluate(
           ({ goals, answers, at }) => localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, answers }, version: 1 })),
@@ -148,6 +148,7 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         await page.goto(`${base}/?fresh=${Date.now()}#/start/${at === 'DONE' ? 'done' : at}`);
         const ready = {
           'start-result': page.getByText('צריך ללוות'),
+          'start-today-mortgage': page.getByRole('img', { name: /^היתרה יורדת/ }),
           'start-compare': page.getByRole('region', { name: 'הבנקים, לתמהיל הזה' }),
           'start-plan': page.getByRole('region', { name: 'מה עושים עכשיו' }),
           'start-refinance': page.getByText('הערכה ממה שמילאתם'),

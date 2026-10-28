@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
+import { priceMix, type MixResult } from '../../engine/amortization';
 import type { Answers } from '../../engine/flow/flow';
+import { impliedRate, REMAINING_MONTHS } from '../../engine/flow/refinancePlan';
+import { existingSpecs } from '../../engine/refinance';
+import { trackFromRate } from '../../engine/tracks';
+import { scenarioOf } from '../../lib/api';
 import type { RecoverySnapshot, RefinanceSnapshot } from '../../engine/flow/share';
 import { decisionsOf, freedBy } from '../../engine/money/decisions';
 import { bestRoute } from '../../lib/routes';
 import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
 import { useQuestionnaire } from '../../store/questionnaireStore';
-import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
+import { useMarketVersion } from '../../store/marketVersion';
+import { isSampleTracks, outstandingBalance, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
+import { useWizard } from '../../store/wizardStore';
 import { useRefinanceAnswers } from './hooks';
 
 /**
@@ -64,4 +71,50 @@ export function useRefinanceSnapshot(answers: Answers, refinancing: boolean): Re
       route: comparison.best,
     };
   }, [refinancing, exact, comparison]);
+}
+
+export interface MortgageToday {
+  /** From the bank's report, every track; otherwise from the figures typed in. */
+  readonly exact: boolean;
+  readonly balance: number;
+  readonly payment: number;
+  /** For figures typed in: the term they stand for and the rate they imply. */
+  readonly months?: number;
+  readonly rate?: number;
+  /** The mortgage as it stands, priced to its end: the path of the balance and what it costs. */
+  readonly mix: MixResult;
+}
+
+/**
+ * The mortgage as it stands today, priced to the end; undefined without one, or while the figures
+ * typed in cannot be one mortgage.
+ */
+export function useMortgageToday(answers: Answers, hasMortgage: boolean): MortgageToday | undefined {
+  const tracks = useRefinance((state) => state.tracks);
+  const macro = useWizard((state) => state.macro);
+  const market = useMarketVersion();
+  return useMemo(() => {
+    if (!hasMortgage) {
+      return undefined;
+    }
+    const scenario = scenarioOf(macro);
+    if (!isSampleTracks(tracks)) {
+      const mix = priceMix(existingSpecs(tracks, scenario), scenario);
+      return { exact: true, balance: outstandingBalance(tracks), payment: mix.initialPayment, mix };
+    }
+    const balance = typeof answers.mortgageBalance === 'number' ? answers.mortgageBalance : undefined;
+    const payment = typeof answers.mortgagePayment === 'number' ? answers.mortgagePayment : undefined;
+    if (answers.mortgageHow !== 'MANUAL' || balance === undefined || payment === undefined) {
+      return undefined;
+    }
+    const months = REMAINING_MONTHS[answers.mortgageYears as string] ?? REMAINING_MONTHS.UNKNOWN!;
+    const rate = impliedRate(balance, payment, months);
+    if (rate === undefined) {
+      return undefined;
+    }
+    const mix = priceMix([trackFromRate('FIXED_UNLINKED', balance, months, rate, scenario)], scenario);
+    return { exact: false, balance, payment, months, rate, mix };
+    // market: the scenario reads the live market table.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMortgage, tracks, macro, market, answers.mortgageHow, answers.mortgageBalance, answers.mortgagePayment, answers.mortgageYears]);
 }

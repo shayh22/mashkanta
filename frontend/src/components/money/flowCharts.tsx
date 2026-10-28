@@ -5,7 +5,8 @@ import { ResponsiveChart } from '../charts/ResponsiveChart';
 import { monthName, shortDate } from './format';
 
 /** Each month: what came in, what went out, and what was left — the line. */
-export function MonthlyFlowChart({ months }: { months: readonly MonthTotals[] }) {
+/** `animate={false}` where the chart may be laid out again — on paper, in a report: it would redraw from zero. */
+export function MonthlyFlowChart({ months, animate = true }: { months: readonly MonthTotals[]; animate?: boolean }) {
   const data = months.map((month) => ({
     label: monthName(month.month, false),
     income: Math.round(month.income),
@@ -42,9 +43,9 @@ export function MonthlyFlowChart({ months }: { months: readonly MonthTotals[] })
               );
             }}
           />
-          <Bar dataKey="income" name="נכנס" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-          <Bar dataKey="spending" name="יצא" fill="var(--chart-2)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-          <Line dataKey="net" name="נשאר" stroke="rgb(var(--ink))" strokeWidth={2} dot={{ r: 3 }} type="monotone" />
+          <Bar dataKey="income" name="נכנס" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={animate} />
+          <Bar dataKey="spending" name="יצא" fill="var(--chart-2)" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={animate} />
+          <Line dataKey="net" name="נשאר" stroke="rgb(var(--ink))" strokeWidth={2} dot={{ r: 3 }} type="monotone" isAnimationActive={animate} />
         </ComposedChart>
       </ResponsiveChart>
     </div>
@@ -52,7 +53,7 @@ export function MonthlyFlowChart({ months }: { months: readonly MonthTotals[] })
 }
 
 /** The account's balance day by day; the part under zero is the overdraft. */
-export function BalanceChart({ balances }: { balances: readonly { date: string; balance: number }[] }) {
+export function BalanceChart({ balances, animate = true }: { balances: readonly { date: string; balance: number }[]; animate?: boolean }) {
   const data = balances.map((point) => ({ label: shortDate(point.date).slice(0, 5), balance: Math.round(point.balance) }));
   const values = data.map((d) => d.balance);
   const top = Math.max(0, ...values);
@@ -95,7 +96,7 @@ export function BalanceChart({ balances }: { balances: readonly { date: string; 
               );
             }}
           />
-          <Area dataKey="balance" type="stepAfter" stroke="rgb(var(--ink-muted))" strokeWidth={1.5} fill="url(#balance-fill)" />
+          <Area dataKey="balance" type="stepAfter" stroke="rgb(var(--ink-muted))" strokeWidth={1.5} fill="url(#balance-fill)" isAnimationActive={animate} />
         </AreaChart>
       </ResponsiveChart>
     </div>
