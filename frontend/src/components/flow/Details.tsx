@@ -1,28 +1,22 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { AnswerValue, Answers } from '../../engine/flow/flow';
 import { savingIdeas } from '../../engine/money/savings';
-import { VERDICT_LABELS } from '../../engine/refinance';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
-import { bestRoute, ROUTE_NAME } from '../../lib/routes';
-import { TRACK_COLORS } from '../../lib/trackColors';
-import type { StressScenario, TrackType } from '../../lib/types';
+import { bestRoute } from '../../lib/routes';
+import type { StressScenario } from '../../lib/types';
 import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
 import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
 import { useBuyResult, useRefinanceAnswers, useRefinanceEstimate } from './hooks';
+import { TRACK_NAMES } from '../../lib/trackColors';
+import { Dot, Panel, Rows } from './parts';
+import { IncomePanel, OverdraftPanel, SpendingPanel } from './Today';
+import { RoutesPanel } from './Compare';
 
 /**
  * The details behind a result, in the questionnaire's own look: no tabs, one column, each part a
  * card with a heading, and the few settings that change the result right here.
  */
 
-const TRACK_NAMES: Record<TrackType, string> = {
-  PRIME: 'פריים',
-  FIXED_UNLINKED: 'קבועה לא צמודה',
-  FIXED_LINKED: 'קבועה צמודה',
-  VARIABLE_UNLINKED: 'משתנה לא צמודה',
-  VARIABLE_LINKED: 'משתנה צמודה',
-  ELIGIBILITY: 'זכאות',
-};
 
 function Shell({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -44,28 +38,6 @@ function Shell({ title, onBack, children }: { title: string; onBack: () => void;
         חזרה לתוצאה
       </button>
     </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex flex-col gap-3 rounded-[20px] bg-flow-card p-4">
-      <h3 className="text-base font-extrabold">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function Rows({ rows }: { rows: readonly (readonly [ReactNode, ReactNode, boolean?])[] }) {
-  return (
-    <dl className="flex flex-col">
-      {rows.map(([label, value, strong], index) => (
-        <div key={index} className={`flex min-h-12 items-center justify-between gap-3 border-b border-flow-line py-2 last:border-b-0 ${strong ? 'font-extrabold' : ''}`}>
-          <dt className="text-[15px]">{label}</dt>
-          <dd className="text-[15px] font-bold tabular-nums">{value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -117,7 +89,6 @@ function StressRows({ initial, scenarios }: { initial: number; scenarios: readon
   );
 }
 
-const dot = (type: TrackType) => <span aria-hidden className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: TRACK_COLORS[type] }} />;
 
 /** A buyer's mix: the term and the appetite for risk to try, every track, the stress, the baskets, the banks and the other terms. */
 export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; onAnswer: (field: string, value: AnswerValue) => void; onBack: () => void }) {
@@ -153,7 +124,7 @@ export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; on
                 .map((track) => (
                   <li key={`${track.track}-${track.termMonths}`} className="flex flex-col gap-1 border-b border-flow-line py-2.5 last:border-b-0">
                     <span className="flex items-center gap-2 text-[15px] font-extrabold">
-                      {dot(track.track)}
+                      <Dot type={track.track} />
                       {track.hebrewName}
                       <span className="ms-auto tabular-nums">{formatCurrency(track.amount)}</span>
                     </span>
@@ -176,26 +147,6 @@ export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; on
 
           <Panel title="אם הריבית או המדד יעלו">
             <StressRows initial={data.recommended.summary.initialPayment} scenarios={data.recommended.stress.scenarios} />
-          </Panel>
-
-          {data.savings.length > 0 && (
-            <Panel title="מול הסלים האחידים של הבנקים">
-              <Rows
-                rows={data.savings.map((saving) => [
-                  saving.againstName,
-                  saving.totalPaidSaving >= 0 ? `חוסך ${formatCurrency(saving.totalPaidSaving)}` : `יקר ב-${formatCurrency(-saving.totalPaidSaving)}`,
-                ])}
-              />
-            </Panel>
-          )}
-
-          <Panel title="הבנקים, לתמהיל הזה">
-            <Rows
-              rows={[...data.bankQuotes]
-                .sort((a, b) => a.rank - b.rank)
-                .slice(0, 5)
-                .map((bank, index) => [bank.hebrewName, `${formatPercent(bank.weightedRate)} · ${formatCurrency(bank.initialPayment)}`, index === 0])}
-            />
           </Panel>
 
           {data.termSensitivity.length > 0 && (
@@ -236,24 +187,7 @@ function ExactDetails({ answers, onBack }: { answers: Answers; onBack: () => voi
     <Shell title="פרטי המיחזור" onBack={onBack}>
       {comparison && route && (
         <>
-          <Panel title="שתי הדרכים">
-            <div className="grid grid-cols-2 gap-2.5">
-              {(['INTERNAL', 'EXTERNAL'] as const).map((kind) => {
-                const each = kind === 'INTERNAL' ? comparison.internal : comparison.external;
-                const best = comparison.best === kind;
-                return (
-                  <div key={kind} className={`flex flex-col gap-1 rounded-2xl p-3 ${best ? 'border-2 border-flow-strong bg-flow-pick' : 'border border-flow-line'}`}>
-                    <span className="text-[15px] font-extrabold">{ROUTE_NAME[kind]}</span>
-                    {best && <span className="text-xs font-bold text-flow-strong">המשתלמת</span>}
-                    <span className="text-sm">{formatCurrency(each.monthlySaving)} בחודש</span>
-                    <span className="text-sm">עלות {formatCurrency(each.upfrontCost)}</span>
-                    <span className="text-sm text-flow-muted">{each.breakevenMonth > 0 ? `מחזיר תוך ${each.breakevenMonth} חודשים` : 'לא מחזיר את עצמו'}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <span className="self-start rounded-full bg-flow-pick px-3 py-1 text-sm font-bold text-flow-strong">{VERDICT_LABELS[route.verdict]}</span>
-          </Panel>
+          <RoutesPanel comparison={comparison} />
 
           <Panel title="המסלולים שלכם היום">
             <ul className="flex flex-col">
@@ -262,7 +196,7 @@ function ExactDetails({ answers, onBack }: { answers: Answers; onBack: () => voi
                 return (
                   <li key={track.id} className="flex flex-col gap-1 border-b border-flow-line py-2.5 last:border-b-0">
                     <span className="flex items-center gap-2 text-[15px] font-extrabold">
-                      {dot(track.type)}
+                      <Dot type={track.type} />
                       {TRACK_NAMES[track.type]}
                       <span className="ms-auto tabular-nums">{formatCurrency(track.balance)}</span>
                     </span>
@@ -285,7 +219,7 @@ function ExactDetails({ answers, onBack }: { answers: Answers; onBack: () => voi
             <ul className="flex flex-col">
               {proposal.map((track) => (
                 <li key={track.id} className="flex items-center gap-2 border-b border-flow-line py-2.5 text-[15px] last:border-b-0">
-                  {dot(track.type)}
+                  <Dot type={track.type} />
                   <span className="font-bold">{TRACK_NAMES[track.type]}</span>
                   {track.carriedOver && <span className="text-xs text-flow-muted">נשאר כמו שהוא</span>}
                   <span className="ms-auto text-sm text-flow-muted tabular-nums">
@@ -342,7 +276,7 @@ function EstimateDetails({ answers, onEdit, onBack }: { answers: Answers; onEdit
                 .filter((track) => track.share > 0.0005)
                 .map((track) => (
                   <li key={`${track.track}-${track.termMonths}`} className="flex items-center gap-2 border-b border-flow-line py-2.5 text-[15px] last:border-b-0">
-                    {dot(track.track)}
+                    <Dot type={track.track} />
                     <span className="font-bold">{track.hebrewName}</span>
                     <span className="ms-auto text-sm text-flow-muted tabular-nums">
                       {formatPercent(track.annualRate)} · {Math.round(track.share * 100)}%
@@ -382,42 +316,11 @@ export function RecoveryDetails({ onBack }: { onBack: () => void }) {
       </Shell>
     );
   }
-  const spending = [...picture.spendingLines].sort((a, b) => b.monthly - a.monthly);
-  const top = Math.max(1, ...spending.map((line) => line.monthly));
   return (
     <Shell title="פרטי החשבון" onBack={onBack}>
-      <Panel title="לאן הולך הכסף, בחודש">
-        <ul className="flex flex-col gap-2.5">
-          {spending.map((line) => (
-            <li key={line.id} className="flex flex-col gap-1">
-              <span className="flex items-center justify-between gap-2 text-[15px]">
-                <span className="font-bold">{line.label}</span>
-                <span className="font-extrabold tabular-nums">{formatCurrency(line.monthly)}</span>
-              </span>
-              <span aria-hidden className="h-2 rounded-full bg-flow-pick">
-                <span className="block h-full rounded-full bg-flow-strong" style={{ width: `${(line.monthly / top) * 100}%` }} />
-              </span>
-            </li>
-          ))}
-        </ul>
-        <Rows rows={[['סך הכל הוצאות', formatCurrency(picture.spending), true]]} />
-      </Panel>
-
-      <Panel title="מה נכנס, בחודש">
-        <Rows rows={[...picture.incomeLines.map((line) => [line.label, formatCurrency(line.monthly)] as const), ['סך הכל הכנסות', formatCurrency(picture.income), true] as const]} />
-      </Panel>
-
-      {picture.overdraft && (
-        <Panel title="יתרת החשבון">
-          <Rows
-            rows={[
-              ['חודשים במינוס', `${picture.overdraft.monthsBelow} מתוך ${picture.overdraft.months}`],
-              ['היתרה הנמוכה', formatCurrency(picture.overdraft.lowest)],
-              ['ריבית על המינוס, בחודש', formatCurrency(picture.overdraft.interestMonthly)],
-            ]}
-          />
-        </Panel>
-      )}
+      <SpendingPanel picture={picture} />
+      <IncomePanel picture={picture} />
+      <OverdraftPanel picture={picture} />
 
       {ideas.length > 0 && (
         <Panel title="איפה אפשר לחסוך">

@@ -2,11 +2,10 @@ import { useMemo } from 'react';
 import type { Answers, Goal } from '../../engine/flow/flow';
 import type { RefinanceSnapshot } from '../../engine/flow/share';
 import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
-import { decisionsOf } from '../../engine/money/decisions';
-import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
 import { useQuestionnaire } from '../../store/questionnaireStore';
 import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
 import { useBuyResult } from './hooks';
+import { useRecoveryOutcome } from './outcomes';
 
 /**
  * What to do now, under the results: the next steps, each ticked off on the device. The charges
@@ -70,8 +69,7 @@ function useBuyTasks(goals: readonly Goal[], answers: Answers): TaskInput['buy']
 }
 
 function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
-  const picture = useMonthlyPicture();
-  const explanations = useMoneyCategories((state) => state.explanations);
+  const { picture, explanations, chosen } = useRecoveryOutcome();
   return useMemo(() => {
     if (!goals.includes('RECOVERY')) {
       return undefined;
@@ -79,15 +77,15 @@ function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
     if (!picture) {
       return { hasStatements: false, cancel: [], reduce: [], overdraft: false, fees: false };
     }
+    // Only the decisions the household kept: a cancellation left out on the result is not a task.
     const payees = picture.spendingLines.flatMap((line) => line.payees.map((payee) => payee.description));
     const marked = (flexibility: 'CANCEL' | 'REDUCE') => [...new Set(payees.filter((payee) => explanations[payee]?.flexibility === flexibility))];
-    const decisions = decisionsOf(picture, explanations);
     return {
       hasStatements: true,
-      cancel: marked('CANCEL'),
+      cancel: chosen.has('cancel') ? marked('CANCEL') : [],
       reduce: marked('REDUCE'),
-      overdraft: decisions.some((decision) => decision.key === 'overdraft'),
-      fees: decisions.some((decision) => decision.key === 'fees'),
+      overdraft: chosen.has('overdraft'),
+      fees: chosen.has('fees'),
     };
-  }, [goals, picture, explanations]);
+  }, [goals, picture, explanations, chosen]);
 }

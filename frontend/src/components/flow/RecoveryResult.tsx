@@ -1,45 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
 import type { RecoverySnapshot } from '../../engine/flow/share';
-import { decisionsOf, freedBy } from '../../engine/money/decisions';
 import { formatCurrency, formatSignedCurrency } from '../../lib/format';
-import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
+import { useRecoveryOutcome } from './outcomes';
 
 /**
  * The recovery plan's result: what is left each month today, and after the decisions the household
  * keeps — each a tick away from being left out — from its own statements and what it said about
  * its charges.
  */
-export function RecoveryResult({
-  onEdit,
-  onDetails,
-  onSnapshot,
-  hasReview,
-}: {
-  onEdit: (step: string) => void;
-  onDetails: () => void;
-  /** The result's figures, for a shared link: the statements themselves never leave the device. */
-  onSnapshot: (snapshot: RecoverySnapshot | undefined) => void;
-  hasReview: boolean;
-}) {
-  const picture = useMonthlyPicture();
-  const explanations = useMoneyCategories((state) => state.explanations);
-  const decisions = useMemo(() => (picture ? decisionsOf(picture, explanations) : []), [picture, explanations]);
-  const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
-  const today = picture ? picture.income - picture.spending : 0;
-  const chosen = useMemo(() => new Set(decisions.map((decision) => decision.key).filter((key) => !left.has(key))), [decisions, left]);
-  const after = today + freedBy(decisions, chosen);
-  useEffect(() => {
-    onSnapshot(
-      picture
-        ? {
-            months: picture.months.length,
-            today: Math.round(today),
-            after: Math.round(after),
-            decisions: decisions.filter((decision) => chosen.has(decision.key)).map((decision) => ({ label: decision.label, monthly: Math.round(decision.monthly) })),
-          }
-        : undefined,
-    );
-  }, [picture, today, after, decisions, chosen, onSnapshot]);
+export function RecoveryResult({ onEdit, onDetails, hasReview }: { onEdit: (step: string) => void; onDetails: () => void; hasReview: boolean }) {
+  const { picture, decisions, chosen, today, after, toggle } = useRecoveryOutcome();
 
   if (!picture) {
     // Statements are kept in memory only: a later visit has none until they are uploaded again.
@@ -56,16 +25,6 @@ export function RecoveryResult({
     );
   }
 
-  const toggle = (key: string) =>
-    setLeft((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
   return (
     <section aria-label="תוכנית ההבראה" className="flex flex-col gap-3.5">
       <div className="flex flex-col gap-1">
