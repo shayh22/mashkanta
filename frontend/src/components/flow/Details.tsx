@@ -11,6 +11,7 @@ import { TRACK_NAMES } from '../../lib/trackColors';
 import { Dot, Panel, Rows } from './parts';
 import { IncomePanel, OverdraftPanel, SpendingPanel } from './Today';
 import { RoutesPanel } from './Compare';
+import { ManualMixPanel, TrackByTrack } from './MixTools';
 
 /**
  * The details behind a result, in the questionnaire's own look: no tabs, one column, each part a
@@ -97,6 +98,7 @@ export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; on
   const term = typeof answers.termYears === 'number' ? answers.termYears : plan?.kind === 'LOAN' ? plan.profile.termMonths / 12 : 25;
   return (
     <Shell title="פרטי התמהיל" onBack={onBack}>
+      {plan?.kind === 'LOAN' && <ManualMixPanel loanAmount={plan.profile.loanAmount} eligibility={plan.profile.eligibilityAmount ?? 0} />}
       <Panel title="לנסות אחרת">
         <Pills label="תקופה" value={term} options={[15, 20, 25, 30].map((years) => ({ id: years, label: `${years} שנים` }))} onPick={(years) => onAnswer('termYears', years)} />
         <Pills
@@ -215,6 +217,7 @@ function ExactDetails({ answers, onBack, tryOther }: { answers: Answers; onBack:
   return (
     <Shell title="פרטי המיחזור" onBack={onBack}>
       {tryOther}
+      <TrackByTrack />
       {comparison && route && (
         <>
           <RoutesPanel comparison={comparison} />
