@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CATALOG } from '../engine/flow/catalog';
+import type { Advice } from '../engine/money/adviceRequest';
 import { GOALS, stepsFor, type AnswerValue, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { isSampleDebts, useConsolidation } from './consolidationStore';
 import { monthlyPicture } from '../engine/money/picture';
@@ -45,6 +46,12 @@ interface QuestionnaireState {
   /** The recovery plan's decisions left out, by key. */
   skipped: string[];
   toggleSkipped: (decision: string) => void;
+  /**
+   * נועם's plan for the month, with the totals it was asked about: in memory only, like the
+   * statements it was made from, and set aside once they change.
+   */
+  advice?: { readonly for: string; readonly goal: string; readonly advice: Advice };
+  setAdvice: (advice: QuestionnaireState['advice']) => void;
   reset: () => void;
 }
 
@@ -71,7 +78,8 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       skipped: [],
       toggleSkipped: (decision) =>
         set((state) => ({ skipped: state.skipped.includes(decision) ? state.skipped.filter((each) => each !== decision) : [...state.skipped, decision] })),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [] }),
+      setAdvice: (advice) => set({ advice }),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined }),
     }),
     {
       name: storageKey('questionnaire'),
