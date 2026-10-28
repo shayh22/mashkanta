@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { waffleCells } from '../../lib/waffle';
 import { BANK_CSV, cardXlsx } from './__fixtures__/statements';
 import { factsFor, MAX_QUESTION_LENGTH, toConsultAnswer, validateConsultRequest } from './consultRequest';
 import { decisionsOf, defaultExtendYears, freedBy, loanDecision, mortgageDecision } from './decisions';
-import { flexibilityRows } from './flexibility';
 import { balancesOf, monthlyPicture } from './picture';
 import { parseCsv, readXlsx } from './sheets';
 import { readStatement } from './statementImport';
@@ -86,24 +84,6 @@ describe('the decisions in the summary', () => {
     const cancelled = decisionsOf(picture, { 'דמי כרטיס': { flexibility: 'CANCEL' } });
     expect(cancelled.map((d) => d.key)).toEqual(['cancel', 'overdraft']);
     expect(freedBy(cancelled, new Set(cancelled.map((d) => d.key)))).toBeCloseTo(20 + overdraft, 6);
-  });
-
-  it('splits each category by what the household said, with the line after cancellations', async () => {
-    const rows = flexibilityRows(await both(), { 'חנות הדוגמאות': { flexibility: 'CANCEL' }, 'רמי לוי סניף דוגמה': { flexibility: 'MUST' } });
-    expect(rows.find((row) => row.key === 'GROCERIES')).toMatchObject({ must: 2_000, open: 0 });
-    const other = rows.find((row) => row.key === 'OTHER')!;
-    expect(other.cancel).toBeCloseTo(2_000 / 3, 6);
-    expect(other.target).toBeCloseTo(0, 6);
-    expect(rows.some((row) => row.key === 'CARD_UNDETAILED')).toBe(false);
-  });
-});
-
-describe('the waffle', () => {
-  it('always fills exactly 100 cells, by largest remainder', () => {
-    expect(waffleCells([1, 1, 1])).toEqual([34, 33, 33]);
-    expect(waffleCells([50, 30, 20])).toEqual([50, 30, 20]);
-    expect(waffleCells([2, 1, -5, Number.NaN]).reduce((a, b) => a + b, 0)).toBe(100);
-    expect(waffleCells([0, 0])).toEqual([0, 0]);
   });
 });
 

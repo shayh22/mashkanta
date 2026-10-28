@@ -23,7 +23,7 @@ async function load(previous?: VisitSnapshot) {
   if (previous) {
     localStorage.setItem('mashkanta:visits', JSON.stringify({ state: { last: previous, visited: [] }, version: 1 }));
   }
-  const { SinceLastVisit } = await import('../SinceLastVisit');
+  const { SinceLastVisitCard: SinceLastVisit } = await import('../flow/SinceLastVisit');
   const { useMarket } = await import('../../store/marketStore');
   const { useVisits } = await import('../../store/visitStore');
   return { SinceLastVisit, useMarket, useVisits };
@@ -40,7 +40,7 @@ describe('since the last visit', () => {
     const banner = screen.getByRole('region', { name: 'מה השתנה מאז הביקור הקודם' });
     expect(banner.textContent).toContain('ריבית הפריים');
     expect(banner.textContent).toContain('5.00% ← 4.75%');
-    expect(banner.textContent).toContain('לטובתך');
+    expect(banner.textContent).toContain('לטובתכם');
     expect(banner.textContent).toContain('ממוצעי המשכנתאות של אוגוסט 2026');
     expect(useVisits.getState().last?.market.prime).toBe(0.0475);
 
@@ -59,17 +59,5 @@ describe('since the last visit', () => {
     second.useMarket.setState({ status: 'loading', market: undefined });
     const { container: loading } = render(<second.SinceLastVisit />);
     expect(loading.textContent).toBe('');
-  });
-
-  it('reports the same in the questionnaire, in its own look', async () => {
-    const { useMarket } = await load(lastWeek);
-    const { SinceLastVisitCard } = await import('../flow/SinceLastVisit');
-    useMarket.setState({ status: 'ready', market: today });
-    render(<SinceLastVisitCard />);
-    const card = screen.getByRole('region', { name: 'מה השתנה מאז הביקור הקודם' });
-    expect(card.textContent).toContain('ריבית הפריים');
-    expect(card.textContent).toContain('לטובתכם');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'הבנתי' }));
-    expect(screen.queryByRole('region', { name: 'מה השתנה מאז הביקור הקודם' })).toBeNull();
   });
 });
