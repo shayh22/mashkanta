@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { BuyResult } from '../components/flow/BuyResult';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { CATALOG } from '../engine/flow/catalog';
-import { firstOpen, neighbour, progressOf, stepsFor, type Goal } from '../engine/flow/flow';
+import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { DONE, START, useFlowAnswers, useFlowSteps, useQuestionnaire } from '../store/questionnaireStore';
 
 /**
@@ -64,7 +65,7 @@ export function StartPage() {
       <div className="mx-auto w-full max-w-md">
         {current === START || !step ? (
           current === DONE && goals.length > 0 ? (
-            <AnswersSummary
+            <Results
               steps={steps}
               answers={answers}
               goals={goals}
@@ -98,6 +99,49 @@ export function StartPage() {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/** After the last question: each goal's result that is ready here, then what was answered. */
+function Results({
+  steps,
+  answers,
+  goals,
+  onEdit,
+  onRestart,
+}: {
+  steps: readonly Step[];
+  answers: Answers;
+  goals: readonly Goal[];
+  onEdit: (step: string) => void;
+  onRestart: () => void;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const buying = goals.includes('BUY');
+  useEffect(() => {
+    if (buying) {
+      heading.current?.focus({ preventScroll: true });
+    }
+  }, [buying]);
+  return (
+    <div className="flex flex-col gap-8">
+      {buying && (
+        <div className="flex flex-col gap-4">
+          <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
+            התוצאה שלכם
+          </h2>
+          <BuyResult answers={answers} onEdit={onEdit} />
+        </div>
+      )}
+      <AnswersSummary
+        steps={steps}
+        answers={answers}
+        goals={goals.filter((goal) => goal !== 'BUY')}
+        onEdit={onEdit}
+        onRestart={onRestart}
+        focus={!buying}
+      />
     </div>
   );
 }

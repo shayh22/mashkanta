@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help',
+  'start', 'start-question', 'start-help', 'start-result',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -130,6 +130,26 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('button', { name: 'הסבר על השאלה' }).click();
           await page.getByRole('dialog').waitFor();
         }
+      }
+      if (screen === 'start-result') {
+        // A buyer's answers, invented, straight to the result: written while the questionnaire is not
+        // open (it would write its own state over them), then read by a fresh load.
+        await page.goto(`${base}/#/buy`);
+        await page.evaluate(() =>
+          localStorage.setItem(
+            'mashkanta:questionnaire',
+            JSON.stringify({
+              state: {
+                goals: ['BUY'],
+                at: 'DONE',
+                answers: { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' },
+              },
+              version: 1,
+            }),
+          ),
+        );
+        await page.goto(`${base}/?fresh=${Date.now()}#/start/done`);
+        await page.getByText('החזר חודשי בהתחלה').waitFor({ timeout: 20_000 });
       }
       if (MONEY_STEPS[screen]) {
         // The statements live in memory: upload them again if this page has none.
