@@ -9,7 +9,8 @@ import { useBuyResult } from './hooks';
  * The buyer's result, straight from the answers: one number — the first monthly payment — the mix
  * as one bar, the few facts that matter, and what stands in the way when something does.
  */
-export function BuyResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
+/** Without `onEdit` and `onDetails`, a result someone shared: worked out again, nothing to change. */
+export function BuyResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit?: (step: string) => void; onDetails?: () => void }) {
   const { plan, result } = useBuyResult(answers);
 
   if (!plan) {
@@ -56,8 +57,8 @@ function Mix({
   data: OptimizationResponse;
   profile: BorrowerProfileRequest;
   equityShort: number;
-  onEdit: (step: string) => void;
-  onDetails: () => void;
+  onEdit?: (step: string) => void;
+  onDetails?: () => void;
 }) {
   const mix = data.recommended;
   const { summary, compliance, stress } = mix;
@@ -67,15 +68,6 @@ function Mix({
     compliance.findings.find((each) => each.level === 'WARNING' && each.code !== 'LTV');
   const cheapest = [...data.bankQuotes].sort((a, b) => a.rank - b.rank)[0];
   const tracks = summary.allocations.filter((track) => track.share > 0.0005);
-  const share = encodeURIComponent(
-    [
-      'התמהיל שלי מ"מפתח כלכלי":',
-      `הלוואה ${formatCurrency(summary.totalPrincipal)} ל-${formatTerm(summary.termMonths)}`,
-      `החזר בהתחלה ${formatCurrency(summary.initialPayment)} בחודש`,
-      ...tracks.map((track) => `${track.hebrewName} ${Math.round(track.share * 100)}%`),
-    ].join('\n'),
-  );
-
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -94,9 +86,11 @@ function Mix({
           <span>
             הבנק מממן עד {Math.round(SEGMENT_MAX_LTV[profile.segment] * 100)}% מהמחיר. חישבנו על {formatCurrency(profile.loanAmount)}.
           </span>
-          <button type="button" onClick={() => onEdit('equity')} className="min-h-11 self-start font-bold underline underline-offset-4">
-            לשנות את ההון העצמי
-          </button>
+          {onEdit && (
+            <button type="button" onClick={() => onEdit('equity')} className="min-h-11 self-start font-bold underline underline-offset-4">
+              לשנות את ההון העצמי
+            </button>
+          )}
         </p>
       )}
       {finding && (
@@ -141,19 +135,11 @@ function Mix({
         ))}
       </dl>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      {onDetails && (
         <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
           כל הפרטים
         </button>
-        <a
-          href={`https://wa.me/?text=${share}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex min-h-[52px] items-center justify-center rounded-full border-2 border-flow-ink px-3 text-base font-extrabold"
-        >
-          שיתוף בוואטסאפ
-        </a>
-      </div>
+      )}
       <p className="text-xs leading-relaxed text-flow-muted">
         לפי ריביות השוק של בנק ישראל ל-{formatTerm(summary.termMonths)}. אינו ייעוץ ואינו הצעה של בנק.
       </p>

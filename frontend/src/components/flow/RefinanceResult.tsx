@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import type { Answers } from '../../engine/flow/flow';
+import type { RefinanceSnapshot } from '../../engine/flow/share';
 import { VERDICT_LABELS } from '../../engine/refinance';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../../lib/format';
 import { bestRoute, ROUTE_NAME } from '../../lib/routes';
@@ -10,9 +12,31 @@ import { useRefinanceAnswers, useRefinanceEstimate } from './hooks';
  * fee, the switching costs and the better of the two routes. From figures typed in, an estimate —
  * said to be one — with the way to the exact check.
  */
-export function RefinanceResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
+export function RefinanceResult({
+  answers,
+  onEdit,
+  onDetails,
+  onSnapshot,
+}: {
+  answers: Answers;
+  onEdit: (step: string) => void;
+  onDetails: () => void;
+  /** The exact result's figures, for a shared link: the report itself cannot travel in one. */
+  onSnapshot: (snapshot: RefinanceSnapshot | undefined) => void;
+}) {
   const tracks = useRefinance((state) => state.tracks);
-  return isSampleTracks(tracks) ? <Estimate answers={answers} onEdit={onEdit} onDetails={onDetails} /> : <Exact answers={answers} onDetails={onDetails} />;
+  const exact = !isSampleTracks(tracks);
+  useEffect(() => {
+    if (!exact) {
+      onSnapshot(undefined);
+    }
+  }, [exact, onSnapshot]);
+  return exact ? <Exact answers={answers} onDetails={onDetails} onSnapshot={onSnapshot} /> : <Estimate answers={answers} onEdit={onEdit} onDetails={onDetails} />;
+}
+
+/** A refinance someone shared: its figures as they were, or the estimate worked out again from the answers. */
+export function SharedRefinance({ answers, snapshot }: { answers: Answers; snapshot?: RefinanceSnapshot }) {
+  return snapshot ? <SnapshotView answers={answers} snapshot={snapshot} /> : <Estimate answers={answers} />;
 }
 
 /** The headline the household asked for: what the payment drops by, or what is saved over the loan. */
@@ -75,32 +99,55 @@ function Facts({ rows }: { rows: readonly (readonly [string, string])[] }) {
   );
 }
 
-function Actions({ share, onDetails }: { share: string; onDetails: () => void }) {
+function Actions({ onDetails }: { onDetails?: () => void }) {
+  return onDetails ? (
+    <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
+      כל הפרטים
+    </button>
+  ) : null;
+}
+
+/** The exact result's own figures, as a shared link carries them. */
+function SnapshotView({ answers, snapshot }: { answers: Answers; snapshot: RefinanceSnapshot }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
-      <button type="button" onClick={onDetails} className="min-h-[52px] rounded-full border-2 border-flow-ink px-3 text-base font-extrabold">
-        כל הפרטים
-      </button>
-      <a
-        href={`https://wa.me/?text=${encodeURIComponent(share)}`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex min-h-[52px] items-center justify-center rounded-full border-2 border-flow-ink px-3 text-base font-extrabold"
-      >
-        שיתוף בוואטסאפ
-      </a>
-    </div>
+    <section aria-label="המיחזור" className="flex flex-col gap-3.5">
+      <Headline answers={answers} monthly={snapshot.monthlySaving} lifetime={snapshot.lifetimeSaving} />
+      <span className="self-start rounded-full bg-flow-pick px-3 py-1 text-sm font-bold text-flow-strong">{VERDICT_LABELS[snapshot.verdict]}</span>
+      <TodayAfter today={snapshot.currentPayment} after={snapshot.proposedPayment} />
+      <Facts
+        rows={[
+          ['הדרך המשתלמת', ROUTE_NAME[snapshot.route]],
+          ['עלות המעבר, כולל עמלות', formatCurrency(snapshot.upfrontCost)],
+          ['מחזיר את עצמו תוך', snapshot.breakevenMonth > 0 ? `${snapshot.breakevenMonth} חודשים` : 'לא מחזיר את עצמו'],
+        ]}
+      />
+      <p className="text-xs leading-relaxed text-flow-muted">לפי דוח היתרות של מי ששיתף. אינו ייעוץ ואינו הצעה של בנק.</p>
+    </section>
   );
 }
 
 /** From the uploaded report: the homeowner path's own analysis, with the questionnaire's answers in it. */
-function Exact({ answers, onDetails }: { answers: Answers; onDetails: () => void }) {
+function Exact({ answers, onDetails, onSnapshot }: { answers: Answers; onDetails: () => void; onSnapshot: (snapshot: RefinanceSnapshot) => void }) {
   useRefinanceAnswers(answers);
   const { comparison } = useRefinanceAnalysis();
-  if (!comparison) {
+  const route = comparison ? bestRoute(comparison) : undefined;
+  useEffect(() => {
+    if (comparison && route) {
+      onSnapshot({
+        currentPayment: Math.round(route.currentPayment),
+        proposedPayment: Math.round(route.proposedPayment),
+        monthlySaving: Math.round(route.monthlySaving),
+        lifetimeSaving: Math.round(route.lifetimeSaving),
+        upfrontCost: Math.round(route.upfrontCost),
+        breakevenMonth: route.breakevenMonth,
+        verdict: route.verdict,
+        route: comparison.best,
+      });
+    }
+  }, [comparison, route, onSnapshot]);
+  if (!comparison || !route) {
     return null;
   }
-  const route = bestRoute(comparison);
   const breakeven = route.breakevenMonth > 0 ? `${route.breakevenMonth} חודשים` : 'לא מחזיר את עצמו';
   return (
     <section aria-label="המיחזור" className="flex flex-col gap-3.5">
@@ -114,21 +161,15 @@ function Exact({ answers, onDetails }: { answers: Answers; onDetails: () => void
           ['מחזיר את עצמו תוך', breakeven],
         ]}
       />
-      <Actions
-        onDetails={onDetails}
-        share={[
-          'בדיקת המיחזור שלי מ"מפתח כלכלי":',
-          `החזר היום ${formatCurrency(route.currentPayment)}, אחרי ${formatCurrency(route.proposedPayment)}`,
-          `עלות המעבר ${formatCurrency(route.upfrontCost)} · ${VERDICT_LABELS[route.verdict]}`,
-        ].join('\n')}
-      />
+      <Actions onDetails={onDetails} />
       <p className="text-xs leading-relaxed text-flow-muted">לפי דוח היתרות וריביות השוק של בנק ישראל. אינו ייעוץ ואינו הצעה של בנק.</p>
     </section>
   );
 }
 
 /** From figures typed in: the rate they imply, against the engine's mix for the same balance and term. */
-function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (step: string) => void; onDetails: () => void }) {
+/** Without `onEdit`, a shared estimate: nothing to change or upload. */
+function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit?: (step: string) => void; onDetails?: () => void }) {
   const { estimate, result } = useRefinanceEstimate(answers);
 
   if (!estimate) {
@@ -138,9 +179,11 @@ function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (s
         <h3 id="refinance-result" className="text-[24px] font-black leading-tight">
           לבדיקת המיחזור חסרים פרטי המשכנתא
         </h3>
-        <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-12 self-start rounded-full bg-flow-strong px-5 text-base font-extrabold text-flow-on-strong">
-          להשלים
-        </button>
+        {onEdit && (
+          <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-12 self-start rounded-full bg-flow-strong px-5 text-base font-extrabold text-flow-on-strong">
+            להשלים
+          </button>
+        )}
       </section>
     );
   }
@@ -151,9 +194,11 @@ function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (s
           ההחזר והיתרה לא מסתדרים
         </h3>
         <p className="text-[15px]">בהחזר הזה היתרה לא נפרעת בזמן שנשאר. בדקו את המספרים, או העלו את דוח היתרות.</p>
-        <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-11 self-start font-bold underline underline-offset-4">
-          לבדוק את המספרים
-        </button>
+        {onEdit && (
+          <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-11 self-start font-bold underline underline-offset-4">
+            לבדוק את המספרים
+          </button>
+        )}
       </section>
     );
   }
@@ -188,18 +233,13 @@ function Estimate({ answers, onEdit, onDetails }: { answers: Answers; onEdit: (s
           <div className="flex flex-col gap-1.5 rounded-2xl bg-flow-accent/25 p-3.5 text-[15px]">
             <span className="font-extrabold">הערכה ממה שמילאתם</span>
             <span>בלי עמלת פירעון מוקדם ועלויות מעבר: הן תלויות בכל מסלול. עם דוח היתרות נחשב בדיוק.</span>
-            <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-11 self-start font-bold underline underline-offset-4">
-              להעלות את הדוח
-            </button>
+            {onEdit && (
+              <button type="button" onClick={() => onEdit('mortgageHow')} className="min-h-11 self-start font-bold underline underline-offset-4">
+                להעלות את הדוח
+              </button>
+            )}
           </div>
-          <Actions
-            onDetails={onDetails}
-            share={[
-              'הערכת המיחזור שלי מ"מפתח כלכלי":',
-              `החזר היום ${formatCurrency(current.payment)}, בתמהיל חדש ${formatCurrency(proposed.initialPayment)}`,
-              `ריבית בערך ${formatPercent(current.rate)} מול ${formatPercent(proposed.weightedInitialRate)} היום`,
-            ].join('\n')}
-          />
+          <Actions onDetails={onDetails} />
         </>
       )}
     </section>
