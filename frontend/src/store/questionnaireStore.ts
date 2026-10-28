@@ -67,6 +67,9 @@ interface QuestionnaireState {
   /** A purchase's mix built by hand, share per track; the calculator's while undefined. */
   manualShares?: ManualShares;
   setManualShares: (shares: ManualShares | undefined) => void;
+  /** Folding the loans marked into the mortgage, counted among the decisions. */
+  consolidate: boolean;
+  setConsolidate: (consolidate: boolean) => void;
   reset: () => void;
 }
 
@@ -102,13 +105,15 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       removeLoanOffer: (id) => set((state) => ({ loanOffers: state.loanOffers.filter((offer) => offer.id !== id) })),
       setLoanAmount: (loanAmount) => set({ loanAmount }),
       setManualShares: (manualShares) => set({ manualShares }),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [], loanOffers: [], loanAmount: undefined, manualShares: undefined }),
+      consolidate: false,
+      setConsolidate: (consolidate) => set({ consolidate }),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [], loanOffers: [], loanAmount: undefined, manualShares: undefined, consolidate: false }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers, loanOffers: state.loanOffers, loanAmount: state.loanAmount, manualShares: state.manualShares }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers, loanOffers: state.loanOffers, loanAmount: state.loanAmount, manualShares: state.manualShares, consolidate: state.consolidate }),
     },
   ),
 );

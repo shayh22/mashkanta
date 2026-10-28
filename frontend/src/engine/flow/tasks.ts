@@ -31,6 +31,8 @@ export interface TaskInput {
     readonly loanMoves?: readonly { readonly key: string; readonly label: string }[];
     /** Refinancing the mortgage kept among the decisions, where refinancing is not the goal itself. */
     readonly mortgage?: boolean;
+    /** Folding the loans into the mortgage, kept among the decisions. */
+    readonly consolidate?: boolean;
   };
 }
 
@@ -114,6 +116,9 @@ export function tasksFor(input: TaskInput): Task[] {
     }
     if (recovery.mortgage && !goals.includes('REFINANCE')) {
       add('rec-mortgage', 'לבקש הצעת מיחזור למשכנתא, לפי התמהיל החדש');
+    }
+    if (recovery.consolidate) {
+      add('rec-consolidate', 'לבקש מהבנק הלוואה לכל מטרה בשעבוד הדירה, לאיחוד ההלוואות שסימנתם');
     }
   }
   return tasks;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SharedPage, StartPage } from '../../pages/StartPage';
@@ -22,7 +22,7 @@ beforeEach(() => {
   } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined, manualShares: undefined });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined, manualShares: undefined, consolidate: false });
   useTrackPlanStore.setState({ actions: {}, answer: undefined, goal: '' });
   useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
@@ -400,6 +400,36 @@ describe('the questionnaire', () => {
     expect(screen.getByRole('region', { name: 'ההלוואות: מה אפשר לעשות' }).classList.contains('no-print')).toBe(true);
   });
 
+  it('folds the loans into the mortgage in full — the relief, the cost, the Bank of Israel’s tests — as one decision', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [
+        { id: 'l1', kind: 'CAR', label: 'הלוואה לרכב', balance: 60_000, annualRate: 0.09, monthlyPayment: 1_500, remainingMonths: 48, include: false },
+        { id: 'l2', kind: 'CREDIT_CARD', label: 'כרטיס', balance: 20_000, annualRate: 0.14, monthlyPayment: 950, remainingMonths: 24, include: false },
+      ],
+    });
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, hasLoans: 'YES' }, consolidate: false });
+    openAt('improve');
+    const user = userEvent.setup();
+    renderPage();
+    const panel = await screen.findByRole('region', { name: 'לאחד את ההלוואות לתוך המשכנתא' });
+    // The home and the mortgage, as the questionnaire has them.
+    expect(useConsolidation.getState().property).toMatchObject({ value: 2_400_000, mortgageBalance: 800_000 });
+    await user.click(within(panel).getByRole('checkbox', { name: /הלוואה לרכב/ }));
+    await user.click(within(panel).getByRole('checkbox', { name: /כרטיס/ }));
+    expect(within(panel).getByText('אחרי האיחוד')).toBeTruthy();
+    expect(within(within(panel).getByRole('region', { name: 'כללי בנק ישראל' })).getByRole('status').textContent).toMatch(/כללי בנק ישראל|40%/);
+    const relief = Number(within(panel).getByText('פנוי כל חודש').nextSibling!.textContent!.replace(/[^\d]/g, ''));
+    expect(relief).toBeGreaterThan(0);
+
+    await user.click(within(panel).getByRole('checkbox', { name: 'לכלול את האיחוד בהחלטות' }));
+    const decision = screen.getByRole('checkbox', { name: /^לאחד את ההלוואות לתוך המשכנתא/ }) as HTMLInputElement;
+    expect(decision.checked).toBe(true);
+    await go('השוואה בין בנקים');
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('לבקש מהבנק הלוואה לכל מטרה בשעבוד הדירה, לאיחוד ההלוואות שסימנתם')).toBeTruthy();
+  }, 30_000);
+
   it('walks back through the result screens, and from the first to the questions', async () => {
     serve(false);
     useQuestionnaire.setState({
@@ -448,6 +478,14 @@ describe('the questionnaire', () => {
     }
     // A mix of their own, from a preset: the result follows it.
     await user.click(screen.getByRole('radio', { name: 'לבנות בעצמי' }));
+    // With prime in the mix, what if prime rose three points a year from now: a dearer payment then.
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'המסלולים' })).getByText(/פריים/)).toBeTruthy(), { timeout: 10_000 });
+    const whatIf = screen.getByRole('region', { name: 'מה אם' });
+    const then = () => within(whatIf).getByText('ההחזר בעוד שנה').nextSibling!.textContent!;
+    fireEvent.change(within(whatIf).getByLabelText('כמה הפריים עולה'), { target: { value: '0' } });
+    expect(then()).toContain('בלי שינוי');
+    fireEvent.change(within(whatIf).getByLabelText('כמה הפריים עולה'), { target: { value: '0.03' } });
+    expect(then()).toMatch(/\(\+/);
     await user.click(screen.getByRole('button', { name: 'הכל בקבועה לא צמודה' }));
     expect(useQuestionnaire.getState().manualShares).toEqual({ FIXED_UNLINKED: 1 });
     expect(screen.getByText(/^עומד בכללי בנק ישראל/)).toBeTruthy();

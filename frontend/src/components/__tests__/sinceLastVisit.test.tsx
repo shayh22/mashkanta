@@ -60,4 +60,16 @@ describe('since the last visit', () => {
     const { container: loading } = render(<second.SinceLastVisit />);
     expect(loading.textContent).toBe('');
   });
+
+  it('reports the same in the questionnaire, in its own look', async () => {
+    const { useMarket } = await load(lastWeek);
+    const { SinceLastVisitCard } = await import('../flow/SinceLastVisit');
+    useMarket.setState({ status: 'ready', market: today });
+    render(<SinceLastVisitCard />);
+    const card = screen.getByRole('region', { name: 'מה השתנה מאז הביקור הקודם' });
+    expect(card.textContent).toContain('ריבית הפריים');
+    expect(card.textContent).toContain('לטובתכם');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'הבנתי' }));
+    expect(screen.queryByRole('region', { name: 'מה השתנה מאז הביקור הקודם' })).toBeNull();
+  });
 });
