@@ -35,7 +35,7 @@ export function ExpensesByCategory({ picture }: { picture: MonthlyPicture }) {
     return null;
   }
   return (
-    <Panel title="ההוצאות, חיוב אחר חיוב">
+    <Panel title="ההוצאות, חיוב אחר חיוב" className="no-print">
       <p className="text-sm text-flow-muted">פתחו קטגוריה וסמנו כל חיוב: חובה, לצמצם או לבטל. מה שמסומן לביטול נכנס להחלטות.</p>
       <ul className="flex flex-col">
         {lines.map((line) => {
@@ -110,7 +110,7 @@ export function LoanMovesPanel() {
     return null;
   }
   return (
-    <Panel title="ההלוואות: מה אפשר לעשות">
+    <Panel title="ההלוואות: מה אפשר לעשות" className="no-print">
       <ul className="flex flex-col gap-3">
         {loans.map((loan) => (
           <LoanMoves key={loan.key} loan={loan} />
@@ -220,39 +220,41 @@ export function NoamAdvisor({ picture }: { picture: MonthlyPicture }) {
   const advice = saved?.for === key ? saved.advice : undefined;
   const spent = new Map(totals.categories.map((category) => [category.id as string, category.monthly]));
   return (
-    <section aria-label="נועם: תוכנית לחודש" className="flex flex-col gap-3 rounded-[20px] bg-flow-card p-4">
+    <section aria-label="נועם: תוכנית לחודש" className={`flex flex-col gap-3 rounded-[20px] bg-flow-card p-4 ${advice ? '' : 'no-print'}`}>
       <div className="flex items-center gap-3">
         <NoamAvatar size={44} />
         <h3 className="text-base font-extrabold">נועם: תוכנית לחודש</h3>
       </div>
-      <label className="flex flex-col gap-1.5 text-[15px] font-bold">
-        מה חשוב לכם עכשיו?
-        <textarea
-          value={goal}
-          maxLength={MAX_GOAL_LENGTH}
-          placeholder={GOAL_EXAMPLES[0]}
-          onChange={(event) => setGoal(event.target.value)}
-          className="min-h-20 rounded-2xl border border-flow-line bg-flow-ground p-3 text-base font-normal"
-        />
-      </label>
-      {!goal && (
-        <div className="flex flex-wrap gap-2">
-          {GOAL_EXAMPLES.map((example) => (
-            <button key={example} type="button" onClick={() => setGoal(example)} className="min-h-10 rounded-full border border-flow-line px-3 text-sm font-semibold">
-              {example}
-            </button>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        disabled={advisor.isPending || goal.trim().length < 3}
-        onClick={() => advisor.mutate({ ...totals, goal: goal.trim() })}
-        className="min-h-12 rounded-full bg-flow-strong px-5 text-base font-extrabold text-flow-on-strong disabled:opacity-40"
-      >
-        {advisor.isPending ? 'נועם בונה תוכנית…' : 'נועם, תבנה לי יעדים'}
-      </button>
-      <p className="text-xs text-flow-muted">נשלחים רק סכומים לפי קטגוריה. בלי שמות של עסקים, תאריכים או חשבון.</p>
+      <div className="no-print flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5 text-[15px] font-bold">
+          מה חשוב לכם עכשיו?
+          <textarea
+            value={goal}
+            maxLength={MAX_GOAL_LENGTH}
+            placeholder={GOAL_EXAMPLES[0]}
+            onChange={(event) => setGoal(event.target.value)}
+            className="min-h-20 rounded-2xl border border-flow-line bg-flow-ground p-3 text-base font-normal"
+          />
+        </label>
+        {!goal && (
+          <div className="flex flex-wrap gap-2">
+            {GOAL_EXAMPLES.map((example) => (
+              <button key={example} type="button" onClick={() => setGoal(example)} className="min-h-10 rounded-full border border-flow-line px-3 text-sm font-semibold">
+                {example}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={advisor.isPending || goal.trim().length < 3}
+          onClick={() => advisor.mutate({ ...totals, goal: goal.trim() })}
+          className="min-h-12 rounded-full bg-flow-strong px-5 text-base font-extrabold text-flow-on-strong disabled:opacity-40"
+        >
+          {advisor.isPending ? 'נועם בונה תוכנית…' : 'נועם, תבנה לי יעדים'}
+        </button>
+        <p className="text-xs text-flow-muted">נשלחים רק סכומים לפי קטגוריה. בלי שמות של עסקים, תאריכים או חשבון.</p>
+      </div>
       {advisor.isError && (
         <p role="alert" className="text-[15px] text-negative">
           {advisor.error instanceof Error ? advisor.error.message : 'התוכנית לא התקבלה.'}

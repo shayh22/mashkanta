@@ -109,7 +109,7 @@ function AddOffer({ goal }: { goal: MortgageOffer['for'] }) {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="no-print flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
         <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-full bg-flow-strong px-3 text-center text-[15px] font-extrabold text-flow-on-strong">
           {reading ? 'קורא…' : 'העלאת אישור עקרוני'}

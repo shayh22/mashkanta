@@ -5,9 +5,10 @@ import type { TrackType } from '../../lib/types';
 /** The pieces the result screens and their details are built of, in the questionnaire's look. */
 
 
-export function Panel({ title, children }: { title: string; children: ReactNode }) {
+/** `className="no-print"` for a panel that is all controls: on paper, the decisions it led to stand for it. */
+export function Panel({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3 rounded-[20px] bg-flow-card p-4">
+    <section aria-label={title} className={`flex flex-col gap-3 rounded-[20px] bg-flow-card p-4 ${className}`}>
       <h3 className="text-base font-extrabold">{title}</h3>
       {children}
     </section>

@@ -6,6 +6,7 @@ import { proposedSpecs } from '../../engine/refinance';
 import { scenarioOf } from '../../lib/api';
 import type { MixSummary } from '../../lib/types';
 import { useMarketVersion } from '../../store/marketVersion';
+import { isSampleDebts, useConsolidation } from '../../store/consolidationStore';
 import { useQuestionnaire } from '../../store/questionnaireStore';
 import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
 import { useWizard } from '../../store/wizardStore';
@@ -81,3 +82,13 @@ export function useRankedOffers(goal: MortgageOffer['for'], answers: Answers) {
   return { priced, marketMix, ranked };
 }
 
+
+/**
+ * The amount loan offers are compared for: what the household typed, else the loans already there
+ * — the same amount on the banks screen and in the tasks, so both name the same cheapest offer.
+ */
+export function useLoanAmount(): number {
+  const stored = useQuestionnaire((state) => state.loanAmount);
+  const debts = useConsolidation((state) => state.debts);
+  return stored ?? (isSampleDebts(debts) ? 0 : Math.round(debts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0)));
+}
