@@ -175,7 +175,7 @@ export function QuestionScreen({
       </div>
 
       <div className="flex items-start gap-2.5 pt-2">
-        <h2 ref={heading} tabIndex={-1} className="flex-1 text-[32px] font-black leading-[1.1] tracking-tight outline-none">
+        <h2 ref={heading} tabIndex={-1} className="flex-1 text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
           {step.title}
         </h2>
         <button
@@ -223,15 +223,23 @@ export function AnswersSummary({
   goals,
   onEdit,
   onRestart,
+  focus = true,
 }: {
   steps: readonly Step[];
   answers: Answers;
+  /** The goals whose result is not shown above, linked to their pages. */
   goals: readonly Goal[];
   onEdit: (step: string) => void;
   onRestart: () => void;
+  /** Whether the screen starts here, rather than at a result above. */
+  focus?: boolean;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => heading.current?.focus({ preventScroll: true }), []);
+  useEffect(() => {
+    if (focus) {
+      heading.current?.focus({ preventScroll: true });
+    }
+  }, [focus]);
   const RESULTS: Record<Goal, { label: string; href: string }> = {
     REFINANCE: { label: 'לבדיקת המיחזור', href: '#/own' },
     BUY: { label: 'לתמהיל לדירה', href: '#/buy' },
@@ -239,7 +247,7 @@ export function AnswersSummary({
   };
   return (
     <div className="flex flex-col gap-5">
-      <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none">
+      <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
         זה מה שסיפרתם
       </h2>
       {CATALOG.sections

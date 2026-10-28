@@ -3,10 +3,11 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StartPage } from '../../pages/StartPage';
-import { START, useQuestionnaire } from '../../store/questionnaireStore';
+import { DONE, START, useQuestionnaire } from '../../store/questionnaireStore';
 import { useMoney } from '../../store/moneyStore';
 import { useRefinance } from '../../store/refinanceStore';
 import { useConsolidation } from '../../store/consolidationStore';
+import { useWizard } from '../../store/wizardStore';
 
 beforeEach(() => {
   window.history.replaceState(null, '', '#/start');
@@ -15,6 +16,7 @@ beforeEach(() => {
   useMoney.setState({ files: [], reading: false, pending: 0 });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
+  useWizard.getState().reset();
 });
 afterEach(() => {
   cleanup();
@@ -173,22 +175,88 @@ describe('the questionnaire', () => {
     expect(useQuestionnaire.getState().answers.worries).toEqual(['OVERDRAFT', 'SAVING']);
   });
 
-  it('ends on what was answered, each a tap from changing, with the way to each result', async () => {
+  it('ends on the buyer’s result — the first payment, the mix — then what was answered, each a tap from changing', async () => {
     serve(false);
     useQuestionnaire.setState({
       goals: ['BUY'],
-      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 20_000, hasObligations: 'NO', stability: 'BALANCED' },
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED' },
       at: 'stability',
     });
     const user = userEvent.setup();
     renderPage();
     await user.click(next());
     expect(window.location.hash).toBe('#/start/done');
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'התוצאה שלכם' }));
+    await screen.findByText('החזר חודשי בהתחלה', {}, { timeout: 10_000 });
+    const payment = document.getElementById('buy-result')!;
+    expect(payment.tagName).toBe('H3');
+    expect(Number(payment.textContent!.replace(/[^\d]/g, ''))).toBeGreaterThan(3_000);
+    expect(screen.getByRole('img', { name: /%/ })).toBeTruthy();
+    expect(screen.getByText('סך הכל תשלמו')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'שיתוף בוואטסאפ' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    expect(screen.queryByRole('link', { name: 'לתמהיל לדירה' })).toBeNull();
+
     expect(screen.getByRole('heading', { name: 'זה מה שסיפרתם' })).toBeTruthy();
     expect(screen.getByText('2,000,000 ₪')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'לתמהיל לדירה' }).getAttribute('href')).toBe('#/buy');
     await user.click(screen.getByRole('button', { name: /כמה עולה הדירה\?/ }));
     expect(screen.getByRole('heading', { name: 'כמה עולה הדירה?' })).toBeTruthy();
+  }, 20_000);
+
+  it('says how much equity is missing above the bank’s ceiling, and takes the household to change it', async () => {
+    serve(false);
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'UPGRADER', equity: 500_000, hasEligibility: 'NO', netIncome: 25_000, hasObligations: 'NO', stability: 'STABLE' },
+      at: DONE,
+    });
+    window.history.replaceState(null, '', '#/start/done');
+    const user = userEvent.setup();
+    renderPage();
+    const alert = await screen.findByText((text) => text.replace(/\u200f/g, '') === 'חסרים 100,000 ₪ הון עצמי', {}, { timeout: 10_000 });
+    expect(alert.closest('[role="alert"]')!.textContent).toContain('עד 70% מהמחיר');
+    await user.click(screen.getByRole('button', { name: 'לשנות את ההון העצמי' }));
+    expect(screen.getByRole('heading', { name: 'כמה הון עצמי יש לכם?' })).toBeTruthy();
+  }, 20_000);
+
+  it('hands the answers to the full mix screen, for every detail and setting', async () => {
+    serve(false);
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'UPGRADER', equity: 500_000, hasEligibility: 'NO', netIncome: 25_000, hasObligations: 'YES', obligations: 900, stability: 'STABLE' },
+      at: DONE,
+    });
+    window.history.replaceState(null, '', '#/start/done');
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'כל הפרטים' }, { timeout: 10_000 }));
+    expect(window.location.hash).toBe('#/buy');
+    // The loan asked for is kept; the wizard shows it within the upgrader's ceiling.
+    expect(useWizard.getState()).toMatchObject({
+      requestedLoanAmount: 1_500_000,
+      profile: { propertyValue: 2_000_000, loanAmount: 1_400_000, monthlyNetIncome: 25_000, existingMonthlyObligations: 900, segment: 'UPGRADER', riskTolerance: 3 },
+    });
+  }, 20_000);
+
+  it('needs no mortgage when the equity covers the price', async () => {
+    serve(false);
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 1_000_000, segment: 'FIRST_HOME', equity: 1_200_000, hasEligibility: 'NO', netIncome: 25_000, hasObligations: 'NO', stability: 'STABLE' },
+      at: DONE,
+    });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'אין צורך במשכנתא' })).toBeTruthy();
+    expect(screen.getByText(/ונשארים \u200f?200,000/)).toBeTruthy();
+  });
+
+  it('links each goal whose result is not here yet to its page', async () => {
+    serve(false);
+    useQuestionnaire.setState({ goals: ['RECOVERY'], answers: { hasMortgage: 'NO', statementsFiles: 'LATER', worries: ['SAVING'], hasLoans: 'NO' }, at: DONE });
+    window.history.replaceState(null, '', '#/start/done');
+    renderPage();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'זה מה שסיפרתם' }));
+    expect(screen.getByRole('link', { name: 'לתוכנית ההבראה' }).getAttribute('href')).toBe('#/money');
   });
 
   it('offers to pick up where the household stopped, or to start again', async () => {

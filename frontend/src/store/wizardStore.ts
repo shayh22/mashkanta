@@ -33,7 +33,7 @@ function clampToCeiling(requested: number, propertyValue: number, segment: Buyer
   return Math.min(requested, propertyValue * SEGMENT_MAX_LTV[segment]);
 }
 
-const DEFAULT_PROFILE: BorrowerProfileRequest = {
+export const DEFAULT_PROFILE: BorrowerProfileRequest = {
   propertyValue: 2_400_000,
   loanAmount: 1_680_000,
   termMonths: 300,

@@ -1,16 +1,7 @@
 import type { MixProposal, SavingsComparison, TrackType } from '../lib/types';
 import { formatCurrency, formatPercent, formatSignedCurrency } from '../lib/format';
 import { Card, LevelBadge } from './ui';
-
-/** Palette per track, reused by the allocation bar and the legend so colour means one thing. */
-const TRACK_COLORS: Record<TrackType, string> = {
-  PRIME: '#6366F1',
-  FIXED_UNLINKED: '#0EA5E9',
-  FIXED_LINKED: '#10B981',
-  VARIABLE_UNLINKED: '#F59E0B',
-  VARIABLE_LINKED: '#F43F5E',
-  ELIGIBILITY: '#8B5CF6',
-};
+import { TRACK_COLORS } from '../lib/trackColors';
 
 /**
  * The chosen mix — the engine's, or one the borrower built — beside the three standardised
