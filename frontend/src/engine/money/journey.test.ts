@@ -9,6 +9,7 @@ import { parseCsv, readXlsx } from './sheets';
 import { readStatement } from './statementImport';
 
 const bank = readStatement(parseCsv(BANK_CSV), 'b')!;
+const loanOf = (name: string, monthly: number, key = name) => ({ key, name, monthly });
 const both = async () => monthlyPicture([bank, readStatement(await readXlsx(await cardXlsx()), 'c')!])!;
 
 describe('the balance line', () => {
@@ -67,6 +68,26 @@ describe('the decisions in the summary', () => {
     expect(freedBy(withTarget, new Set(['overdraft']))).toBeCloseTo(30, 6);
   });
 
+  it('counts the overdraft’s interest once, whether marked to cancel or under the advisor’s fee target', async () => {
+    const picture = await both();
+    const interest = { 'תשלום ריבית על משיכת יתר- מינוס': { flexibility: 'CANCEL' as const } };
+    expect(decisionsOf(picture, interest).map((d) => d.key)).toEqual(['overdraft']);
+    expect(decisionsOf(picture, {}, [{ category: 'FEES', current: 30, target: 0 }]).map((d) => d.key)).toEqual(['target:FEES']);
+  });
+
+  it('counts a fee once: not under fees when marked to cancel, nor when it is the overdraft’s', () => {
+    const fee = (id: string, month: string, description: string, amount: number) => ({ id, date: `${month}-03`, description, amount, source: 'BANK' as const });
+    const months = ['2026-04', '2026-05', '2026-06'];
+    const extra = months.flatMap((month, i) => [fee(`f${i}`, month, 'דמי כרטיס', -20), fee(`g${i}`, month, 'עמלת משיכת יתר', -10)]);
+    const picture = monthlyPicture([{ ...bank, transactions: [...bank.transactions, ...extra] }])!;
+    const overdraft = decisionsOf(picture, {}).find((d) => d.key === 'overdraft')!.monthly;
+    // The overdraft's fee is in its interest; the card fee alone is under fees.
+    expect(decisionsOf(picture, {}).find((d) => d.key === 'fees')!.monthly).toBeCloseTo(20, 6);
+    const cancelled = decisionsOf(picture, { 'דמי כרטיס': { flexibility: 'CANCEL' } });
+    expect(cancelled.map((d) => d.key)).toEqual(['cancel', 'overdraft']);
+    expect(freedBy(cancelled, new Set(cancelled.map((d) => d.key)))).toBeCloseTo(20 + overdraft, 6);
+  });
+
   it('splits each category by what the household said, with the line after cancellations', async () => {
     const rows = flexibilityRows(await both(), { 'חנות הדוגמאות': { flexibility: 'CANCEL' }, 'רמי לוי סניף דוגמה': { flexibility: 'MUST' } });
     expect(rows.find((row) => row.key === 'GROCERIES')).toMatchObject({ must: 2_000, open: 0 });
@@ -90,26 +111,34 @@ describe('moves on the loans screen, as decisions', () => {
   const plan = { balance: 20_000, annualRate: 0.06, remainingMonths: 36 };
 
   it('prices a balloon against the payment the statements show, and says what it costs', () => {
-    const decision = loanDecision('הלוואה דוגמה', 667, { ...plan, move: 'BALLOON' })!;
+    const decision = loanDecision(loanOf('הלוואה דוגמה', 667), { ...plan, move: 'BALLOON' })!;
     expect(decision.monthly).toBeCloseTo(567, 6);
     expect(decision.label).toBe('הלוואה דוגמה: בלון');
     expect(decision.note).toContain('20,000');
     expect(decision.source).toBe('debts');
   });
 
+  it('keeps two loans of the same name apart, and never prices a move as cheaper than keeping', () => {
+    const one = loanDecision(loanOf('הלוואה', 667, 'debt:a'), { ...plan, move: 'BALLOON' })!;
+    const two = loanDecision(loanOf('הלוואה', 667, 'debt:b'), { ...plan, move: 'BALLOON' })!;
+    expect(one.key).not.toBe(two.key);
+    // A stated payment well above the terms' (insurance riding on it) still costs the balloon its extra interest.
+    expect(loanDecision(loanOf('הלוואה', 1_500), { ...plan, move: 'BALLOON' })!.note).not.toContain('-');
+  });
+
   it('spreads a loan over twice what is left by default, or as chosen', () => {
     expect(defaultExtendYears(36)).toBe(6);
     expect(defaultExtendYears(300)).toBe(40);
-    expect(loanDecision('ה', 667, { ...plan, move: 'EXTEND' })!.label).toBe('ה: פריסה ל-6 שנים');
-    expect(loanDecision('ה', 667, { ...plan, move: 'EXTEND', extendYears: 10 })!.label).toBe('ה: פריסה ל-10 שנים');
+    expect(loanDecision(loanOf('ה', 667), { ...plan, move: 'EXTEND' })!.label).toBe('ה: פריסה ל-6 שנים');
+    expect(loanDecision(loanOf('ה', 667), { ...plan, move: 'EXTEND', extendYears: 10 })!.label).toBe('ה: פריסה ל-10 שנים');
   });
 
   it('is nothing while the loan is kept, its terms are missing, or nothing is freed', () => {
-    expect(loanDecision('ה', 667, { ...plan, move: 'KEEP' })).toBeUndefined();
-    expect(loanDecision('ה', 667, { move: 'BALLOON', balance: 20_000 })).toBeUndefined();
-    expect(loanDecision('ה', 667, undefined)).toBeUndefined();
+    expect(loanDecision(loanOf('ה', 667), { ...plan, move: 'KEEP' })).toBeUndefined();
+    expect(loanDecision(loanOf('ה', 667), { move: 'BALLOON', balance: 20_000 })).toBeUndefined();
+    expect(loanDecision(loanOf('ה', 667), undefined)).toBeUndefined();
     // A balloon dearer than the payment frees nothing.
-    expect(loanDecision('ה', 50, { ...plan, move: 'BALLOON' })).toBeUndefined();
+    expect(loanDecision(loanOf('ה', 50), { ...plan, move: 'BALLOON' })).toBeUndefined();
   });
 
   it('counts a refinance only when it lowers the payment, with its cost', () => {

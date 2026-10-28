@@ -54,6 +54,9 @@ export function loanMoves(terms: LoanTerms, extendMonths: number, statedPayment?
   const months = Math.round(terms.remainingMonths);
   const keepMonthly = statedPayment && statedPayment > 0 ? statedPayment : annuity(terms.balance, terms.annualRate, months);
   const keepTotal = keepMonthly * months;
+  // What a move costs is measured against the terms themselves: a stated payment above them (an
+  // insurance riding on it) would otherwise make a dearer loan look cheaper.
+  const termsTotal = annuity(terms.balance, terms.annualRate, months) * months;
   const interestOnly = (terms.balance * terms.annualRate) / 12;
   const balloonTotal = interestOnly * months + terms.balance;
   const longer = Math.round(Math.min(480, Math.max(months + 1, extendMonths)));
@@ -61,7 +64,7 @@ export function loanMoves(terms: LoanTerms, extendMonths: number, statedPayment?
   const extendTotal = extendMonthly * longer;
   return {
     KEEP: { kind: 'KEEP', monthly: keepMonthly, months, atEnd: 0, total: keepTotal, extraCost: 0 },
-    BALLOON: { kind: 'BALLOON', monthly: interestOnly, months, atEnd: terms.balance, total: balloonTotal, extraCost: balloonTotal - keepTotal },
-    EXTEND: { kind: 'EXTEND', monthly: extendMonthly, months: longer, atEnd: 0, total: extendTotal, extraCost: extendTotal - keepTotal },
+    BALLOON: { kind: 'BALLOON', monthly: interestOnly, months, atEnd: terms.balance, total: balloonTotal, extraCost: Math.max(0, balloonTotal - termsTotal) },
+    EXTEND: { kind: 'EXTEND', monthly: extendMonthly, months: longer, atEnd: 0, total: extendTotal, extraCost: Math.max(0, extendTotal - termsTotal) },
   };
 }

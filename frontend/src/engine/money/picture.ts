@@ -117,6 +117,12 @@ export const payeeOf = (description: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** The name a business is kept under: its payee, or the whole description where nothing is left of it. */
+export const payeeName = (description: string) => payeeOf(description) || description;
+
+/** A fee line that is the overdraft's interest. */
+export const OVERDRAFT_INTEREST = /משיכת יתר|מינוס/;
+
 function lines(
   transactions: readonly Classified[],
   months: readonly string[],
@@ -134,7 +140,7 @@ function lines(
       const lastMonth = sign * members.filter((transaction) => monthOf(transaction.date) === last).reduce((sum, t) => sum + t.amount, 0);
       const payees = new Map<string, { total: number; count: number; months: Set<string>; standing: boolean }>();
       for (const transaction of members) {
-        const name = payeeOf(transaction.description) || transaction.description;
+        const name = payeeName(transaction.description);
         const entry = payees.get(name) ?? { total: 0, count: 0, months: new Set<string>(), standing: false };
         entry.months.add(monthOf(transaction.date));
         payees.set(name, {
@@ -192,7 +198,7 @@ export function monthlyPicture(statements: readonly Statement[], overrides: Cate
         all.push({ ...transaction, category: 'CARD_UNDETAILED' });
         continue;
       }
-      const own = transaction.source === 'BANK' && transaction.amount > 0 ? undefined : overrides[payeeOf(transaction.description)];
+      const own = transaction.source === 'BANK' && transaction.amount > 0 ? undefined : overrides[payeeName(transaction.description)];
       all.push({ ...transaction, category: own ?? categorize(transaction) });
     }
   }
@@ -295,7 +301,7 @@ function overdraftOf(
     }
   }
   const interest = -transactions
-    .filter((transaction) => transaction.category === 'FEES' && /משיכת יתר|מינוס/.test(transaction.description))
+    .filter((transaction) => transaction.category === 'FEES' && OVERDRAFT_INTEREST.test(transaction.description))
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   return {
     monthsBelow: below.size,

@@ -1,5 +1,5 @@
 import { factsFor, type ConsultFact } from '../../engine/money/consultRequest';
-import { defaultExtendYears, loanDecision, mortgageDecision } from '../../engine/money/decisions';
+import { defaultExtendYears, loanDecision, mortgageDecision, type LoanPlan } from '../../engine/money/decisions';
 import { loanMoves, validTerms, type LoanMoveKind } from '../../engine/money/loanMoves';
 import type { MonthlyPicture } from '../../engine/money/picture';
 import { VERDICT_LABELS } from '../../engine/refinance';
@@ -8,6 +8,7 @@ import { useMoney, useMoneyCategories } from '../../store/moneyStore';
 import {
   loanCandidates,
   NOT_ON_STATEMENTS,
+  ownPlanOf,
   planOf,
   useJourneyLoans,
   type JourneyLoan,
@@ -161,13 +162,13 @@ function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonl
   const linkLoan = useMoney((state) => state.linkLoan);
   const plan = planOf(loan, plans);
   const name = loan.name;
-  const key = loan.key;
+  const update = (patch: Partial<LoanPlan>) => setLoan(loan.key, { ...ownPlanOf(loan, plans), ...patch });
   const terms = { balance: plan?.balance, annualRate: plan?.annualRate, remainingMonths: plan?.remainingMonths };
   const ready = validTerms(terms);
   const extendYears = plan.extendYears ?? defaultExtendYears(plan.remainingMonths ?? 12);
   const moves = ready ? loanMoves(terms, extendYears * 12, loan.monthly) : undefined;
   const chosen = plan.move;
-  const decision = loanDecision(name, loan.monthly, plan);
+  const decision = loanDecision(loan, plan);
   return (
     <li className="space-y-3 rounded-xl border border-line p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -206,7 +207,7 @@ function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonl
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="space-y-1 text-xs text-ink-soft">
           <span>יתרה לסילוק (₪)</span>
-          <NumberInput label={`יתרה של ${name}`} value={plan.balance ?? 0} digits={0} min={0} step={1_000} onChange={(balance) => setLoan(key, { balance })} />
+          <NumberInput label={`יתרה של ${name}`} value={plan.balance ?? 0} digits={0} min={0} step={1_000} onChange={(balance) => update({ balance })} />
         </label>
         <label className="space-y-1 text-xs text-ink-soft">
           <span>ריבית שנתית (%)</span>
@@ -218,12 +219,12 @@ function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonl
             min={0}
             max={0.4}
             step={0.0025}
-            onChange={(annualRate) => setLoan(key, { annualRate })}
+            onChange={(annualRate) => update({ annualRate })}
           />
         </label>
         <label className="space-y-1 text-xs text-ink-soft">
           <span>חודשים שנותרו</span>
-          <NumberInput label={`חודשים שנותרו ב${name}`} value={plan.remainingMonths ?? 0} digits={0} min={0} max={480} step={1} onChange={(remainingMonths) => setLoan(key, { remainingMonths: Math.round(remainingMonths) })} />
+          <NumberInput label={`חודשים שנותרו ב${name}`} value={plan.remainingMonths ?? 0} digits={0} min={0} max={480} step={1} onChange={(remainingMonths) => update({ remainingMonths: Math.round(remainingMonths) })} />
         </label>
       </div>
 
@@ -241,7 +242,7 @@ function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonl
                     chosen === kind ? 'border-brand-600 bg-brand-50 text-ink' : 'border-line text-ink-muted'
                   }`}
                 >
-                  <input type="radio" name={`move-${name}`} className="accent-brand-600" checked={chosen === kind} onChange={() => setLoan(key, { move: kind })} />
+                  <input type="radio" name={`move-${loan.key}`} className="accent-brand-600" checked={chosen === kind} onChange={() => update({ move: kind })} />
                   {MOVE_LABELS[kind]}
                 </label>
               ))}
@@ -249,7 +250,7 @@ function LoanCard({ loan, candidates }: { loan: JourneyLoan; candidates: readonl
             {chosen === 'EXTEND' && (
               <label className="flex items-center gap-2 text-sm text-ink-muted">
                 לפרוס על
-                <NumberInput label={`שנים לפריסה של ${name}`} className="w-20" value={extendYears} digits={0} min={1} max={40} step={1} onChange={(years) => setLoan(key, { extendYears: Math.round(years) })} />
+                <NumberInput label={`שנים לפריסה של ${name}`} className="w-20" value={extendYears} digits={0} min={1} max={40} step={1} onChange={(years) => update({ extendYears: Math.round(years) })} />
                 שנים
               </label>
             )}
