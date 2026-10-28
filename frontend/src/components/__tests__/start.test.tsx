@@ -500,7 +500,9 @@ describe('the questionnaire', () => {
     await user.click(screen.getByRole('button', { name: 'לפתוח את התשובות אצלי ולשנות' }));
     expect(useQuestionnaire.getState().goals).toEqual(['RECOVERY']);
     await user.click(screen.getByRole('button', { name: 'כן, לפתוח אצלי' }));
-    expect(useQuestionnaire.getState()).toMatchObject({ goals: ['BUY'], at: DONE, answers: expect.objectContaining(answers) });
+    expect(useQuestionnaire.getState()).toMatchObject({ goals: ['BUY'], at: DONE, answers });
+    // The visitor's own answer is replaced, not mixed in.
+    expect(useQuestionnaire.getState().answers.hasMortgage).toBeUndefined();
     expect(window.location.hash).toBe('#/start/done');
   }, 30_000);
 
