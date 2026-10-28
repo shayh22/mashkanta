@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StartPage } from '../../pages/StartPage';
 import { DONE, START, useQuestionnaire } from '../../store/questionnaireStore';
-import { useMoney } from '../../store/moneyStore';
+import { useMoney, useMoneyCategories } from '../../store/moneyStore';
+import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements';
 import { useRefinance } from '../../store/refinanceStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useWizard } from '../../store/wizardStore';
@@ -363,8 +364,9 @@ describe('the questionnaire', () => {
     const car = new File([scheduleText('bank', 'שיעור ריבית 6%', 80_000)], 'car.txt', { type: 'text/plain' });
     const renovation = new File([scheduleText('bank', 'שיעור ריבית 6%', 40_000)], 'renovation.txt', { type: 'text/plain' });
     await user.upload(screen.getByLabelText('בחירת מסמכי הלוואות'), [car, renovation]);
-    const list = await screen.findByRole('region', { name: 'ההלוואות שלכם' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    // The documents are read one after the other: wait for both.
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'ההלוואות שלכם' })).getAllByRole('listitem')).toHaveLength(2));
+    const list = screen.getByRole('region', { name: 'ההלוואות שלכם' });
     expect(next().disabled).toBe(false);
 
     await user.upload(screen.getByLabelText('בחירת מסמכי הלוואות'), car);
@@ -384,13 +386,77 @@ describe('the questionnaire', () => {
     expect(useConsolidation.getState().debts.find((debt) => debt.label === 'כרטיס')).toMatchObject({ balance: 12_000, monthlyPayment: 600, remainingMonths: 20 });
   });
 
-  it('links each goal whose result is not here yet to its page', async () => {
+  /** The fixtures' card export as CSV, as a card company would give it. */
+  const cardFile = () => {
+    const dayOf = (excel: number) => {
+      const iso = new Date(Date.UTC(1899, 11, 30) + excel * 86_400_000).toISOString();
+      return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+    };
+    const csv = CARD_ROWS.map((row) =>
+      row.map((cell, column) => (cell === null ? '' : `"${(typeof cell === 'number' && (column === 0 || column === 4) ? dayOf(cell) : String(cell)).replace(/"/g, '""')}"`)).join(','),
+    ).join('\n');
+    return new File([csv], 'card.csv', { type: 'text/csv' });
+  };
+
+  it('walks a recovery plan: the statements, what each unclear charge is, what can go, and the month after', async () => {
+    serve(false);
+    if (!Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+        return new Promise<ArrayBuffer>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+    useMoneyCategories.setState({ explanations: {} });
+    useQuestionnaire.setState({ goals: ['RECOVERY'], answers: { hasMortgage: 'NO' }, at: 'statementsUpload' });
+    window.history.replaceState(null, '', '#/start/statementsUpload');
+    const user = userEvent.setup();
+    renderPage();
+    await user.upload(screen.getByLabelText('בחירת קבצי עו״ש או כרטיס אשראי'), [new File([BANK_CSV], 'bank.csv', { type: 'text/csv' }), cardFile()]);
+    await waitFor(() => expect(next().disabled).toBe(false));
+    await user.click(next());
+
+    expect(screen.getByRole('heading', { name: 'מה החיובים האלה?' })).toBeTruthy();
+    const what = screen.getByRole('radiogroup', { name: /חנות הדוגמאות/ });
+    await user.click(within(what).getByRole('radio', { name: 'מנוי' }));
+    expect(useMoneyCategories.getState().explanations['חנות הדוגמאות']).toMatchObject({ category: 'SUBSCRIPTIONS' });
+    // Answering keeps it on the screen, though it has left "other".
+    expect(within(screen.getByRole('radiogroup', { name: /חנות הדוגמאות/ })).getByRole('radio', { name: 'מנוי' }).getAttribute('aria-checked')).toBe('true');
+    await user.click(next());
+
+    expect(screen.getByRole('heading', { name: 'מה מזה אפשר לבטל או לצמצם?' })).toBeTruthy();
+    await user.click(within(screen.getByRole('radiogroup', { name: /חנות הדוגמאות/ })).getByRole('radio', { name: 'לבטל' }));
+    expect(useMoneyCategories.getState().explanations['חנות הדוגמאות']).toMatchObject({ flexibility: 'CANCEL' });
+    await user.click(next());
+    await user.click(screen.getByRole('button', { name: 'לא מצליחים לחסוך' }));
+    await user.click(next());
+    await user.click(screen.getByRole('radio', { name: 'לא' }));
+    await user.click(next());
+
+    expect(window.location.hash).toBe('#/start/done');
+    const result = screen.getByRole('region', { name: 'תוכנית ההבראה' });
+    const cancel = within(result).getByRole('checkbox', { name: /לבטל את מה שסימנתם/ }) as HTMLInputElement;
+    expect(cancel.checked).toBe(true);
+    const before = document.getElementById('recovery-result')!.textContent;
+    await user.click(cancel);
+    expect(document.getElementById('recovery-result')!.textContent).not.toBe(before);
+
+    await user.click(within(result).getByRole('button', { name: 'כל הפרטים' }));
+    expect(screen.getByRole('heading', { name: 'פרטי החשבון' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'לאן הולך הכסף, בחודש' })).toBeTruthy();
+  }, 30_000);
+
+  it('asks for the statements again on a later visit, since they are never kept', async () => {
     serve(false);
     useQuestionnaire.setState({ goals: ['RECOVERY'], answers: { hasMortgage: 'NO', statementsFiles: 'LATER', worries: ['SAVING'], hasLoans: 'NO' }, at: DONE });
     window.history.replaceState(null, '', '#/start/done');
+    const user = userEvent.setup();
     renderPage();
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'זה מה שסיפרתם' }));
-    expect(screen.getByRole('link', { name: 'לתוכנית ההבראה' }).getAttribute('href')).toBe('#/money');
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'התוצאה שלכם' }));
+    await user.click(screen.getByRole('button', { name: 'להעלות את דפי החשבון' }));
+    expect(screen.getByRole('heading', { name: 'העלו את דפי העו״ש והאשראי' })).toBeTruthy();
   });
 
   it('offers to pick up where the household stopped, or to start again', async () => {

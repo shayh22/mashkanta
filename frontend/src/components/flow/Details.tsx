@@ -1,10 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { AnswerValue, Answers } from '../../engine/flow/flow';
+import { savingIdeas } from '../../engine/money/savings';
 import { VERDICT_LABELS } from '../../engine/refinance';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
 import { bestRoute, ROUTE_NAME } from '../../lib/routes';
 import { TRACK_COLORS } from '../../lib/trackColors';
 import type { StressScenario, TrackType } from '../../lib/types';
+import { useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
 import { isSampleTracks, useRefinance, useRefinanceAnalysis } from '../../store/refinanceStore';
 import { useBuyResult, useRefinanceAnswers, useRefinanceEstimate } from './hooks';
 
@@ -364,6 +366,75 @@ function EstimateDetails({ answers, onEdit, onBack }: { answers: Answers; onEdit
           להעלות את הדוח
         </button>
       </div>
+    </Shell>
+  );
+}
+
+/** The recovery plan's details: where the money goes, what comes in, the balance, and every idea to save. */
+export function RecoveryDetails({ onBack }: { onBack: () => void }) {
+  const picture = useMonthlyPicture();
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const ideas = useMemo(() => (picture ? savingIdeas(picture, explanations) : []), [picture, explanations]);
+  if (!picture) {
+    return (
+      <Shell title="פרטי החשבון" onBack={onBack}>
+        <p className="rounded-[20px] bg-flow-card p-5 text-base">אין כרגע דפי חשבון במכשיר. העלו אותם שוב בשאלון.</p>
+      </Shell>
+    );
+  }
+  const spending = [...picture.spendingLines].sort((a, b) => b.monthly - a.monthly);
+  const top = Math.max(1, ...spending.map((line) => line.monthly));
+  return (
+    <Shell title="פרטי החשבון" onBack={onBack}>
+      <Panel title="לאן הולך הכסף, בחודש">
+        <ul className="flex flex-col gap-2.5">
+          {spending.map((line) => (
+            <li key={line.id} className="flex flex-col gap-1">
+              <span className="flex items-center justify-between gap-2 text-[15px]">
+                <span className="font-bold">{line.label}</span>
+                <span className="font-extrabold tabular-nums">{formatCurrency(line.monthly)}</span>
+              </span>
+              <span aria-hidden className="h-2 rounded-full bg-flow-pick">
+                <span className="block h-full rounded-full bg-flow-strong" style={{ width: `${(line.monthly / top) * 100}%` }} />
+              </span>
+            </li>
+          ))}
+        </ul>
+        <Rows rows={[['סך הכל הוצאות', formatCurrency(picture.spending), true]]} />
+      </Panel>
+
+      <Panel title="מה נכנס, בחודש">
+        <Rows rows={[...picture.incomeLines.map((line) => [line.label, formatCurrency(line.monthly)] as const), ['סך הכל הכנסות', formatCurrency(picture.income), true] as const]} />
+      </Panel>
+
+      {picture.overdraft && (
+        <Panel title="יתרת החשבון">
+          <Rows
+            rows={[
+              ['חודשים במינוס', `${picture.overdraft.monthsBelow} מתוך ${picture.overdraft.months}`],
+              ['היתרה הנמוכה', formatCurrency(picture.overdraft.lowest)],
+              ['ריבית על המינוס, בחודש', formatCurrency(picture.overdraft.interestMonthly)],
+            ]}
+          />
+        </Panel>
+      )}
+
+      {ideas.length > 0 && (
+        <Panel title="איפה אפשר לחסוך">
+          <ul className="flex flex-col">
+            {ideas.map((idea, index) => (
+              <li key={`${idea.kind}-${index}`} className="flex flex-col gap-1 border-b border-flow-line py-2.5 last:border-b-0">
+                <span className="flex items-center justify-between gap-2 text-[15px] font-extrabold">
+                  {idea.title}
+                  {idea.monthly !== undefined && idea.monthly >= 1 && <span className="tabular-nums text-flow-strong">+{formatCurrency(idea.monthly)}</span>}
+                </span>
+                <span className="text-sm text-flow-muted">{idea.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      <p className="text-xs leading-relaxed text-flow-muted">לפי {picture.months.length} חודשים מלאים. הקבצים נקראו במכשיר ולא נשמרו.</p>
     </Shell>
   );
 }
