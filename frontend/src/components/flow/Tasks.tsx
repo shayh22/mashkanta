@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import type { Answers, Goal } from '../../engine/flow/flow';
 import type { RefinanceSnapshot } from '../../engine/flow/share';
+import { rankOffers } from '../../engine/flow/offers';
 import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
 import { useQuestionnaire } from '../../store/questionnaireStore';
 import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
 import { useBuyResult } from './hooks';
+import { useRankedOffers } from './offerHooks';
 import { useImprovement } from './outcomes';
 
 /**
@@ -15,6 +17,7 @@ export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[
   const buy = useBuyTasks(goals, answers);
   const recovery = useRecoveryTasks(goals);
   const exact = !isSampleTracks(useRefinance((state) => state.tracks));
+  const offers = [useBestOffer('BUY', goals, answers), useBestOffer('REFINANCE', goals, answers)].filter((offer) => !!offer);
   const done = useQuestionnaire((state) => state.done);
   const toggle = useQuestionnaire((state) => state.toggleDone);
 
@@ -25,6 +28,7 @@ export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[
     // The exact result's verdict, once it is worked out; without the report, the way to it.
     ...(!exact ? { refinance: { exact: false } } : refinance ? { refinance: { exact: true, verdict: refinance.verdict, route: refinance.route } } : {}),
     ...(recovery ? { recovery } : {}),
+    ...(offers.length > 0 ? { offers } : {}),
   });
   if (tasks.length === 0) {
     return null;
@@ -53,6 +57,13 @@ export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[
       </ul>
     </section>
   );
+}
+
+/** The cheapest offer the household got for a goal, if it got any. */
+function useBestOffer(goal: 'BUY' | 'REFINANCE', goals: readonly Goal[], answers: Answers) {
+  const { priced } = useRankedOffers(goal, goals.includes(goal) ? answers : {});
+  const best = rankOffers(priced)[0];
+  return best ? { goal, best: best.label, count: priced.length } : undefined;
 }
 
 function useBuyTasks(goals: readonly Goal[], answers: Answers): TaskInput['buy'] {

@@ -47,6 +47,14 @@ describe('what to do now', () => {
     expect(ids({ goals: ['REFINANCE'], answers: {}, recovery })).toEqual(['loan:car']);
   });
 
+  it('takes the cheapest offer forward, or a single one to the other banks', () => {
+    expect(tasksFor({ goals: ['BUY'], answers: {}, offers: [{ goal: 'BUY', best: 'בנק א', count: 3 }] })[0]!.text).toBe(
+      'להתקדם עם בנק א, הזולה מבין 3 ההצעות, או להציג אותה לבנקים האחרים',
+    );
+    expect(tasksFor({ goals: ['REFINANCE'], answers: {}, offers: [{ goal: 'REFINANCE', best: 'בנק ב', count: 1 }] })[0]!.text).toContain('לבנקים נוספים');
+    expect(ids({ goals: ['BUY'], answers: {}, offers: [{ goal: 'REFINANCE', best: 'בנק ב', count: 1 }] })).toEqual([]);
+  });
+
   it('has nothing for a goal not chosen, or a result not yet worked out', () => {
     expect(ids({ goals: ['BUY'], answers: {}, refinance: { exact: false } })).toEqual([]);
     expect(ids({ goals: ['BUY', 'REFINANCE'], answers: {} })).toEqual([]);

@@ -16,6 +16,8 @@ export interface TaskInput {
   readonly answers: Answers;
   readonly buy?: { readonly equityShort: number; readonly cheapestBank?: string; readonly mix?: string };
   readonly refinance?: { readonly exact: boolean; readonly verdict?: RefinanceVerdict; readonly route?: RouteKind };
+  /** The cheapest of the offers the household got, for the purchase or the refinance, and how many there are. */
+  readonly offers?: readonly { readonly goal: 'BUY' | 'REFINANCE'; readonly best: string; readonly count: number }[];
   readonly recovery?: {
     readonly hasStatements: boolean;
     /** The businesses the household marked, by name: these tasks stay on the device. */
@@ -65,6 +67,17 @@ export function tasksFor(input: TaskInput): Task[] {
     }
     if (answers.hasLoans === 'YES') {
       add('refi-loans', 'לבדוק איחוד של ההלוואות הנוספות לתוך המיחזור');
+    }
+  }
+
+  for (const offer of input.offers ?? []) {
+    if (goals.includes(offer.goal)) {
+      add(
+        `offer-${offer.goal}`,
+        offer.count > 1
+          ? `להתקדם עם ${offer.best}, הזולה מבין ${offer.count} ההצעות, או להציג אותה לבנקים האחרים`
+          : `להציג את ההצעה של ${offer.best} לבנקים נוספים, ולבקש מהם להתחרות בה`,
+      );
     }
   }
 
