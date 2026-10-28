@@ -20,6 +20,17 @@ import { isSampleTracks, useRefinance } from './refinanceStore';
 export const START = 'START';
 export const DONE = 'DONE';
 
+/**
+ * After the questions, the result in four screens: the situation today (DONE, the first), where it
+ * can improve, the banks side by side, and the plan.
+ */
+export const RESULT_SCREENS = [DONE, 'improve', 'compare', 'plan'] as const;
+export type ResultScreen = (typeof RESULT_SCREENS)[number];
+
+/** The banks screen, for a goal that borrows; the rest for every goal. */
+export const resultScreensFor = (goals: readonly Goal[]): ResultScreen[] =>
+  RESULT_SCREENS.filter((screen) => screen !== 'compare' || goals.includes('BUY') || goals.includes('REFINANCE'));
+
 interface QuestionnaireState {
   goals: Goal[];
   answers: Record<string, AnswerValue>;
@@ -31,6 +42,9 @@ interface QuestionnaireState {
   /** The tasks ticked off, by id. */
   done: string[];
   toggleDone: (task: string) => void;
+  /** The recovery plan's decisions left out, by key. */
+  skipped: string[];
+  toggleSkipped: (decision: string) => void;
   reset: () => void;
 }
 
@@ -54,13 +68,16 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       go: (at) => set({ at }),
       done: [],
       toggleDone: (task) => set((state) => ({ done: state.done.includes(task) ? state.done.filter((each) => each !== task) : [...state.done, task] })),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [] }),
+      skipped: [],
+      toggleSkipped: (decision) =>
+        set((state) => ({ skipped: state.skipped.includes(decision) ? state.skipped.filter((each) => each !== decision) : [...state.skipped, decision] })),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [] }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped }),
     },
   ),
 );
