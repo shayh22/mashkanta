@@ -26,9 +26,10 @@ import { useMarket } from './store/marketStore';
 const OwnPage = lazy(() => import('./pages/OwnPage').then((module) => ({ default: module.OwnPage })));
 const MoneyPage = lazy(() => import('./pages/MoneyPage').then((module) => ({ default: module.MoneyPage })));
 const StartPage = lazy(() => import('./pages/StartPage').then((module) => ({ default: module.StartPage })));
+const SharedPage = lazy(() => import('./pages/StartPage').then((module) => ({ default: module.SharedPage })));
 
 /** The jobs the platform does. Each is addressable by URL hash so it can be linked to. */
-type Mode = 'own' | 'buy' | 'money' | 'start';
+type Mode = 'own' | 'buy' | 'money' | 'start' | 'shared';
 type MortgageView = 'wizard' | 'results' | 'upload';
 
 const MODES: { id: Mode; title: string }[] = [
@@ -49,6 +50,10 @@ function modeFromHash(): Mode {
     return LEGACY[hash]!;
   }
   // The questionnaire (`#/start`) has no tab while it is built; it is reached by its address.
+  // A shared result (`#/s/<result>`) opens on its own page.
+  if (hash === 's') {
+    return 'shared';
+  }
   return hash === 'start' ? 'start' : MODES.some((mode) => mode.id === hash) ? (hash as Mode) : 'own';
 }
 
@@ -146,11 +151,11 @@ export default function App() {
       </a>
       <Header theme={theme} onToggleTheme={toggleTheme} />
       <GlossaryPanel />
-      {mode !== 'start' && <ModeNav mode={mode} onSelect={navigate} />}
-      {mode !== 'start' && <SinceLastVisit />}
+      {mode !== 'start' && mode !== 'shared' && <ModeNav mode={mode} onSelect={navigate} />}
+      {mode !== 'start' && mode !== 'shared' && <SinceLastVisit />}
 
       <main id="main" className="flex-1 px-4 pb-10 pt-6" tabIndex={-1}>
-        <div {...(mode === 'start' ? {} : { role: 'tabpanel', id: `panel-${mode}`, 'aria-labelledby': `tab-${mode}` })}>
+        <div {...(mode === 'start' || mode === 'shared' ? {} : { role: 'tabpanel', id: `panel-${mode}`, 'aria-labelledby': `tab-${mode}` })}>
           {mode === 'buy' && (
             <div className="space-y-5">
 
@@ -238,6 +243,18 @@ export default function App() {
               }
             >
               <StartPage />
+            </Suspense>
+          )}
+
+          {mode === 'shared' && (
+            <Suspense
+              fallback={
+                <div className="mx-auto w-full max-w-3xl">
+                  <LoadingCard message="טוען…" />
+                </div>
+              }
+            >
+              <SharedPage key={window.location.hash} />
             </Suspense>
           )}
 
