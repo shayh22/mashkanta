@@ -1,4 +1,4 @@
-// End-to-end smoke check: every screen of all three paths with every folded section open, desktop and phone, light and dark.
+// End-to-end smoke check: every screen of the questionnaire with every folded section open, desktop and phone, light and dark.
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs http://localhost:4173 [screenshotDir]
@@ -21,21 +21,10 @@ try {
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
-/** Every screen of both paths. Each opens every folded section, so all of it is checked. */
+/** Every screen of the questionnaire. Each opens every folded section, so all of it is checked. */
 const SCREENS = [
-  'own', 'own-debts', 'own-result', 'buy', 'buy-results',
-  'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
   'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
 ];
-/** The household journey's steps after the files, by the name its progress bar gives each. */
-const MONEY_STEPS = {
-  'money-flow': 'שלב 2: נכנס ויוצא',
-  'money-spending': 'שלב 3: לאן הולך הכסף',
-  'money-debts': 'שלב 4: הלוואות ומשכנתא',
-  'money-savings': 'שלב 5: איפה לחסוך',
-  'money-summary': 'שלב 6: הסיכום',
-};
-
 /** An invented bank statement, in the layout Israeli banks export, for the household picture. */
 const SAMPLE_BANK = [
   'תאריך,יום ערך,תיאור התנועה,זכות/חובה ₪, יתרה ₪',
@@ -52,9 +41,9 @@ const VIEWPORTS = { desktop: { width: 1366, height: 900 }, phone: { width: 360, 
 const browser = await playwright.chromium.launch();
 const problems = [];
 
-// The first screen of either path has no charts. Recharts is over 100KB gzipped; it must arrive
-// only with a page that draws one.
-for (const first of ['own', 'buy', 'start']) {
+// The opening screen has no charts. Recharts is over 100KB gzipped; it must arrive only with a
+// screen that draws one.
+for (const first of ['start']) {
   const page = await browser.newPage();
   const scripts = [];
   page.on('request', (request) => request.resourceType() === 'script' && scripts.push(request.url()));
@@ -76,7 +65,7 @@ for (const first of ['own', 'buy', 'start']) {
   if (!market?.prime?.value || !market?.housing) {
     problems.push(`/api/market: HTTP ${response.status()} ${JSON.stringify(market?.missing ?? market)}`);
   }
-  await page.goto(`${base}/#/buy`);
+  await page.goto(`${base}/#/start`);
   const status = page.getByRole('status').filter({ hasText: 'נתוני בנק ישראל' });
   await status.waitFor({ timeout: 20_000 }).catch(() => problems.push('header never showed live market data'));
   await page.close();
@@ -99,20 +88,6 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
 
     for (const screen of SCREENS) {
       current = screen;
-      await page.goto(`${base}/#/own`);
-      if (screen === 'own-debts' || screen === 'own-result') {
-        await page.getByRole('button', { name: screen === 'own-debts' ? 'יש' : 'אין', exact: true }).click();
-      }
-      if (screen === 'own-result') {
-        await page.getByRole('button', { name: /לתוצאה/ }).click();
-        await page.getByRole('heading', { name: /התמהיל שנבחר לכם/ }).waitFor({ timeout: 15_000 });
-      }
-      if (screen.startsWith('buy')) {
-        await page.goto(`${base}/#/buy`);
-      }
-      if (screen.startsWith('money')) {
-        await page.goto(`${base}/#/money`);
-      }
       if (screen === 'start' || screen === 'start-question' || screen === 'start-help') {
         // The home page is the questionnaire.
         await page.goto(screen === 'start' ? `${base}/?home=${Date.now()}` : `${base}/#/start`);
@@ -193,7 +168,7 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
       }
       if (screen === 'start-recovery') {
         // A recovery plan from the invented statement: uploaded, then the next question.
-        await page.goto(`${base}/#/buy`);
+        await page.goto(`${base}/favicon.svg`);
         await page.evaluate(() =>
           localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals: ['RECOVERY'], at: 'statementsUpload', answers: { hasMortgage: 'NO' } }, version: 1 })),
         );
@@ -204,26 +179,6 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
         await page.getByText('עו״ש · נקרא').waitFor({ timeout: 15_000 });
         await page.getByRole('button', { name: 'הבא', exact: true }).click();
         await page.getByRole('progressbar').waitFor();
-      }
-      if (MONEY_STEPS[screen]) {
-        // The statements live in memory: upload them again if this page has none.
-        if ((await page.getByRole('list', { name: 'קבצים שהועלו' }).count()) === 0) {
-          await page
-            .getByLabel('בחירת קבצי עו״ש או כרטיס אשראי')
-            .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_BANK) });
-          await page.getByText('נקרא', { exact: true }).waitFor({ timeout: 15_000 });
-        }
-        await page.getByRole('button', { name: MONEY_STEPS[screen] }).click();
-        await page.getByRole('button', { name: MONEY_STEPS[screen] }).and(page.locator('[aria-current="step"]')).waitFor();
-        // The categories fold with <details>; open them so their pickers are checked too.
-        await page.locator('main details').evaluateAll((all) => all.forEach((details) => (details.open = true)));
-      }
-      if (screen === 'buy-results') {
-        // Walk the wizard to the optimizer's results, the heaviest page in the app.
-        await page.getByRole('button', { name: 'המשך' }).click();
-        await page.getByRole('button', { name: 'המשך' }).click();
-        await page.getByRole('button', { name: 'חשב תמהיל אופטימלי' }).click();
-        await page.getByText('פרטים נוספים').waitFor({ timeout: 15_000 });
       }
       // Open every folded section, so its content is checked too.
       const closed = page.locator('main button[aria-expanded="false"]');
@@ -267,4 +222,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('smoke: every screen of all three paths, all sections open, clean on desktop and phone, light and dark');
+console.log('smoke: every screen of the questionnaire, all sections open, clean on desktop and phone, light and dark');
