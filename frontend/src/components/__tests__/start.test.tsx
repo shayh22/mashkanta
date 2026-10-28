@@ -357,6 +357,47 @@ describe('the questionnaire', () => {
     expect(tasks.getByText('לקחת את ההלוואה מבנק דוגמה, הזולה מבין 2 ההצעות')).toBeTruthy();
   }, 30_000);
 
+  it('names the same cheapest loan in the tasks as on the banks screen, for the loans’ own amount', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [{ id: 'l1', kind: 'CAR', label: 'הלוואה לרכב', balance: 60_000, annualRate: 0.08, monthlyPayment: 1_500, remainingMonths: 48, include: false }],
+    });
+    // The low rate with a fee is cheaper on sixty thousand; on a shekel, the fee would decide.
+    useQuestionnaire.setState({
+      goals: ['RECOVERY'],
+      answers: { hasMortgage: 'NO', statementsFiles: 'LATER', worries: ['LOANS'], hasLoans: 'YES' },
+      loanAmount: undefined,
+      loanOffers: [
+        { id: 'a', lender: 'ריבית נמוכה ועמלה', annualRate: 0.05, months: 60, fee: 500 },
+        { id: 'b', lender: 'בלי עמלה', annualRate: 0.08, months: 60, fee: 0 },
+      ],
+    });
+    openAt('compare');
+    renderPage();
+    const panel = screen.getByRole('region', { name: 'הצעות להלוואה' });
+    expect((within(panel).getByLabelText('כמה צריך ללוות?') as HTMLInputElement).value).toBe('60,000');
+    const first = within(within(panel).getByRole('list', { name: 'הלוואות, מהזולה ליקרה' })).getAllByRole('listitem')[0]!;
+    expect(first.textContent).toContain('ריבית נמוכה ועמלה');
+    await go('התוכנית');
+    expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByText('לקחת את ההלוואה מריבית נמוכה ועמלה, הזולה מבין 2 ההצעות')).toBeTruthy();
+  });
+
+  it('leaves the screen-only controls off the paper report', async () => {
+    serve(false);
+    useConsolidation.setState({
+      debts: [{ id: 'l1', kind: 'CAR', label: 'הלוואה לרכב', balance: 60_000, annualRate: 0.08, monthlyPayment: 1_500, remainingMonths: 48, include: false }],
+    });
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { ...typedMortgage, hasLoans: 'YES' } });
+    openAt('compare');
+    renderPage();
+    const offers = screen.getByRole('region', { name: 'ההצעות שקיבלתם מהבנקים' });
+    expect(within(offers).getByLabelText('בחירת אישור עקרוני').closest('.no-print')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'הצעות להלוואה' })).getByLabelText('כמה צריך ללוות?').closest('.no-print')).toBeTruthy();
+    await go('התוכנית');
+    await userEvent.setup().click(within(screen.getByRole('navigation', { name: 'שלבי התוצאה' })).getByRole('button', { name: 'איפה משפרים' }));
+    expect(screen.getByRole('region', { name: 'ההלוואות: מה אפשר לעשות' }).classList.contains('no-print')).toBe(true);
+  });
+
   it('walks back through the result screens, and from the first to the questions', async () => {
     serve(false);
     useQuestionnaire.setState({

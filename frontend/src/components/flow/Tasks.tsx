@@ -8,7 +8,7 @@ import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
 import { useQuestionnaire } from '../../store/questionnaireStore';
 import { isSampleTracks, useRefinance } from '../../store/refinanceStore';
 import { useBuyResult } from './hooks';
-import { useRankedOffers } from './offerHooks';
+import { useLoanAmount, useRankedOffers } from './offerHooks';
 import { useImprovement } from './outcomes';
 
 /**
@@ -73,9 +73,9 @@ function useBestOffer(goal: 'BUY' | 'REFINANCE', goals: readonly Goal[], answers
 /** The cheapest loan offer for the amount, against the market's average rate. */
 function useBestLoanOffer() {
   const offers = useQuestionnaire((state) => state.loanOffers);
-  const amount = useQuestionnaire((state) => state.loanAmount) ?? 0;
+  const amount = useLoanAmount();
   const priced = offers.flatMap((offer) => {
-    const loan = priceLoan(Math.max(amount, 1), offer);
+    const loan = priceLoan(amount, offer);
     return loan ? [{ ...loan, rate: offer.annualRate }] : [];
   });
   const best = rankLoans(priced)[0];

@@ -3,9 +3,8 @@ import { consumerLoanAverage } from '../../engine/consolidation';
 import type { Answers, Goal } from '../../engine/flow/flow';
 import { priceLoan, rankLoans, type PricedLoan } from '../../engine/flow/loanOffers';
 import { formatCurrency, formatPercent, formatTerm } from '../../lib/format';
-import { isSampleDebts, useConsolidation } from '../../store/consolidationStore';
 import { useQuestionnaire } from '../../store/questionnaireStore';
-import { useRankedOffers } from './offerHooks';
+import { useLoanAmount, useRankedOffers } from './offerHooks';
 import { useMortgageToday } from './outcomes';
 import { Panel } from './parts';
 
@@ -22,16 +21,12 @@ const DEFAULT_MONTHS = 60;
 
 export function LoanOffersPanel({ answers, goals }: { answers: Answers; goals: readonly Goal[] }) {
   const offers = useQuestionnaire((state) => state.loanOffers);
-  const stored = useQuestionnaire((state) => state.loanAmount);
+  const amount = useLoanAmount();
   const setAmount = useQuestionnaire((state) => state.setLoanAmount);
   const removeLoanOffer = useQuestionnaire((state) => state.removeLoanOffer);
-  const debts = useConsolidation((state) => state.debts);
   const hasMortgage = goals.includes('REFINANCE') || answers.hasMortgage === 'YES';
   const mortgage = useMortgageToday(answers, hasMortgage);
   const { marketMix } = useRankedOffers('REFINANCE', goals.includes('REFINANCE') ? answers : {});
-  // The loans already there, as the amount to compare, until the household types its own.
-  const owed = isSampleDebts(debts) ? 0 : Math.round(debts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0));
-  const amount = stored ?? owed;
 
   const priced: Row[] = offers.flatMap((offer) => {
     const loan = priceLoan(amount, offer);
@@ -53,7 +48,7 @@ export function LoanOffersPanel({ answers, goals }: { answers: Answers; goals: r
 
   return (
     <Panel title="הצעות להלוואה">
-      <label className="flex flex-col gap-1 text-[15px] font-bold">
+      <label className="no-print flex flex-col gap-1 text-[15px] font-bold">
         כמה צריך ללוות?
         <input
           inputMode="numeric"
@@ -66,6 +61,7 @@ export function LoanOffersPanel({ answers, goals }: { answers: Answers; goals: r
           className="min-h-12 rounded-2xl border border-flow-line bg-flow-ground px-3 text-lg font-bold tabular-nums"
         />
       </label>
+      {amount > 0 && <p className="hidden text-[15px] font-bold print:block">לסכום של {formatCurrency(amount)}</p>}
       {amount > 0 && priced.length === 0 && <p className="text-[15px] text-flow-muted">הוסיפו את ההצעות שקיבלתם, ותראו מה כל אחת עולה בסך הכל, מול ממוצע השוק{inMortgage ? ' ומול המשכנתא' : ''}.</p>}
       {amount > 0 && rows.length > 0 && (
         <ul aria-label="הלוואות, מהזולה ליקרה" className="flex flex-col">
@@ -119,7 +115,7 @@ function LoanOfferForm() {
     );
   }
   return (
-    <div className="flex flex-col gap-2 rounded-2xl bg-flow-ground p-3">
+    <div className="no-print flex flex-col gap-2 rounded-2xl bg-flow-ground p-3">
       <label className="flex flex-col gap-1 text-xs font-bold">
         מי מציע
         <input value={lender} onChange={(event) => setLender(event.target.value)} placeholder="בנק, חברת כרטיסי אשראי…" className="min-h-11 rounded-xl border border-flow-line bg-flow-card px-2 text-base" />
