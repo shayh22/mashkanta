@@ -140,7 +140,8 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           ? { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' }
           : { mortgageHow: 'MANUAL', mortgageBalance: 800000, mortgagePayment: 7200, mortgageYears: 'TEN_20', homeValue: 2400000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28000, stability: 'BALANCED', hasLoans: 'NO' };
         const at = { 'start-result': 'DONE', 'start-today-mortgage': 'DONE', 'start-compare': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
-        await page.goto(`${base}/#/buy`);
+        // Written from a page of the site that runs none of it, so no store writes its own state over them.
+        await page.goto(`${base}/favicon.svg`);
         const loans = screen === 'start-improve-loans';
         await page.evaluate(
           ({ goals, answers, at, loans }) => {

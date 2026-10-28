@@ -380,6 +380,8 @@ describe('the questionnaire', () => {
     await user.click(await screen.findByRole('button', { name: 'כל הפרטים' }));
     expect(screen.getByRole('heading', { name: 'פרטי ההערכה' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'המשכנתא כמו שמילאתם' })).toBeTruthy();
+    await user.click(within(screen.getByRole('region', { name: 'לנסות אחרת' })).getByRole('radio', { name: 'יציבות' }));
+    expect(useQuestionnaire.getState().answers.stability).toBe('STABLE');
     await user.click(screen.getByRole('button', { name: 'להעלות את הדוח' }));
     expect(screen.getByRole('heading', { name: 'כמה נשאר לשלם על המשכנתא?' })).toBeTruthy();
   }, 30_000);
@@ -646,6 +648,53 @@ describe('the questionnaire', () => {
     await go('השוואה בין בנקים');
     await go('התוכנית');
     expect(within(screen.getByRole('region', { name: 'מה עושים עכשיו' })).getByRole('checkbox', { name: 'לבטל: קפה דוגמה' })).toBeTruthy();
+  }, 30_000);
+
+  it('lets נועם set targets for the month from the totals alone, and adds them to the decisions', async () => {
+    const posts: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method !== 'POST') {
+          return new Response(JSON.stringify({ enabled: true }));
+        }
+        const body = JSON.parse(init.body as string) as { categories: { id: string; monthly: number }[] };
+        posts.push({ url, body });
+        // Half of the largest category a target may be set for (not a repayment), as a model would answer.
+        const top = [...body.categories].filter((category) => !['HOUSING_LOANS', 'LOANS'].includes(category.id)).sort((a, b) => b.monthly - a.monthly)[0]!;
+        const advice = { summary: 'תוכנית קצרה', steps: [{ title: 'לחתוך בהוצאה הגדולה', detail: 'בהדרגה', category: top.id, targetMonthly: Math.round(top.monthly / 2) }], cautions: [] };
+        return new Response(JSON.stringify({ model: 'm', advice }));
+      }),
+    );
+    if (!Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+        return new Promise<ArrayBuffer>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+    useMoneyCategories.setState({ explanations: {} });
+    useQuestionnaire.setState({ advice: undefined });
+    await useMoney.getState().addFiles([new File([BANK_CSV], 'bank.csv', { type: 'text/csv' }), cardFile()]);
+    useQuestionnaire.setState({ goals: ['RECOVERY'], answers: { hasMortgage: 'NO', statementsFiles: true, worries: ['SAVING'], hasLoans: 'NO' } });
+    openAt('improve');
+    const user = userEvent.setup();
+    renderPage();
+    const noam = await screen.findByRole('region', { name: 'נועם: תוכנית לחודש' });
+    await user.click(within(noam).getByRole('button', { name: 'לחסוך 1,000 ₪ בחודש' }));
+    await user.click(within(noam).getByRole('button', { name: 'נועם, תבנה לי יעדים' }));
+    expect(await within(noam).findByRole('list', { name: 'התוכנית של נועם' })).toBeTruthy();
+
+    // Only totals by category went out: no business on the statements.
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.url).toBe('/api/advise');
+    expect(JSON.stringify(posts[0]!.body)).not.toMatch(/חנות הדוגמאות|קפה דוגמה|רמי לוי/);
+    const target = await screen.findByRole('checkbox', { name: /: יעד / });
+    expect((target as HTMLInputElement).checked).toBe(true);
+    // Groceries at 2,000 a month, the target half: a thousand freed, by the app's own sum.
+    expect(target.closest('label')!.textContent!.replace(/\u200f/g, '')).toMatch(/\+1,000/);
   }, 30_000);
 
   it('prices each loan’s moves, and a move chosen frees its payment, becomes a decision and a task', async () => {

@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { FLEX_CHOICES } from '../../engine/flow/recovery';
-import type { CategoryId } from '../../engine/money/categories';
+import { adviceRequestOf, MAX_GOAL_LENGTH, type AdviceRequest } from '../../engine/money/adviceRequest';
+import { CATEGORY_LABELS, type CategoryId } from '../../engine/money/categories';
 import { defaultExtendYears } from '../../engine/money/decisions';
 import { loanMoves, validTerms, type LoanMoveKind } from '../../engine/money/loanMoves';
 import type { MonthlyPicture } from '../../engine/money/picture';
+import { adviseHousehold, useAiEnabled } from '../../lib/aiClient';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import { planOf, type JourneyLoan } from '../../store/journeyLoans';
 import { useMoney, useMoneyCategories } from '../../store/moneyStore';
-import { useImprovement } from './outcomes';
+import { useQuestionnaire } from '../../store/questionnaireStore';
+import { NoamAvatar } from './Noam';
+import { adviceKey, useImprovement } from './outcomes';
 import { Panel } from './parts';
 
 /**
@@ -187,5 +192,99 @@ function LoanMoves({ loan }: { loan: JourneyLoan }) {
         </span>
       )}
     </li>
+  );
+}
+
+const GOAL_EXAMPLES = ['לצאת מהמינוס בתוך חצי שנה', 'לחסוך 1,000 ₪ בחודש'];
+
+/**
+ * נועם's plan for the month: the household's goal in its own words, and a few steps toward it from
+ * the totals by category alone — no business, date or account. Its targets join the decisions,
+ * each a tick away from being left out; what they free is the app's own sum.
+ */
+export function NoamAdvisor({ picture }: { picture: MonthlyPicture }) {
+  const enabled = useAiEnabled();
+  const explanations = useMoneyCategories((state) => state.explanations);
+  const saved = useQuestionnaire((state) => state.advice);
+  const setAdvice = useQuestionnaire((state) => state.setAdvice);
+  const [goal, setGoal] = useState(saved?.goal ?? '');
+  const totals = useMemo(() => adviceRequestOf(picture, '', explanations), [picture, explanations]);
+  const key = adviceKey(totals);
+  const advisor = useMutation({
+    mutationFn: (request: AdviceRequest) => adviseHousehold(request),
+    onSuccess: (advice, request) => setAdvice({ for: adviceKey(request), goal: request.goal, advice }),
+  });
+  if (!enabled) {
+    return null;
+  }
+  const advice = saved?.for === key ? saved.advice : undefined;
+  const spent = new Map(totals.categories.map((category) => [category.id as string, category.monthly]));
+  return (
+    <section aria-label="נועם: תוכנית לחודש" className="flex flex-col gap-3 rounded-[20px] bg-flow-card p-4">
+      <div className="flex items-center gap-3">
+        <NoamAvatar size={44} />
+        <h3 className="text-base font-extrabold">נועם: תוכנית לחודש</h3>
+      </div>
+      <label className="flex flex-col gap-1.5 text-[15px] font-bold">
+        מה חשוב לכם עכשיו?
+        <textarea
+          value={goal}
+          maxLength={MAX_GOAL_LENGTH}
+          placeholder={GOAL_EXAMPLES[0]}
+          onChange={(event) => setGoal(event.target.value)}
+          className="min-h-20 rounded-2xl border border-flow-line bg-flow-ground p-3 text-base font-normal"
+        />
+      </label>
+      {!goal && (
+        <div className="flex flex-wrap gap-2">
+          {GOAL_EXAMPLES.map((example) => (
+            <button key={example} type="button" onClick={() => setGoal(example)} className="min-h-10 rounded-full border border-flow-line px-3 text-sm font-semibold">
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={advisor.isPending || goal.trim().length < 3}
+        onClick={() => advisor.mutate({ ...totals, goal: goal.trim() })}
+        className="min-h-12 rounded-full bg-flow-strong px-5 text-base font-extrabold text-flow-on-strong disabled:opacity-40"
+      >
+        {advisor.isPending ? 'נועם בונה תוכנית…' : 'נועם, תבנה לי יעדים'}
+      </button>
+      <p className="text-xs text-flow-muted">נשלחים רק סכומים לפי קטגוריה. בלי שמות של עסקים, תאריכים או חשבון.</p>
+      {advisor.isError && (
+        <p role="alert" className="text-[15px] text-negative">
+          {advisor.error instanceof Error ? advisor.error.message : 'התוכנית לא התקבלה.'}
+        </p>
+      )}
+      {advice && (
+        <div aria-live="polite" className="flex flex-col gap-2.5">
+          {advice.summary && <p className="text-[15px] font-bold">{advice.summary}</p>}
+          <ol aria-label="התוכנית של נועם" className="flex flex-col gap-2">
+            {advice.steps.map((step, index) => (
+              <li key={`${index}:${step.title}`} className="flex gap-3 rounded-2xl bg-flow-ground p-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-flow-strong text-sm font-extrabold text-flow-on-strong">{index + 1}</span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[15px] font-bold">{step.title}</span>
+                  {step.detail && <span className="text-sm text-flow-muted">{step.detail}</span>}
+                  {step.target && (
+                    <span className="text-sm tabular-nums">
+                      {CATEGORY_LABELS[step.target.category]}: {formatCurrency(spent.get(step.target.category) ?? 0)} ← <b>{formatCurrency(step.target.monthly)}</b> בחודש
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {advice.cautions.map((caution) => (
+            <p key={caution} className="text-sm font-bold text-negative">
+              {caution}
+            </p>
+          ))}
+          <p className="text-xs text-flow-muted">היעדים נוספו להחלטות למעלה. נכתב עם AI לפי הסכומים בלבד, ואינו ייעוץ פיננסי.</p>
+        </div>
+      )}
+    </section>
   );
 }
