@@ -20,7 +20,7 @@ export const CATALOG: Catalog = {
     { id: 'mortgage', label: 'המשכנתא שלכם', goals: ['REFINANCE', 'RECOVERY'] },
     { id: 'home', label: 'הדירה', goals: ['BUY'] },
     { id: 'household', label: 'ההכנסה', goals: ['BUY', 'REFINANCE'] },
-    { id: 'statements', label: 'החשבון', goals: ['RECOVERY'] },
+    { id: 'statements', label: 'החשבון', goals: ['BUY', 'REFINANCE', 'RECOVERY'] },
     { id: 'loans', label: 'הלוואות', goals: ['REFINANCE', 'RECOVERY'] },
   ],
   steps: [
@@ -189,13 +189,32 @@ export const CATALOG: Catalog = {
       ],
     },
 
-    // The account, for a recovery plan
+    // The account: the heart of a recovery plan; for the other goals, the full picture if wanted.
+    {
+      id: 'statementsOffer',
+      section: 'statements',
+      title: 'להוסיף גם את החשבון?',
+      help: 'statements',
+      fields: [
+        {
+          id: 'statementsOffer',
+          label: 'להוסיף גם את החשבון?',
+          kind: 'choice',
+          options: [
+            { id: 'YES', label: 'כן, לראות לאן הולך הכסף' },
+            { id: 'NO', label: 'לא עכשיו' },
+          ],
+        },
+      ],
+      when: (_answers, goals) => !has(goals, 'RECOVERY'),
+    },
     {
       id: 'statementsUpload',
       section: 'statements',
       title: 'העלו את דפי העו״ש והאשראי',
       help: 'statements',
       fields: [{ id: 'statementsFiles', label: 'דפי חשבון', kind: 'upload', upload: 'statements' }],
+      when: (answers, goals) => has(goals, 'RECOVERY') || answers.statementsOffer === 'YES',
     },
     {
       id: 'worry',
@@ -215,6 +234,7 @@ export const CATALOG: Catalog = {
           ],
         },
       ],
+      when: (_answers, goals) => has(goals, 'RECOVERY'),
     },
 
     // Other loans, asked once for a refinance and a recovery plan alike

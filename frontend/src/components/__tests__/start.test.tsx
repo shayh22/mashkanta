@@ -13,6 +13,12 @@ import { useWizard } from '../../store/wizardStore';
 import { scheduleText } from '../../engine/__fixtures__/schedule';
 
 beforeEach(() => {
+  // Recharts measures its container; jsdom has no ResizeObserver.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [] });
@@ -189,8 +195,8 @@ describe('the questionnaire', () => {
     serve(false);
     useQuestionnaire.setState({
       goals: ['BUY'],
-      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED' },
-      at: 'stability',
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED', statementsOffer: 'NO' },
+      at: 'statementsOffer',
     });
     const user = userEvent.setup();
     renderPage();
@@ -251,7 +257,7 @@ describe('the questionnaire', () => {
     });
     window.print = print;
     await user.click(screen.getByRole('button', { name: 'דוח PDF' }));
-    expect(print).toHaveBeenCalledOnce();
+    await waitFor(() => expect(print).toHaveBeenCalledOnce(), { timeout: 5_000 });
     for (const part of ['המצב היום', 'צריך ללוות', 'החזר חודשי בהתחלה', 'הבנקים, לתמהיל הזה', 'מה עושים עכשיו']) {
       expect(printed).toContain(part);
     }
@@ -278,7 +284,7 @@ describe('the questionnaire', () => {
     await user.click(screen.getByRole('button', { name: 'חזרה: איפה משפרים' }));
     await user.click(screen.getByRole('button', { name: 'חזרה: המצב היום' }));
     await user.click(screen.getByRole('button', { name: 'חזרה לשאלות' }));
-    expect(screen.getByRole('heading', { name: 'מה חשוב לכם יותר?' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'להוסיף גם את החשבון?' })).toBeTruthy();
   });
 
   it('says how much equity is missing above the bank’s ceiling, and takes the household to change it', async () => {
@@ -354,6 +360,9 @@ describe('the questionnaire', () => {
     const today = screen.getByRole('region', { name: 'המשכנתא היום' });
     expect(within(today).getByText('הריבית שזה אומר, בערך')).toBeTruthy();
     expect(within(today).getByText('אחוז מימון היום').nextSibling!.textContent).toBe('33%');
+    const meter = screen.getByRole('region', { name: 'כמה מההכנסה הולך להחזרים' });
+    expect(within(meter).getByText('26%')).toBeTruthy();
+    expect(within(meter).getByText('בטווח שהבנקים רואים כסביר')).toBeTruthy();
 
     await go('איפה משפרים');
     await screen.findByText('הערכה ממה שמילאתם', {}, { timeout: 10_000 });
@@ -405,8 +414,10 @@ describe('the questionnaire', () => {
     const today = screen.getByRole('region', { name: 'המשכנתא היום' });
     expect(within(today).getAllByRole('listitem')).toHaveLength(2);
     expect(within(today).getByRole('img', { name: /^המסלולים: קבועה לא צמודה .*פריים/ })).toBeTruthy();
-    expect(within(today).getByText('יתרה').nextSibling!.textContent).toMatch(/800,000/);
-    expect(within(today).getByRole('img').getAttribute('aria-label')).toContain('קבועה לא צמודה');
+    expect(within(today).getByText('יתרה', { selector: 'dt' }).nextSibling!.textContent).toMatch(/800,000/);
+    // To its end: the balance down to nothing, and what the interest and indexation come to on the way.
+    expect(await within(today).findByRole('img', { name: /^היתרה יורדת מ-.*800,000.*לאפס בתוך 20 שנים/ }, { timeout: 10_000 })).toBeTruthy();
+    expect(Number(within(today).getByText('מזה ריבית והצמדה').nextSibling!.textContent!.replace(/[^\d]/g, ''))).toBeGreaterThan(100_000);
 
     await go('איפה משפרים');
     await screen.findByText('עלות המעבר, כולל עמלות', {}, { timeout: 10_000 });
@@ -458,6 +469,13 @@ describe('the questionnaire', () => {
     const loans = screen.getByRole('region', { name: 'ההלוואות' });
     expect(within(loans).getAllByRole('listitem')).toHaveLength(2);
     expect(within(loans).getByText('כל ההלוואות, בחודש').nextSibling!.textContent!.replace(/\u200f/g, '')).toContain('2,100');
+    // With the mortgage, a third of the income: above the line where a bank prices the risk.
+    const meter = screen.getByRole('region', { name: 'כמה מההכנסה הולך להחזרים' });
+    expect(within(meter).getByText('33%')).toBeTruthy();
+    expect(within(meter).getByRole('img', { name: /משכנתא .*7,200.*הלוואות .*2,100/ })).toBeTruthy();
+    expect(within(meter).getByText(/^מעל 30%/)).toBeTruthy();
+    // Drawn against a scale to sixty percent: the mortgage's quarter of the income, three sevenths of the bar.
+    expect((within(meter).getByRole('img').firstElementChild as HTMLElement).style.width).toMatch(/^42\.8/);
   });
 
   it('lists every loan read, adds each new document to the list, and keeps the same loan once', async () => {
