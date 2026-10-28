@@ -101,10 +101,11 @@ function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
     const kept = decisions.filter((decision) => chosen.has(decision.key));
     const loanMoves = kept.filter((decision) => decision.key.startsWith('loan:')).map((decision) => ({ key: decision.key, label: decision.label }));
     const mortgage = kept.some((decision) => decision.key === 'mortgage');
+    const consolidate = kept.some((decision) => decision.key === 'consolidate');
     if (!picture) {
       // A recovery plan needs the statements; any household with loans has their moves.
       return goals.includes('RECOVERY') || loans.length > 0
-        ? { hasStatements: !goals.includes('RECOVERY'), cancel: [], reduce: [], overdraft: false, fees: false, loanMoves, mortgage }
+        ? { hasStatements: !goals.includes('RECOVERY'), cancel: [], reduce: [], overdraft: false, fees: false, loanMoves, mortgage, consolidate }
         : undefined;
     }
     // Only the decisions the household kept: a cancellation left out on the result is not a task.
@@ -118,6 +119,7 @@ function useRecoveryTasks(goals: readonly Goal[]): TaskInput['recovery'] {
       fees: chosen.has('fees'),
       loanMoves,
       mortgage,
+      consolidate,
     };
   }, [goals, picture, explanations, loans, decisions, chosen]);
 }

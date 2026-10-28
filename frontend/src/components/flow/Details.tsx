@@ -12,6 +12,12 @@ import { Dot, Panel, Rows } from './parts';
 import { IncomePanel, OverdraftPanel, SpendingPanel } from './Today';
 import { RoutesPanel } from './Compare';
 import { ManualMixPanel, TrackByTrack } from './MixTools';
+import { WhatIfPanel } from './WhatIf';
+import type { TrackAllocation } from '../../lib/types';
+
+/** A mix's tracks, as the what-if panel prices them. */
+const tracksOf = (allocations: readonly TrackAllocation[]) =>
+  allocations.filter((track) => track.amount > 0).map((track) => ({ type: track.track, amount: track.amount, annualRate: track.annualRate, termMonths: track.termMonths }));
 
 /**
  * The details behind a result, in the questionnaire's own look: no tabs, one column, each part a
@@ -150,6 +156,7 @@ export function BuyDetails({ answers, onAnswer, onBack }: { answers: Answers; on
           <Panel title="אם הריבית או המדד יעלו">
             <StressRows initial={data.recommended.summary.initialPayment} scenarios={data.recommended.stress.scenarios} />
           </Panel>
+          <WhatIfPanel tracks={tracksOf(data.recommended.summary.allocations)} />
 
           {data.termSensitivity.length > 0 && (
             <Panel title="תקופות אחרות">
@@ -269,6 +276,8 @@ function ExactDetails({ answers, onBack, tryOther }: { answers: Answers; onBack:
             />
           </Panel>
 
+          <WhatIfPanel tracks={proposal.map((track) => ({ type: track.type, amount: track.amount, annualRate: track.annualRate, termMonths: track.termMonths }))} />
+
           <Panel title="מה עולה המעבר">
             <Rows
               rows={[
@@ -325,6 +334,7 @@ function EstimateDetails({ answers, onEdit, onBack, tryOther }: { answers: Answe
               ]}
             />
           </Panel>
+          <WhatIfPanel tracks={tracksOf(proposed.allocations)} />
         </>
       )}
       <div className="flex flex-col gap-1.5 rounded-2xl bg-flow-accent/25 p-3.5 text-[15px]">

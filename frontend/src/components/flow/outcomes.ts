@@ -10,6 +10,7 @@ import { adviceRequestOf, type AdviceRequest } from '../../engine/money/adviceRe
 import { decisionsOf, freedBy, loanDecision, mortgageDecision, type CategoryTarget, type Decision } from '../../engine/money/decisions';
 import type { MonthlyPicture } from '../../engine/money/picture';
 import { bestRoute } from '../../lib/routes';
+import { isSampleDebts, useConsolidation, useConsolidationAnalysis } from '../../store/consolidationStore';
 import { planOf, useJourneyLoans } from '../../store/journeyLoans';
 import { useMoney, useMoneyCategories, useMonthlyPicture } from '../../store/moneyStore';
 import { useMortgageMove } from '../../store/mortgageMove';
@@ -39,20 +40,44 @@ export function useImprovement() {
   const skipped = useQuestionnaire((state) => state.skipped);
   const toggle = useQuestionnaire((state) => state.toggleSkipped);
   const targets = useAdviceTargets(picture);
-  const decisions = useMemo(
-    () =>
-      [
-        ...(route ? [mortgageDecision(route)] : []),
-        ...loans.map((loan) => loanDecision(loan, planOf(loan, plans))),
-        ...(picture ? decisionsOf(picture, explanations, targets) : []),
-      ].filter((decision): decision is Decision => !!decision),
-    [route, loans, plans, picture, explanations, targets],
-  );
+  const consolidation = useConsolidationDecision();
+  const decisions = useMemo(() => {
+    // A loan folded into the mortgage has no move of its own: its payment is freed once.
+    const folded = new Set(consolidation?.debtIds ?? []);
+    return [
+      ...(route ? [mortgageDecision(route)] : []),
+      ...(consolidation ? [consolidation.decision] : []),
+      ...loans.filter((loan) => !loan.debtId || !folded.has(loan.debtId)).map((loan) => loanDecision(loan, planOf(loan, plans))),
+      ...(picture ? decisionsOf(picture, explanations, targets) : []),
+    ].filter((decision): decision is Decision => !!decision);
+  }, [route, consolidation, loans, plans, picture, explanations, targets]);
   const chosen = useMemo(() => new Set(decisions.map((decision) => decision.key).filter((key) => !skipped.includes(key))), [decisions, skipped]);
   const freed = freedBy(decisions, chosen);
   const today = picture ? picture.income - picture.spending : 0;
   const after = today + freed;
   return { picture, explanations, loans, decisions, chosen, freed, today, after, toggle };
+}
+
+/** Folding the loans marked into the mortgage, as a decision, when the household counts it. */
+function useConsolidationDecision(): { decision: Decision; debtIds: string[] } | undefined {
+  const counted = useQuestionnaire((state) => state.consolidate);
+  const debts = useConsolidation((state) => state.debts);
+  const analysis = useConsolidationAnalysis();
+  return useMemo(() => {
+    if (!counted || isSampleDebts(debts) || analysis.included.length === 0 || analysis.monthlyRelief < 1) {
+      return undefined;
+    }
+    return {
+      decision: {
+        key: 'consolidate',
+        label: 'לאחד את ההלוואות לתוך המשכנתא',
+        monthly: analysis.monthlyRelief,
+        source: 'debts',
+        ...(analysis.extraLifetimeCost >= 1 ? { note: `עולה ${Math.round(analysis.extraLifetimeCost).toLocaleString('he-IL')} ₪ יותר בסך הכל` } : {}),
+      },
+      debtIds: analysis.included.map((debt) => debt.id),
+    };
+  }, [counted, debts, analysis]);
 }
 
 /** The totals נועם is asked about, as a key: a plan made for other totals is set aside. */

@@ -1,4 +1,5 @@
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
+import type { MarketMonth } from '../../engine/boiMarket';
 import type { YearPoint } from '../../engine/amortization';
 import { formatCompact, formatCurrency } from '../../lib/format';
 import { ResponsiveChart } from '../charts/ResponsiveChart';
@@ -52,3 +53,48 @@ export function DebtPathChart({ start, yearly }: { start: number; yearly: readon
 }
 
 export { BalanceChart, MonthlyFlowChart } from '../money/flowCharts';
+
+/** The Bank of Israel's average rates, month by month: the three tracks, and prime dashed as the reference. */
+export function RatesTrendChart({ history }: { history: readonly MarketMonth[] }) {
+  const data = history.map((month) => ({ ...month, label: `${month.month.slice(5, 7)}/${month.month.slice(2, 4)}` }));
+  const series = [
+    { key: 'fixedUnlinked', name: 'קבועה לא צמודה', color: 'var(--chart-1)' },
+    { key: 'fixedLinked', name: 'קבועה צמודה', color: 'var(--chart-2)' },
+    { key: 'variableLinked', name: 'משתנה צמודה', color: 'var(--chart-3)' },
+    { key: 'prime', name: 'פריים', color: 'rgb(var(--flow-muted))', dashed: true },
+  ] as const;
+  return (
+    <div className="h-56 w-full text-flow-muted" dir="ltr" role="img" aria-label={`הריביות הממוצעות בבנק ישראל מ-${data[0]?.label ?? ''} עד ${data.at(-1)?.label ?? ''}`}>
+      <ResponsiveChart width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'currentColor' }} tickLine={false} axisLine={false} reversed minTickGap={20} />
+          <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(1)}%`} tick={{ fontSize: 11, fill: 'currentColor' }} tickLine={false} axisLine={false} width={44} orientation="right" domain={['auto', 'auto']} />
+          <Tooltip
+            content={({ active, payload }) => {
+              const row = payload?.[0]?.payload as (typeof data)[number] | undefined;
+              if (!active || !row) {
+                return null;
+              }
+              return (
+                <div className="rounded-xl bg-flow-card px-3 py-2 text-xs text-flow-ink shadow" dir="rtl">
+                  <p className="font-bold">{row.label}</p>
+                  {series.map((each) =>
+                    row[each.key] !== undefined ? (
+                      <p key={each.key} className="tabular-nums">
+                        {each.name} {((row[each.key] as number) * 100).toFixed(2)}%
+                      </p>
+                    ) : null,
+                  )}
+                </div>
+              );
+            }}
+          />
+          {series.map((each) => (
+            <Line key={each.key} dataKey={each.key} name={each.name} stroke={each.color} strokeWidth={2} strokeDasharray={'dashed' in each ? '5 4' : undefined} dot={false} connectNulls isAnimationActive={false} />
+          ))}
+        </LineChart>
+      </ResponsiveChart>
+    </div>
+  );
+}
