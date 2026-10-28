@@ -7,6 +7,7 @@ import { ShareBar } from '../components/flow/Share';
 import { TasksCard } from '../components/flow/Tasks';
 import { BuyBanks, RefinanceBanks } from '../components/flow/Compare';
 import { MortgageOffers } from '../components/flow/Offers';
+import { LoanOffersPanel } from '../components/flow/LoanOffers';
 import { useImprovement, useRecoverySnapshot, useRefinanceSnapshot } from '../components/flow/outcomes';
 import { ExpensesByCategory, LoanMovesPanel, NoamAdvisor } from '../components/flow/Improve';
 import { useMonthlyPicture } from '../store/moneyStore';
@@ -313,6 +314,7 @@ function ScreenBody({
         {goals.includes('BUY') && <MortgageOffers goal="BUY" answers={answers} />}
         {goals.includes('REFINANCE') && <RefinanceBanks answers={answers} />}
         {goals.includes('REFINANCE') && <MortgageOffers goal="REFINANCE" answers={answers} />}
+        {(goals.includes('RECOVERY') || answers.hasLoans === 'YES') && <LoanOffersPanel answers={answers} goals={goals} />}
       </div>
     );
   }

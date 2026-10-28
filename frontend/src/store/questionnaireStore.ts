@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CATALOG } from '../engine/flow/catalog';
+import type { LoanOffer } from '../engine/flow/loanOffers';
 import type { MortgageOffer } from '../engine/flow/offers';
 import type { Advice } from '../engine/money/adviceRequest';
 import { GOALS, stepsFor, type AnswerValue, type Answers, type Goal, type Step } from '../engine/flow/flow';
@@ -29,9 +30,8 @@ export const DONE = 'DONE';
 export const RESULT_SCREENS = [DONE, 'improve', 'compare', 'plan'] as const;
 export type ResultScreen = (typeof RESULT_SCREENS)[number];
 
-/** The banks screen, for a goal that borrows; the rest for every goal. */
-export const resultScreensFor = (goals: readonly Goal[]): ResultScreen[] =>
-  RESULT_SCREENS.filter((screen) => screen !== 'compare' || goals.includes('BUY') || goals.includes('REFINANCE'));
+/** Every screen for every goal: the banks screen compares mortgage offers, and loan offers too. */
+export const resultScreensFor = (goals: readonly Goal[]): ResultScreen[] => (goals.length > 0 ? [...RESULT_SCREENS] : []);
 
 interface QuestionnaireState {
   goals: Goal[];
@@ -57,6 +57,12 @@ interface QuestionnaireState {
   offers: MortgageOffer[];
   addOffer: (offer: MortgageOffer) => void;
   removeOffer: (id: string) => void;
+  /** Loan offers for one amount, compared by what each costs in all. */
+  loanOffers: LoanOffer[];
+  loanAmount?: number;
+  addLoanOffer: (offer: LoanOffer) => void;
+  removeLoanOffer: (id: string) => void;
+  setLoanAmount: (amount: number | undefined) => void;
   reset: () => void;
 }
 
@@ -87,13 +93,17 @@ export const useQuestionnaire = create<QuestionnaireState>()(
       offers: [],
       addOffer: (offer) => set((state) => ({ offers: [...state.offers, offer] })),
       removeOffer: (id) => set((state) => ({ offers: state.offers.filter((offer) => offer.id !== id) })),
-      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [] }),
+      loanOffers: [],
+      addLoanOffer: (offer) => set((state) => ({ loanOffers: [...state.loanOffers, offer] })),
+      removeLoanOffer: (id) => set((state) => ({ loanOffers: state.loanOffers.filter((offer) => offer.id !== id) })),
+      setLoanAmount: (loanAmount) => set({ loanAmount }),
+      reset: () => set({ goals: [], answers: {}, at: START, done: [], skipped: [], advice: undefined, offers: [], loanOffers: [], loanAmount: undefined }),
     }),
     {
       name: storageKey('questionnaire'),
       version: 1,
       storage: browserStorage,
-      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers }),
+      partialize: (state) => ({ goals: state.goals, answers: state.answers, at: state.at, done: state.done, skipped: state.skipped, offers: state.offers, loanOffers: state.loanOffers, loanAmount: state.loanAmount }),
     },
   ),
 );

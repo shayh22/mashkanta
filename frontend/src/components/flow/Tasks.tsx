@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { Answers, Goal } from '../../engine/flow/flow';
 import type { RefinanceSnapshot } from '../../engine/flow/share';
+import { consumerLoanAverage } from '../../engine/consolidation';
+import { priceLoan, rankLoans } from '../../engine/flow/loanOffers';
 import { rankOffers } from '../../engine/flow/offers';
 import { tasksFor, type TaskInput } from '../../engine/flow/tasks';
 import { useQuestionnaire } from '../../store/questionnaireStore';
@@ -18,6 +20,7 @@ export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[
   const recovery = useRecoveryTasks(goals);
   const exact = !isSampleTracks(useRefinance((state) => state.tracks));
   const offers = [useBestOffer('BUY', goals, answers), useBestOffer('REFINANCE', goals, answers)].filter((offer) => !!offer);
+  const loanOffer = useBestLoanOffer();
   const done = useQuestionnaire((state) => state.done);
   const toggle = useQuestionnaire((state) => state.toggleDone);
 
@@ -29,6 +32,7 @@ export function TasksCard({ goals, answers, refinance }: { goals: readonly Goal[
     ...(!exact ? { refinance: { exact: false } } : refinance ? { refinance: { exact: true, verdict: refinance.verdict, route: refinance.route } } : {}),
     ...(recovery ? { recovery } : {}),
     ...(offers.length > 0 ? { offers } : {}),
+    ...(loanOffer ? { loanOffer } : {}),
   });
   if (tasks.length === 0) {
     return null;
@@ -64,6 +68,18 @@ function useBestOffer(goal: 'BUY' | 'REFINANCE', goals: readonly Goal[], answers
   const { priced } = useRankedOffers(goal, goals.includes(goal) ? answers : {});
   const best = rankOffers(priced)[0];
   return best ? { goal, best: best.label, count: priced.length } : undefined;
+}
+
+/** The cheapest loan offer for the amount, against the market's average rate. */
+function useBestLoanOffer() {
+  const offers = useQuestionnaire((state) => state.loanOffers);
+  const amount = useQuestionnaire((state) => state.loanAmount) ?? 0;
+  const priced = offers.flatMap((offer) => {
+    const loan = priceLoan(Math.max(amount, 1), offer);
+    return loan ? [{ ...loan, rate: offer.annualRate }] : [];
+  });
+  const best = rankLoans(priced)[0];
+  return best ? { best: best.label, count: priced.length, rate: best.rate, average: consumerLoanAverage().rate } : undefined;
 }
 
 function useBuyTasks(goals: readonly Goal[], answers: Answers): TaskInput['buy'] {

@@ -25,7 +25,7 @@ const [base = 'http://localhost:4173', shots] = process.argv.slice(2);
 const SCREENS = [
   'own', 'own-debts', 'own-result', 'buy', 'buy-results',
   'money', 'money-flow', 'money-spending', 'money-debts', 'money-savings', 'money-summary',
-  'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
+  'start', 'start-question', 'start-help', 'start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details', 'start-recovery', 'shared',
 ];
 /** The household journey's steps after the files, by the name its progress bar gives each. */
 const MONEY_STEPS = {
@@ -132,22 +132,26 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           await page.getByRole('dialog').waitFor();
         }
       }
-      if (['start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
+      if (['start-result', 'start-today-mortgage', 'start-improve', 'start-improve-loans', 'start-compare-loans', 'start-compare', 'start-plan', 'start-refinance', 'start-details'].includes(screen)) {
         // Invented answers, straight to a result screen: written while the questionnaire is not
         // open (it would write its own state over them), then read by a fresh load.
-        const refinancing = ['start-refinance', 'start-today-mortgage', 'start-improve-loans'].includes(screen);
+        const refinancing = ['start-refinance', 'start-today-mortgage', 'start-improve-loans', 'start-compare-loans'].includes(screen);
         const answers = !refinancing
           ? { propertyValue: 2000000, segment: 'UPGRADER', equity: 500000, hasEligibility: 'NO', netIncome: 22000, hasObligations: 'NO', stability: 'BALANCED' }
           : { mortgageHow: 'MANUAL', mortgageBalance: 800000, mortgagePayment: 7200, mortgageYears: 'TEN_20', homeValue: 2400000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28000, stability: 'BALANCED', hasLoans: 'NO' };
-        const at = { 'start-result': 'DONE', 'start-today-mortgage': 'DONE', 'start-compare': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
+        const at = { 'start-result': 'DONE', 'start-today-mortgage': 'DONE', 'start-compare': 'compare', 'start-compare-loans': 'compare', 'start-plan': 'plan' }[screen] ?? 'improve';
         // Written from a page of the site that runs none of it, so no store writes its own state over them.
         await page.goto(`${base}/favicon.svg`);
-        const loans = screen === 'start-improve-loans';
+        const loans = screen === 'start-improve-loans' || screen === 'start-compare-loans';
         await page.evaluate(
           ({ goals, answers, at, loans }) => {
             // An invented offer, so the banks screen shows them side by side.
             const offers = at === 'compare' ? [{ id: 'e2e', for: 'BUY', bank: 'בנק לדוגמה', tracks: [{ type: 'FIXED_UNLINKED', amount: 1400000, annualRate: 0.05, termMonths: 300 }] }] : [];
-            localStorage.setItem('mashkanta:questionnaire', JSON.stringify({ state: { goals, at, offers, answers: loans ? { ...answers, hasLoans: 'YES' } : answers }, version: 1 }));
+            const loanOffers = at === 'compare' && loans ? [{ id: 'e2e-loan', lender: 'מלווה לדוגמה', annualRate: 0.07, months: 60, fee: 250 }] : [];
+            localStorage.setItem(
+              'mashkanta:questionnaire',
+              JSON.stringify({ state: { goals, at, offers, loanOffers, loanAmount: loans ? 60000 : undefined, answers: loans ? { ...answers, hasLoans: 'YES' } : answers }, version: 1 }),
+            );
             if (loans) {
               // An invented loan, as a lender's report would give it.
               const debts = [{ id: 'e2e', kind: 'CAR', label: 'הלוואת רכב לדוגמה', balance: 60000, annualRate: 0.08, monthlyPayment: 1500, remainingMonths: 48, include: false }];
@@ -164,9 +168,10 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
           'start-plan': page.getByRole('region', { name: 'מה עושים עכשיו' }),
           'start-refinance': page.getByText('הערכה ממה שמילאתם'),
           'start-improve-loans': page.getByRole('radiogroup', { name: 'מה לעשות עם הלוואת רכב לדוגמה' }),
+          'start-compare-loans': page.getByRole('list', { name: 'הלוואות, מהזולה ליקרה' }),
         }[screen] ?? page.getByText('החזר חודשי בהתחלה');
         await ready.waitFor({ timeout: 20_000 });
-        if (loans) {
+        if (screen === 'start-improve-loans') {
           await page.getByRole('radio', { name: /^לפרוס/ }).click();
           await page.getByRole('checkbox', { name: /הלוואת רכב לדוגמה: פריסה/ }).waitFor();
         }
