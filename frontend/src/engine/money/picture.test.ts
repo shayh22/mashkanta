@@ -75,6 +75,12 @@ describe('the monthly picture', () => {
     expect(payeeOf('הקמת הלוואה 13200000000')).toBe('הקמת הלוואה');
   });
 
+  it('files a line that is all numbers by what the household said about it', () => {
+    const numbered = { id: 'n', date: '2026-05-03', description: '987654321', amount: -200, source: 'BANK' as const };
+    const picture = monthlyPicture([{ ...bank, transactions: [...bank.transactions, numbered] }], { '987654321': 'LOANS' });
+    expect(line(picture, 'LOANS')?.payees.map((payee) => payee.description)).toContain('987654321');
+  });
+
   it('is nothing without statements', () => {
     expect(monthlyPicture([])).toBeUndefined();
   });

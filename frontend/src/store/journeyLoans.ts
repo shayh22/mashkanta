@@ -32,6 +32,8 @@ export interface LoanCandidate {
   readonly name: string;
   readonly monthly: number;
   readonly category: CategoryId;
+  /** Filed as a loan or insurance, or charged like one: a standing order, or once in every month. */
+  readonly loanLike: boolean;
 }
 
 /** "Not on the statements": the household says the loan is paid from an account not uploaded. */
@@ -43,19 +45,35 @@ export const samePayment = (a: number, b: number) => Math.abs(a - b) <= Math.max
 /** Categories whose charges are never one loan's repayment. */
 const NOT_A_LOAN: ReadonlySet<CategoryId> = new Set(['HOUSING_LOANS', 'CASH', 'CARD_UNDETAILED', 'GROCERIES', 'FEES']);
 
+/** Where a loan's repayment is filed: as one, or under the insurer that lent from the pension. */
+const LOAN_LIKE: ReadonlySet<CategoryId> = new Set(['LOANS', 'INSURANCE']);
+
 /** Every charge on the statements that could be a loan's repayment, loans first. */
 export function loanCandidates(picture: MonthlyPicture | undefined): LoanCandidate[] {
   return (picture?.spendingLines ?? [])
     .filter((line) => !NOT_A_LOAN.has(line.id))
-    .flatMap((line) => line.payees.filter((payee) => payee.monthly >= 50).map((payee) => ({ name: payee.description, monthly: payee.monthly, category: line.id })));
+    .flatMap((line) =>
+      line.payees
+        .filter((payee) => payee.monthly >= 50)
+        .map((payee) => ({
+          name: payee.description,
+          monthly: payee.monthly,
+          category: line.id,
+          loanLike:
+            LOAN_LIKE.has(line.id) ||
+            payee.standing ||
+            (payee.months >= 2 && payee.months === picture!.months.length && payee.count === payee.months),
+        })),
+    );
 }
 
 /**
  * The loans, each once. A report loan is the same loan as a charge on the statements when the
- * household linked them, or — unless it said the loan is paid elsewhere — when the payments agree,
- * whatever the charge is filed under: a pension loan is charged under the insurer's name. Such a
- * charge takes the report's terms; a report loan with no charge stands on its own; every charge
- * filed as a loan is one, report or not.
+ * household linked them, or — unless it said the loan is paid elsewhere — when the payments agree
+ * and the charge looks like a loan's (see `LoanCandidate.loanLike`): a pension loan is charged under
+ * the insurer's name, while a shop charge of the same size is not taken for one. The household's
+ * links are honoured before any guess. Such a charge takes the report's terms; a report loan with
+ * no charge stands on its own; every charge filed as a loan is one, report or not.
  */
 export function matchLoans(
   picture: MonthlyPicture | undefined,
@@ -65,8 +83,9 @@ export function matchLoans(
   const candidates = loanCandidates(picture);
   const reported = debts.filter((debt) => debt.balance > 0 && debt.monthlyPayment > 0);
   const byPayee = new Map<string, ConsumerDebt>();
-  const standalone: ConsumerDebt[] = [];
-  for (const debt of reported) {
+  // The household's own links first, so a guess never takes the charge it pointed at.
+  const ordered = [...reported].sort((a, b) => Number(!links[a.id]) - Number(!links[b.id]));
+  for (const debt of ordered) {
     const link = links[debt.id];
     let payee: LoanCandidate | undefined;
     if (link === NOT_ON_STATEMENTS) {
@@ -76,7 +95,7 @@ export function matchLoans(
     } else {
       // Loans first, then the nearest payment.
       payee = candidates
-        .filter((candidate) => !byPayee.has(candidate.name) && samePayment(candidate.monthly, debt.monthlyPayment))
+        .filter((candidate) => candidate.loanLike && !byPayee.has(candidate.name) && samePayment(candidate.monthly, debt.monthlyPayment))
         .sort(
           (a, b) =>
             Number(b.category === 'LOANS') - Number(a.category === 'LOANS') ||
@@ -85,10 +104,10 @@ export function matchLoans(
     }
     if (payee) {
       byPayee.set(payee.name, debt);
-    } else {
-      standalone.push(debt);
     }
   }
+  const matched = new Set(byPayee.values());
+  const standalone = reported.filter((debt) => !matched.has(debt));
   const fromDebt = (debt: ConsumerDebt) => ({
     defaults: { balance: debt.balance, annualRate: debt.annualRate, remainingMonths: debt.remainingMonths },
     debtId: debt.id,
@@ -99,7 +118,7 @@ export function matchLoans(
     .map((candidate): JourneyLoan => {
       const debt = byPayee.get(candidate.name);
       return {
-        key: candidate.name,
+        key: debt ? `debt:${debt.id}` : candidate.name,
         name: candidate.name,
         monthly: candidate.monthly,
         fromReport: !!debt,
@@ -126,9 +145,17 @@ export function useJourneyLoans(picture: MonthlyPicture | undefined): JourneyLoa
   return useMemo(() => matchLoans(picture, isSampleDebts(debts) ? [] : debts, links), [debts, picture, links]);
 }
 
+/**
+ * What the household typed for a loan. A report loan keeps its plan under the report's id, linked or
+ * not; a charge linked to a report later still finds what was typed under its name.
+ */
+export function ownPlanOf(loan: JourneyLoan, plans: Readonly<Record<string, LoanPlan>>): LoanPlan | undefined {
+  return plans[loan.key] ?? (loan.onStatements ? plans[loan.name] : undefined);
+}
+
 /** A loan's plan with the report's terms where the household has typed none. */
 export function planOf(loan: JourneyLoan, plans: Readonly<Record<string, LoanPlan>>): LoanPlan {
-  const own = plans[loan.key];
+  const own = ownPlanOf(loan, plans);
   return {
     move: own?.move ?? 'KEEP',
     balance: own?.balance ?? loan.defaults?.balance,

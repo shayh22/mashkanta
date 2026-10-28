@@ -179,7 +179,7 @@ export function SummaryStep({ picture }: { picture: MonthlyPicture }) {
   // The moves chosen on the loans screen, each with what it costs as well as what it frees.
   const debtMoves = [
     ...(refinance ? [mortgageDecision(route)] : []),
-    ...loans.map((loan) => loanDecision(loan.name, loan.monthly, planOf(loan, plans))),
+    ...loans.map((loan) => loanDecision(loan, planOf(loan, plans))),
   ].filter((decision): decision is Decision => !!decision);
   const decisions = [...debtMoves, ...decisionsOf(picture, explanations, targets)];
   const [unchosen, setUnchosen] = useState<ReadonlySet<string>>(new Set());

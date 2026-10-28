@@ -9,6 +9,16 @@ describe('moves for a loan', () => {
     expect(annuity(0, 0.05, 12)).toBe(0);
   });
 
+  it('prices what a move costs against the terms, not a stated payment above them', () => {
+    const terms = { balance: 100_000, annualRate: 0.06, remainingMonths: 24 };
+    const plain = loanMoves(terms, 60);
+    const stated = loanMoves(terms, 60, 6_000);
+    expect(stated.KEEP.monthly).toBe(6_000);
+    expect(stated.BALLOON.extraCost).toBeCloseTo(plain.BALLOON.extraCost, 6);
+    expect(stated.EXTEND.extraCost).toBeCloseTo(plain.EXTEND.extraCost, 6);
+    expect(loanMoves({ ...terms, annualRate: 0 }, 60).EXTEND.extraCost).toBe(0);
+  });
+
   it('a balloon pays only the interest, and the whole balance at the end', () => {
     const moves = loanMoves({ balance: 100_000, annualRate: 0.06, remainingMonths: 24 }, 60);
     expect(moves.BALLOON.monthly).toBeCloseTo(500, 6);
