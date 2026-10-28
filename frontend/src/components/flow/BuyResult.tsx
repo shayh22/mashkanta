@@ -11,7 +11,7 @@ import { useBuyResult } from './hooks';
  */
 /** Without `onEdit` and `onDetails`, a result someone shared: worked out again, nothing to change. */
 export function BuyResult({ answers, onEdit, onDetails }: { answers: Answers; onEdit?: (step: string) => void; onDetails?: () => void }) {
-  const { plan, result } = useBuyResult(answers);
+  const { plan, result, manual } = useBuyResult(answers);
 
   if (!plan) {
     return null;
@@ -42,7 +42,7 @@ export function BuyResult({ answers, onEdit, onDetails }: { answers: Answers; on
           החישוב לא הצליח. {result.error instanceof Error ? result.error.message : ''}
         </p>
       )}
-      {result.data && <Mix data={result.data} profile={plan.profile} equityShort={plan.equityShort} onEdit={onEdit} onDetails={onDetails} />}
+      {result.data && <Mix data={result.data} profile={plan.profile} equityShort={plan.equityShort} onEdit={onEdit} onDetails={onDetails} manual={manual} />}
     </section>
   );
 }
@@ -53,12 +53,15 @@ function Mix({
   equityShort,
   onEdit,
   onDetails,
+  manual,
 }: {
   data: OptimizationResponse;
   profile: BorrowerProfileRequest;
   equityShort: number;
   onEdit?: (step: string) => void;
   onDetails?: () => void;
+  /** The household built this mix itself, on the details screen. */
+  manual?: boolean;
 }) {
   const mix = data.recommended;
   const { summary, compliance, stress } = mix;
@@ -104,7 +107,7 @@ function Mix({
       )}
 
       <div className="flex flex-col gap-3 rounded-[20px] bg-flow-card p-4">
-        <h4 className="text-base font-extrabold">התמהיל</h4>
+        <h4 className="text-base font-extrabold">{manual ? 'התמהיל שלכם' : 'התמהיל'}</h4>
         <div role="img" aria-label={tracks.map((track) => `${track.hebrewName} ${Math.round(track.share * 100)}%`).join(', ')} className="flex h-4 overflow-hidden rounded-full">
           {tracks.map((track) => (
             <span key={`${track.track}-${track.termMonths}`} style={{ width: `${track.share * 100}%`, background: TRACK_COLORS[track.track] }} />

@@ -10,6 +10,7 @@ import { BANK_CSV, CARD_ROWS } from '../../engine/money/__fixtures__/statements'
 import { useRefinance } from '../../store/refinanceStore';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useWizard } from '../../store/wizardStore';
+import { useTrackPlanStore } from '../../store/trackPlanStore';
 import { scheduleText } from '../../engine/__fixtures__/schedule';
 
 beforeEach(() => {
@@ -21,7 +22,8 @@ beforeEach(() => {
   } as unknown as typeof ResizeObserver;
   window.history.replaceState(null, '', '#/start');
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined });
+  useQuestionnaire.setState({ goals: [], answers: {}, at: START, done: [], skipped: [], offers: [], advice: undefined, loanOffers: [], loanAmount: undefined, manualShares: undefined });
+  useTrackPlanStore.setState({ actions: {}, answer: undefined, goal: '' });
   useMoney.setState({ files: [], reading: false, pending: 0, loans: {}, loanLinks: {} });
   useRefinance.getState().reset();
   useConsolidation.getState().reset();
@@ -444,6 +446,16 @@ describe('the questionnaire', () => {
     for (const panel of ['המסלולים', 'אם הריבית או המדד יעלו']) {
       expect(await screen.findByRole('region', { name: panel }, { timeout: 10_000 })).toBeTruthy();
     }
+    // A mix of their own, from a preset: the result follows it.
+    await user.click(screen.getByRole('radio', { name: 'לבנות בעצמי' }));
+    await user.click(screen.getByRole('button', { name: 'הכל בקבועה לא צמודה' }));
+    expect(useQuestionnaire.getState().manualShares).toEqual({ FIXED_UNLINKED: 1 });
+    expect(screen.getByText(/^עומד בכללי בנק ישראל/)).toBeTruthy();
+    await user.clear(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'));
+    await user.type(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'), '90');
+    expect(screen.getByRole('alert').textContent).toContain('90%');
+    await user.clear(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'));
+    await user.type(screen.getByLabelText('אחוז במסלול קבועה לא צמודה'), '100');
     await user.click(screen.getByRole('radio', { name: '20 שנים' }));
     expect(useQuestionnaire.getState().answers.termYears).toBe(20);
     await user.click(screen.getByRole('radio', { name: 'יציבות' }));
@@ -451,6 +463,8 @@ describe('the questionnaire', () => {
     await user.click(screen.getAllByRole('button', { name: 'חזרה לתוצאה' })[0]!);
     expect(window.location.hash).toBe('#/start/improve');
     expect(screen.getByRole('heading', { name: 'איפה משפרים' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'התמהיל שלכם' }, { timeout: 10_000 })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'קבועה לא צמודה (קל"צ) 100%' })).toBeTruthy();
   }, 30_000);
 
   it('needs no mortgage when the equity covers the price, and has no banks to compare', async () => {
@@ -571,6 +585,14 @@ describe('the questionnaire', () => {
     expect(window.location.hash).toBe('#/start/details-refinance');
     expect(within(screen.getByRole('region', { name: 'המסלולים שלכם היום' })).getAllByRole('listitem')).toHaveLength(2);
     expect(within(screen.getByRole('region', { name: 'מה עולה המעבר' })).getByText('עמלת פירעון מוקדם')).toBeTruthy();
+
+    // Track by track: put savings into the prime track, priced beside refinancing it all.
+    const byTrack = screen.getByRole('region', { name: 'מסלול אחר מסלול' });
+    await user.click(within(within(byTrack).getByRole('radiogroup', { name: 'מה לעשות במסלול פריים' })).getByRole('radio', { name: 'לפרוע חלק' }));
+    const effect = within(byTrack).getByRole('region', { name: 'מה התוכנית עושה' });
+    expect(within(effect).getByText('החזר בחודש')).toBeTruthy();
+    expect(within(effect).getByText(/מיחזור של הכל|על מיחזור של הכל/)).toBeTruthy();
+    await user.click(within(byTrack).getByRole('button', { name: 'חזרה להמלצה לכל מסלול' }));
   }, 30_000);
 
   it('shows each result under its own name when there are two', async () => {

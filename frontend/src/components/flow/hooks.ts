@@ -7,7 +7,9 @@ import { optimize } from '../../lib/api';
 import { useConsolidation } from '../../store/consolidationStore';
 import { useMarket } from '../../store/marketStore';
 import { useRefinance } from '../../store/refinanceStore';
+import { useQuestionnaire } from '../../store/questionnaireStore';
 import { DEFAULT_PROFILE, useWizard } from '../../store/wizardStore';
+import { usableShares } from './mixShares';
 
 /**
  * The questionnaire's results, computed once and shared by the result and its details: the same
@@ -17,16 +19,18 @@ import { DEFAULT_PROFILE, useWizard } from '../../store/wizardStore';
 export function useBuyResult(answers: Answers) {
   const macro = useWizard((state) => state.macro);
   const market = useMarket((state) => state.version);
+  // The household's own mix, once it adds up; the calculator's otherwise.
+  const shares = usableShares(useQuestionnaire((state) => state.manualShares));
   const plan = useMemo(() => buyPlan(answers, DEFAULT_PROFILE), [answers]);
   const profile = plan?.kind === 'LOAN' ? plan.profile : undefined;
   const result = useQuery({
-    queryKey: ['flow-buy', profile, macro, market],
-    queryFn: () => optimize(profile!, macro, 0.5),
+    queryKey: ['flow-buy', profile, macro, market, shares],
+    queryFn: () => optimize(profile!, macro, 0.5, shares),
     enabled: !!profile,
     staleTime: Infinity,
     retry: false,
   });
-  return { plan, result };
+  return { plan, result, manual: !!shares };
 }
 
 export function useRefinanceEstimate(answers: Answers) {
