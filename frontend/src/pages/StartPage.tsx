@@ -19,7 +19,7 @@ import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } f
 import { decodeShared } from '../engine/flow/share';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { APP_NAME } from '../components/Logo';
-import { usePageTitle } from '../lib/pageTitle';
+import { titleOf, usePageTitle } from '../lib/pageTitle';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { DONE, resultScreensFor, START, useAnswer, useFlowAnswers, useFlowSteps, useQuestionnaire, type ResultScreen } from '../store/questionnaireStore';
@@ -188,12 +188,16 @@ function Results({
     if (!printing) {
       return;
     }
+    // "Save as PDF" names the file after the page: the report, not the screen it was printed from.
+    const screenTitle = document.title;
     const done = () => {
       delete document.body.dataset.print;
+      document.title = screenTitle;
       setPrinting(false);
     };
     window.addEventListener('afterprint', done, { once: true });
     document.body.dataset.print = 'report';
+    document.title = titleOf('הדוח שלי');
     // The charts drawn first: the report is laid out off screen, so they have a width to fill.
     let cancelled = false;
     void chartsReady().then(() =>
