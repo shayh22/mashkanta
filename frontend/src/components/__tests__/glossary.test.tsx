@@ -99,4 +99,22 @@ describe('the glossary panel', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('keeps the keyboard inside while it is open', () => {
+    act(() => useGlossary.getState().show());
+    render(<GlossaryPanel />);
+    const dialog = screen.getByRole('dialog', { name: 'מילון מונחים' });
+    const close = within(dialog).getByRole('button', { name: 'סגירה' });
+    // Back from its first control to its last, and on from the last to the first.
+    close.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(close);
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+    // Focus left on the page behind comes back in.
+    (document.body as HTMLElement).focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+  });
 });

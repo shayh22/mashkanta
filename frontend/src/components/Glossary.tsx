@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Reac
 import { createPortal } from 'react-dom';
 import { GLOSSARY, GLOSSARY_GROUPS, TERM_IDS, type GlossaryEntry, type TermId } from '../lib/glossary';
 import { useGlossary } from '../store/glossaryStore';
+import { useFocusTrap } from '../lib/focusTrap';
 
 /**
  * Hard terms explained in place. A {@link Term} is underlined where it appears; resting the pointer
@@ -216,6 +217,7 @@ export function GlossaryPanel() {
   const { open, focus, close } = useGlossary();
   const [query, setQuery] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open);
   const searchRef = useRef<HTMLInputElement>(null);
   const titleId = useId();
 
