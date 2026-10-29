@@ -19,6 +19,7 @@ import { AccountToday, BuyToday, CommitmentsMeter, LoansToday, MortgageToday } f
 import { decodeShared } from '../engine/flow/share';
 import { AnswersSummary, GoalPicker, QuestionScreen } from '../components/flow/Screens';
 import { APP_NAME } from '../components/Logo';
+import { usePageTitle } from '../lib/pageTitle';
 import { CATALOG } from '../engine/flow/catalog';
 import { firstOpen, neighbour, progressOf, stepsFor, type Answers, type Goal, type Step } from '../engine/flow/flow';
 import { DONE, resultScreensFor, START, useAnswer, useFlowAnswers, useFlowSteps, useQuestionnaire, type ResultScreen } from '../store/questionnaireStore';
@@ -179,6 +180,7 @@ function Results({
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
   }, [screen]);
+  usePageTitle(SCREEN_TITLES[screen]);
 
   // The report: every screen at once, on white paper, through the browser's print — where "save
   // as PDF" is one choice away.
@@ -377,6 +379,7 @@ export function SharedPage() {
   const [confirming, setConfirming] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus({ preventScroll: true }), []);
+  usePageTitle(shared ? 'תוצאה ששותפה איתכם' : 'הקישור לא תקין');
 
   // In place of the visitor's own answers, as the confirmation says: nothing of theirs mixes in.
   const takeIn = () => {

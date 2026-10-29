@@ -14,6 +14,7 @@ import { RoutesPanel } from './Compare';
 import { ManualMixPanel, TrackByTrack } from './MixTools';
 import { WhatIfPanel } from './WhatIf';
 import type { TrackAllocation } from '../../lib/types';
+import { usePageTitle } from '../../lib/pageTitle';
 
 /** A mix's tracks, as the what-if panel prices them. */
 const tracksOf = (allocations: readonly TrackAllocation[]) =>
@@ -28,6 +29,7 @@ const tracksOf = (allocations: readonly TrackAllocation[]) =>
 function Shell({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus({ preventScroll: true }), []);
+  usePageTitle(title);
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">

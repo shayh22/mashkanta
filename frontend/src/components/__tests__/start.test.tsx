@@ -193,6 +193,34 @@ describe('the questionnaire', () => {
   };
   const go = (title: string) => userEvent.setup().click(screen.getByRole('button', { name: `הבא: ${title}` }));
 
+  it('names each screen in the browser’s title, and gives the page its own title back at home', async () => {
+    serve(false);
+    const base = document.title;
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED', statementsOffer: 'NO' },
+      at: 'statementsOffer',
+    });
+    openAt('statementsOffer');
+    const user = userEvent.setup();
+    renderPage();
+    const question = screen.getByRole('heading', { level: 2 }).textContent!;
+    expect(document.title).toBe(`${question} · מפתח כלכלי`);
+    await user.click(next());
+    expect(document.title).toBe('המצב היום · מפתח כלכלי');
+    await go('איפה משפרים');
+    expect(document.title).toBe('איפה משפרים · מפתח כלכלי');
+    await user.click(screen.getByRole('button', { name: 'כל הפרטים' }));
+    expect(document.title).toBe('פרטי התמהיל · מפתח כלכלי');
+    await user.click(screen.getAllByRole('button', { name: 'חזרה לתוצאה' })[0]!);
+    expect(document.title).toBe('איפה משפרים · מפתח כלכלי');
+    useQuestionnaire.setState({ at: START });
+    window.history.replaceState(null, '', '#/start');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(await screen.findByRole('heading', { name: 'מה נסדר היום?' })).toBeTruthy();
+    expect(document.title).toBe(base);
+  }, 30_000);
+
   it('ends on the situation today, then where it improves, the banks and the plan — each a screen of its own', async () => {
     serve(false);
     useQuestionnaire.setState({
