@@ -284,6 +284,8 @@ describe('the questionnaire', () => {
     let printed = '';
     const print = vi.fn(() => {
       expect(document.body.dataset.print).toBe('report');
+      // Saved as a PDF, the file is named after the report.
+      expect(document.title).toBe('הדוח שלי · מפתח כלכלי');
       printed = document.querySelector('.report')!.textContent!;
     });
     window.print = print;
@@ -295,6 +297,7 @@ describe('the questionnaire', () => {
     window.dispatchEvent(new Event('afterprint'));
     await waitFor(() => expect(document.querySelector('.report')).toBeNull());
     expect(document.body.dataset.print).toBeUndefined();
+    expect(document.title).toBe('התוכנית · מפתח כלכלי');
 
     expect(screen.getByRole('heading', { name: 'זה מה שסיפרתם' })).toBeTruthy();
     expect(screen.getByText('2,000,000 ₪')).toBeTruthy();

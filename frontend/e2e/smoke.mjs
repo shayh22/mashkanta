@@ -56,6 +56,19 @@ for (const first of ['start']) {
   await page.close();
 }
 
+// Asked to move less, nothing moves: a goal card's transition lands at once.
+{
+  const page = await browser.newPage({ reducedMotion: 'reduce' });
+  await page.goto(`${base}/#/start`);
+  const card = page.locator('label:has(input[type=checkbox])').first();
+  await card.waitFor({ timeout: 20_000 });
+  const duration = await card.evaluate((element) => getComputedStyle(element).transitionDuration);
+  if (!duration.split(',').every((each) => parseFloat(each) <= 0.001)) {
+    problems.push(`with reduced motion, a goal card still transitions for ${duration}`);
+  }
+  await page.close();
+}
+
 // Live market figures: the endpoint answers (the Worker in production, the Vite middleware
 // locally), and the header shows the prime rate read from it rather than the seeded fallback.
 {
