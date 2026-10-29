@@ -164,13 +164,3 @@ export function planOf(loan: JourneyLoan, plans: Readonly<Record<string, LoanPla
     ...(own?.extendYears !== undefined ? { extendYears: own.extendYears } : {}),
   };
 }
-
-/** Whether the household has loaded anything of its own: statements, a mortgage report, loans. */
-export function useDocumentsStatus() {
-  const files = useMoney((state) => state.files);
-  const debts = useConsolidation((state) => state.debts);
-  return {
-    statements: files.filter((file) => file.statement).length,
-    loans: isSampleDebts(debts) ? 0 : debts.length,
-  };
-}

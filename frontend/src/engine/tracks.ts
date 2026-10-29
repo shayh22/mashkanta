@@ -140,10 +140,6 @@ export function initialRate(spec: TrackSpec, scenario: MacroScenario): number {
   return annualRateAt(spec, 1, scenario);
 }
 
-export function withAmount(spec: TrackSpec, amount: number): TrackSpec {
-  return { ...spec, amount };
-}
-
 export function withTerm(spec: TrackSpec, termMonths: number): TrackSpec {
   return { ...spec, termMonths, graceMonths: Math.min(spec.graceMonths, Math.max(0, termMonths - 1)) };
 }

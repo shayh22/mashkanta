@@ -186,26 +186,3 @@ export const useWizard = create<WizardState>()(
     },
   ),
 );
-
-/** Metrics the wizard shows live, without a round trip to the backend. */
-export function useDerivedMetrics() {
-  const profile = useWizard((state) => state.profile);
-  const requestedLoanAmount = useWizard((state) => state.requestedLoanAmount);
-  const ltv = profile.loanAmount / profile.propertyValue;
-  const maxLtv = SEGMENT_MAX_LTV[profile.segment];
-
-  return {
-    ltv,
-    maxLtv,
-    requestedLoanAmount,
-    /** True when the ceiling is currently holding the loan below what the user asked for. */
-    isClamped: requestedLoanAmount > profile.loanAmount + 1,
-    maxLoan: profile.propertyValue * maxLtv,
-    equity: Math.max(0, profile.propertyValue - profile.loanAmount),
-    ltvExceeded: ltv > maxLtv + 1e-9,
-    disposableIncome: Math.max(0, profile.monthlyNetIncome - profile.existingMonthlyObligations),
-    /** The payment ceiling implied by the 40% debt-to-income rule. */
-    maxAffordablePayment: Math.max(0, profile.monthlyNetIncome * 0.4 - profile.existingMonthlyObligations),
-    comfortablePayment: Math.max(0, profile.monthlyNetIncome * 0.3 - profile.existingMonthlyObligations),
-  };
-}

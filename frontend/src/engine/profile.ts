@@ -1,5 +1,5 @@
 import type { BuyerSegment, LiquidityEvent } from '../lib/types';
-import { LIMITS, SEGMENT_MAX_LTV } from './regulatory';
+import { LIMITS } from './regulatory';
 
 /** Everything the onboarding wizard collects, in one value. */
 export interface BorrowerProfile {
@@ -19,14 +19,6 @@ export interface BorrowerProfile {
   readonly dynamicPreference: number;
   readonly eligibilityAmount: number;
   readonly eligibilityRate: number;
-}
-
-export function ltvOf(borrower: BorrowerProfile): number {
-  return borrower.loanAmount / borrower.propertyValue;
-}
-
-export function maxLtvOf(borrower: BorrowerProfile): number {
-  return SEGMENT_MAX_LTV[borrower.segment];
 }
 
 /** Income left for a mortgage payment once existing obligations are served. */
@@ -135,9 +127,4 @@ function narrative(
     parts.push('נלקחה בחשבון הלוואת זכאות ממשרד הבינוי והשיכון.');
   }
   return parts.join(' ');
-}
-
-/** True when the borrower expects to repay a meaningful chunk early. */
-export function expectsEarlyRepayment(risk: RiskProfile): boolean {
-  return risk.prepaymentHorizon > 0;
 }

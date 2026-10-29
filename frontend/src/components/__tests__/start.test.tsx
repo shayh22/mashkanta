@@ -633,6 +633,53 @@ describe('the questionnaire', () => {
     await user.click(within(byTrack).getByRole('button', { name: 'חזרה להמלצה לכל מסלול' }));
   }, 30_000);
 
+  it('lets נועם turn a goal into a move per track, from the tracks’ figures alone, and says when it fails', async () => {
+    const posts: Record<string, unknown>[] = [];
+    let fail = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method !== 'POST') {
+          return new Response(JSON.stringify({ enabled: true }));
+        }
+        posts.push(JSON.parse(init.body as string) as Record<string, unknown>);
+        if (fail) {
+          return new Response('{}', { status: 429 });
+        }
+        const plan = { summary: 'לפרוע את הפריים', cautions: ['כדאי להשאיר כרית ביטחון'], actions: [{ index: 0, action: 'KEEP' }, { index: 1, action: 'PREPAY', prepayAmount: 100_000 }] };
+        return new Response(JSON.stringify({ model: 'm', plan }));
+      }),
+    );
+    useRefinance.getState().setTracks([
+      { id: 'a', type: 'FIXED_UNLINKED', balance: 500_000, annualRate: 0.068, remainingMonths: 240, monthsElapsed: 60 },
+      { id: 'b', type: 'PRIME', balance: 300_000, annualRate: 0.0625, remainingMonths: 240, monthsElapsed: 60 },
+    ]);
+    useQuestionnaire.setState({ goals: ['REFINANCE'], answers: { mortgageHow: 'UPLOAD', homeValue: 2_400_000, refinanceGoal: 'LOWER_PAYMENT', netIncome: 28_000, stability: 'STABLE', hasLoans: 'NO' } });
+    openAt('details-refinance');
+    const user = userEvent.setup();
+    renderPage();
+    const byTrack = await screen.findByRole('region', { name: 'מסלול אחר מסלול' }, { timeout: 10_000 });
+    await user.click(await within(byTrack).findByRole('button', { name: 'נועם, תבנה לי תוכנית לפי מטרה' }));
+    await user.click(within(byTrack).getByRole('button', { name: 'יש לי 100,000 ₪ בצד: איפה הכי כדאי לשים אותם?' }));
+    await user.click(within(byTrack).getByRole('button', { name: 'נועם, תבנה לי תוכנית' }));
+
+    expect(await within(byTrack).findByText('לפרוע את הפריים')).toBeTruthy();
+    expect(within(byTrack).getByText('כדאי להשאיר כרית ביטחון')).toBeTruthy();
+    // The plan lands on the tracks: the prime track is part paid off, the fixed one kept.
+    expect(useTrackPlanStore.getState().actions).toEqual({ a: { kind: 'KEEP' }, b: { kind: 'PREPAY', amount: 100_000 } });
+    const prime = within(byTrack).getByRole('radiogroup', { name: 'מה לעשות במסלול פריים' });
+    expect(within(prime).getByRole('radio', { name: 'לפרוע חלק' }).getAttribute('aria-checked')).toBe('true');
+    // Only the tracks' figures and the goal went out.
+    expect(posts).toHaveLength(1);
+    expect(Object.keys(posts[0]!).sort()).toEqual(['goal', 'monthlyPayment', 'tracks']);
+
+    // A second request over the hour's quota says so, and keeps the plan already applied.
+    fail = true;
+    await user.click(within(byTrack).getByRole('button', { name: 'נועם, תבנה לי תוכנית' }));
+    expect((await within(byTrack).findByRole('alert')).textContent).toBe('הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.');
+    expect(useTrackPlanStore.getState().actions.b).toEqual({ kind: 'PREPAY', amount: 100_000 });
+  }, 30_000);
+
   it('shows each result under its own name when there are two', async () => {
     serve(false);
     useQuestionnaire.setState({
