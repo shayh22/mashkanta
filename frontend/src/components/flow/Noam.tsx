@@ -3,6 +3,7 @@ import { CATALOG } from '../../engine/flow/catalog';
 import type { AnswerValue, Answers, Goal, Step } from '../../engine/flow/flow';
 import { answerText, fillsFor, glossaryAnswer, MAX_MESSAGE_LENGTH, noamRequestFor } from '../../engine/flow/noamRequest';
 import { askNoam, useAiEnabled } from '../../lib/aiClient';
+import { useFocusTrap } from '../../lib/focusTrap';
 import { GLOSSARY, type TermId } from '../../lib/glossary';
 
 /** נועם: a drawn adviser in a jacket and tie — a person, not a photo of anyone. */
@@ -74,6 +75,8 @@ export function HelpSheet({
   const [error, setError] = useState<string>();
   const close = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLInputElement>(null);
+  const sheet = useRef<HTMLElement>(null);
+  useFocusTrap(sheet);
   const entry = step.help ? GLOSSARY[step.help] : undefined;
 
   useEffect(() => {
@@ -140,6 +143,7 @@ export function HelpSheet({
     <div className="fixed inset-0 z-50 flex items-end justify-center" dir="rtl">
       <button type="button" aria-label="סגירת ההסבר" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/45" onClick={onClose} />
       <section
+        ref={sheet}
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-title"

@@ -121,6 +121,19 @@ describe('the questionnaire', () => {
     expect(posts).toHaveLength(0);
     expect(within(sheet).getByRole('button', { name: 'לשאול את נועם בכל זאת' })).toBeTruthy();
 
+    // The keyboard stays in the sheet: past its last control back to its first, and the other way.
+    const close = within(sheet).getByRole('button', { name: 'סגירה' });
+    close.focus();
+    await user.tab({ shift: true });
+    expect(sheet.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(close);
+    await user.tab();
+    expect(document.activeElement).toBe(close);
+    for (let press = 0; press < 12; press++) {
+      await user.tab();
+      expect(sheet.contains(document.activeElement)).toBe(true);
+    }
+
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(help);
