@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CATALOG, GOAL_CHOICES } from '../../engine/flow/catalog';
 import { stepComplete, visibleFields, type AnswerValue, type Answers, type Goal, type Progress, type Step } from '../../engine/flow/flow';
 import { answerText } from '../../engine/flow/noamRequest';
+import { usePageTitle } from '../../lib/pageTitle';
 import { FieldInput } from './Fields';
 import { HelpSheet, NoamAvatar } from './Noam';
 
@@ -122,6 +123,7 @@ export function QuestionScreen({
   onNext: () => void;
 }) {
   const [help, setHelp] = useState<'term' | 'noam'>();
+  usePageTitle(step.title);
   const heading = useRef<HTMLHeadingElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const fields = visibleFields(step, answers);
