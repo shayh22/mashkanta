@@ -42,6 +42,8 @@ export function tasksFor(input: TaskInput): Task[] {
   const { goals, answers } = input;
   const tasks: Task[] = [];
   const add = (id: string, text: string) => tasks.push({ id, text });
+  // A step already taken is not asked again: offers in hand stand for asking the banks.
+  const hasOffers = (goal: 'BUY' | 'REFINANCE') => (input.offers ?? []).some((offer) => offer.goal === goal && offer.count > 0);
 
   if (goals.includes('BUY') && input.buy) {
     if (input.buy.equityShort > 0) {
@@ -50,11 +52,14 @@ export function tasksFor(input: TaskInput): Task[] {
     if (answers.hasEligibility === 'UNKNOWN') {
       add('buy-eligibility', 'לבדוק זכאות באתר משרד הבינוי והשיכון');
     }
-    add('buy-approval', 'לבקש אישור עקרוני מ-3 בנקים לפחות');
+    if (!hasOffers('BUY')) {
+      add('buy-approval', 'לבקש אישור עקרוני מ-3 בנקים לפחות');
+    }
     if (input.buy.mix) {
       add('buy-mix', `להציג לבנקים את התמהיל: ${input.buy.mix}`);
     }
-    if (input.buy.cheapestBank) {
+    // The estimate of the cheapest bank gives way to the offers themselves.
+    if (input.buy.cheapestBank && !hasOffers('BUY')) {
       add('buy-cheapest', `להתחיל מ${input.buy.cheapestBank}, הזול לתמהיל הזה`);
     }
   }
@@ -66,10 +71,13 @@ export function tasksFor(input: TaskInput): Task[] {
     } else if (verdict === 'NOT_WORTHWHILE') {
       add('refi-later', 'לבדוק שוב בעוד חצי שנה, או כשהריבית משתנה');
     } else {
-      add('refi-offer', route === 'EXTERNAL' ? 'לבקש הצעת מיחזור מבנק אחר, לפי התמהיל החדש' : 'לבקש מהבנק שלכם הצעת מיחזור, לפי התמהיל החדש');
+      if (!hasOffers('REFINANCE')) {
+        add('refi-offer', route === 'EXTERNAL' ? 'לבקש הצעת מיחזור מבנק אחר, לפי התמהיל החדש' : 'לבקש מהבנק שלכם הצעת מיחזור, לפי התמהיל החדש');
+      }
       add('refi-fee', 'לבקש מהבנק את עמלת הפירעון המוקדם העדכנית, בכתב');
     }
-    if (answers.hasLoans === 'YES') {
+    // Once folding the loans in is decided, the step is asking the bank for it, below.
+    if (answers.hasLoans === 'YES' && !input.recovery?.consolidate) {
       add('refi-loans', 'לבדוק איחוד של ההלוואות הנוספות לתוך המיחזור');
     }
   }
