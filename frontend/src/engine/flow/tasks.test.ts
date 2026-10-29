@@ -56,6 +56,20 @@ describe('what to do now', () => {
     expect(ids({ goals: ['BUY'], answers: {}, offers: [{ goal: 'REFINANCE', best: 'בנק ב', count: 1 }] })).toEqual([]);
   });
 
+  it('does not ask again for a step already taken: offers in hand, or the loans’ consolidation decided', () => {
+    const buy = { equityShort: 0, cheapestBank: 'בנק לדוגמה', mix: 'פריים 100%' };
+    // Offers for the purchase stand for asking the banks, and for the estimate of the cheapest.
+    expect(ids({ goals: ['BUY'], answers: {}, buy, offers: [{ goal: 'BUY', best: 'בנק א', count: 1 }] })).toEqual(['buy-mix', 'offer-BUY']);
+    // Offers for a refinance do not count for the purchase.
+    expect(ids({ goals: ['BUY'], answers: {}, buy, offers: [{ goal: 'REFINANCE', best: 'בנק א', count: 1 }] })).toEqual(['buy-approval', 'buy-mix', 'buy-cheapest']);
+
+    const refinance = { exact: true, verdict: 'IMMEDIATE', route: 'EXTERNAL' } as const;
+    expect(ids({ goals: ['REFINANCE'], answers: {}, refinance, offers: [{ goal: 'REFINANCE', best: 'בנק ב', count: 2 }] })).toEqual(['refi-fee', 'offer-REFINANCE']);
+
+    const recovery = { hasStatements: true, cancel: [], reduce: [], overdraft: false, fees: false, consolidate: true };
+    expect(ids({ goals: ['REFINANCE'], answers: { hasLoans: 'YES' }, refinance, recovery })).toEqual(['refi-offer', 'refi-fee', 'rec-consolidate']);
+  });
+
   it('takes the cheapest loan offer, and asks for the market rate when it is well above', () => {
     expect(tasksFor({ goals: ['RECOVERY'], answers: {}, loanOffer: { best: 'מלווה א', count: 2, rate: 0.12, average: 0.079 } }).map((task) => task.text)).toEqual([
       'לקחת את ההלוואה ממלווה א, הזולה מבין 2 ההצעות',
