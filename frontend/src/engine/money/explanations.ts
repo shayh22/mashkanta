@@ -32,5 +32,3 @@ export function overridesOf(explanations: Explanations): CategoryOverrides {
     Object.entries(explanations).flatMap(([payee, explanation]) => (explanation.category ? [[payee, explanation.category]] : [])),
   );
 }
-
-export const isExplained = (explanation?: PayeeExplanation) => !!explanation?.flexibility || !!explanation?.note;

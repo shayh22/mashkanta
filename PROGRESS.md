@@ -1029,3 +1029,10 @@
 4. **ניקוי**: נמחקו מודולים טהורים שרק הדפים הישנים השתמשו בהם, עם הבדיקות שלהם (`risk`, `waterfall`, `explainRequest`, `flexibility`, `waffle`, `trackOptions`, `pageTabs`, `combinedStore`). קובץ ה-JS הראשי ירד מ-226KB ל-131KB.
 5. **בדיקות**: בדיקות הניווט נכתבו מחדש (כתובות ישנות ומטרה מסומנת). מבדיקת ה-e2e הוסרו מסכי הדפים הישנים, ובדיקת "ספריית הגרפים לא נטענת בכניסה" נשארה לדף הבית. ה-README מתאר עכשיו את השאלון.
 - שער: 505/505 (הוסרו 67 בדיקות של הדפים שהוסרו) · lint 0 · typecheck 0 · build · e2e נקי.
+
+### 2026-10-29 — `fix/dead-code` ✅ (סבב שיפור: ROADMAP הושלם, הסבב הוקדש לניקוי ולכיסוי בדיקות)
+
+1. **קוד שנשאר יתום אחרי הסרת הדפים הישנים**: הוסרו אחד-עשר רכיבי ממשק שאף מסך כבר לא משתמש בהם (`Stat`, `LevelBadge`, `Field`, `CurrencyField`, `SegmentedControl`, `RangeField`, `ProgressSteps`, `ErrorCard`, `NumberInput`, `Toggle`, `ScrollRegion`). מ-`ui.tsx` נשארו רק `Card` ו-`LoadingCard`. הוסרו גם `lib/glide.ts`, שני עזרי שדה הסכום ב-`lib/format.ts`, ותשע פונקציות ללא קורא (`periodOf`, `ltvOf`, `maxLtvOf`, `expectsEarlyRepayment`, `withAmount`, `explainVerdict`, `useDocumentsStatus`, `useDerivedMetrics`, `isExplained`), יחד עם מחלקות CSS שאיש לא משתמש בהן (`badge-*`, `card-muted`, `ltr-nums`). בסך הכל נמחקו כ-530 שורות.
+2. **נשארו בכוונה**: `explainMix` ו-`/api/explain` ממתינים להחלטת המשתמש אם להחזיר את "הסבר את התמהיל". `categorizePayees` ו-`consultStep` נשארו גם הם: אף מסך לא קורא להם, אבל נקודות הקצה שלהם ב-Worker עדיין קיימות.
+3. **כיסוי**: נוספה בדיקה ל"נועם, תבנה לי תוכנית" שבודקת שלושה דברים. התוכנית מוחלת על המסלולים (הפריים נפרע חלקית והקבוע נשאר). נשלחים רק נתוני המסלולים והמטרה. כשהמכסה לשעה נגמרת זה נאמר במפורש, והתוכנית שכבר הוחלה נשארת. עד עכשיו המסלולים האלה לא היו מכוסים.
+- שער: 506/506 (+1) · lint 0 · typecheck 0 · build · e2e נקי.

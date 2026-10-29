@@ -27,14 +27,3 @@ export const monthName = (month: string, withYear = true) =>
   );
 export const shortDate = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}`;
 
-export function periodOf(months: readonly string[]): string {
-  const first = months[0]!;
-  const last = months[months.length - 1]!;
-  if (first === last) {
-    return monthName(first);
-  }
-  return first.slice(0, 4) === last.slice(0, 4)
-    ? `${monthName(first, false)}–${monthName(last)}`
-    : `${monthName(first)}–${monthName(last)}`;
-}
-
