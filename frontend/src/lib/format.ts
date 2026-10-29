@@ -11,8 +11,6 @@ const compact = new Intl.NumberFormat('he-IL', {
   maximumFractionDigits: 1,
 });
 
-const plain = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 0 });
-
 /** ₪1,234,568 — the default for any shekel amount. */
 export function formatCurrency(value: number): string {
   return currency.format(Math.round(value));
@@ -44,14 +42,3 @@ export function formatTerm(months: number): string {
   return `${years} שנים ו-${remainder} חודשים`;
 }
 
-/** Parses what a user typed into a currency field, tolerating separators and a shekel sign. */
-export function parseCurrencyInput(raw: string): number {
-  const digits = raw.replace(/[^\d.]/g, '');
-  const value = Number.parseFloat(digits);
-  return Number.isFinite(value) ? value : 0;
-}
-
-/** Groups digits as the user types, without fighting the caret in the RTL layout. */
-export function formatCurrencyInput(value: number): string {
-  return value > 0 ? plain.format(value) : '';
-}

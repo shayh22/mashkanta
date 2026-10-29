@@ -305,22 +305,6 @@ export function compareRoutes(
   };
 }
 
-/** A one-sentence Hebrew explanation of a route's verdict. */
-export function explainVerdict(analysis: RouteAnalysis): string {
-  const fee = Math.round(analysis.upfrontCost).toLocaleString('he-IL');
-  const npv = Math.round(analysis.netPresentValue).toLocaleString('he-IL');
-  switch (analysis.verdict) {
-    case 'IMMEDIATE':
-      return `עלות מעבר של ${fee} ₪ מוחזרת תוך ${analysis.breakevenMonth} חודשים, וערך נוכחי נקי של ${npv} ₪ לטובת המיחזור.`;
-    case 'LONG_TERM':
-      return `עלות מעבר של ${fee} ₪ מוחזרת רק בחודש ${analysis.breakevenMonth}; המיחזור משתלם אם תחזיקו את ההלוואה לפחות עד אז.`;
-    default:
-      return analysis.breakevenMonth === 0
-        ? `החיסכון בהחזרים אינו מכסה עלות מעבר של ${fee} ₪ לאורך יתרת התקופה.`
-        : `הערך הנוכחי הנקי שלילי (${npv} ₪) — החיסכון העתידי שווה היום פחות מעלות המעבר.`;
-  }
-}
-
 /** Whether refinancing one track on its own pays, at the current bank. */
 export interface TrackVerdict {
   readonly id: string;
