@@ -93,7 +93,14 @@ describe('the questionnaire', () => {
     expect((screen.getByLabelText('יתרה לסילוק, בערך') as HTMLInputElement).value).toBe('820,000');
     await user.type(screen.getByLabelText('החזר חודשי היום'), '50');
     expect(screen.getByText('לפחות 100 ₪')).toBeTruthy();
+    // Read with the field: its unit, and why the figure is out of range.
+    const payment = screen.getByLabelText('החזר חודשי היום');
+    const description = () => payment.getAttribute('aria-describedby')!.split(' ').map((id) => document.getElementById(id)!.textContent).join(' ');
+    expect(payment.getAttribute('aria-invalid')).toBe('true');
+    expect(description()).toBe('₪ לפחות 100 ₪');
     await user.type(screen.getByLabelText('החזר חודשי היום'), '00');
+    expect(payment.getAttribute('aria-invalid')).toBeNull();
+    expect(description()).toBe('₪');
     await user.click(screen.getByRole('radio', { name: '10–20' }));
     expect(next().disabled).toBe(false);
     expect(useQuestionnaire.getState().answers).toMatchObject({ mortgageBalance: 820_000, mortgagePayment: 5_000, mortgageYears: 'TEN_20' });

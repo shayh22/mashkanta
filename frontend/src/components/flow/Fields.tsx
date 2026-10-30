@@ -135,6 +135,8 @@ function FigureInput({
   const id = useId();
   const shown = typeof value === 'number' ? Math.round(value).toLocaleString('en-US') : '';
   const out = typeof value === 'number' && ((field.min !== undefined && value < field.min) || (field.max !== undefined && value > field.max));
+  // Read with the field: its unit, and why the figure is out of range.
+  const described = [field.unit && `${id}-unit`, out && `${id}-range`].filter(Boolean).join(' ');
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className={primary ? 'sr-only' : 'text-[15px] font-bold'}>
@@ -154,15 +156,20 @@ function FigureInput({
           value={shown}
           placeholder={field.placeholder ?? 'הקלידו סכום'}
           aria-invalid={out || undefined}
+          aria-describedby={described || undefined}
           onChange={(event) => {
             const digits = digitsOf(event.target.value);
             onChange(digits ? Number(digits) : undefined);
           }}
         />
-        {field.unit && <span className="text-lg text-flow-muted">{field.unit}</span>}
+        {field.unit && (
+          <span id={`${id}-unit`} className="text-lg text-flow-muted">
+            {field.unit}
+          </span>
+        )}
       </div>
       {out && (
-        <p className="text-sm text-negative">
+        <p id={`${id}-range`} className="text-sm text-negative">
           {field.min !== undefined && (value as number) < field.min
             ? `לפחות ${field.min.toLocaleString('he-IL')}${field.unit ? ` ${field.unit}` : ''}`
             : `עד ${field.max!.toLocaleString('he-IL')}${field.unit ? ` ${field.unit}` : ''}`}
