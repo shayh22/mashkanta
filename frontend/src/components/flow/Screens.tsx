@@ -229,39 +229,10 @@ export function QuestionScreen({
 }
 
 /** After the last question: what the household told us, each answer a tap away from changing. */
-export function AnswersSummary({
-  steps,
-  answers,
-  goals,
-  onEdit,
-  onRestart,
-  focus = true,
-}: {
-  steps: readonly Step[];
-  answers: Answers;
-  /** The goals whose result is not shown above, linked to their pages. */
-  goals: readonly Goal[];
-  onEdit: (step: string) => void;
-  onRestart: () => void;
-  /** Whether the screen starts here, rather than at a result above. */
-  focus?: boolean;
-}) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    if (focus) {
-      heading.current?.focus({ preventScroll: true });
-    }
-  }, [focus]);
-  const RESULTS: Record<Goal, { label: string; href: string }> = {
-    REFINANCE: { label: 'לבדיקת המיחזור', href: '#/own' },
-    BUY: { label: 'לתמהיל לדירה', href: '#/buy' },
-    RECOVERY: { label: 'לתוכנית ההבראה', href: '#/money' },
-  };
+export function AnswersSummary({ steps, answers, onEdit, onRestart }: { steps: readonly Step[]; answers: Answers; onEdit: (step: string) => void; onRestart: () => void }) {
   return (
     <div className="flex flex-col gap-5">
-      <h2 ref={heading} tabIndex={-1} className="text-[32px] font-black leading-[1.1] tracking-tight outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
-        זה מה שסיפרתם
-      </h2>
+      <h2 className="text-[32px] font-black leading-[1.1] tracking-tight">זה מה שסיפרתם</h2>
       {CATALOG.sections
         .filter((section) => steps.some((step) => step.section === section.id))
         .map((section) => (
@@ -297,13 +268,6 @@ export function AnswersSummary({
               })}
           </section>
         ))}
-      <div className="flex flex-col gap-2.5">
-        {goals.map((goal) => (
-          <a key={goal} href={RESULTS[goal].href} className={primaryButton}>
-            {RESULTS[goal].label}
-          </a>
-        ))}
-      </div>
       <button type="button" onClick={onRestart} className="min-h-11 self-center text-base font-bold text-flow-strong underline-offset-4 hover:underline">
         להתחיל מחדש
       </button>
