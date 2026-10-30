@@ -101,11 +101,19 @@ describe('market worker', () => {
   });
 
   it('routes every AI path to its own handler, which says whether AI is on', async () => {
-    for (const path of ['/api/extract', '/api/explain', '/api/plan', '/api/categorize', '/api/advise', '/api/consult', '/api/noam']) {
+    for (const path of ['/api/extract', '/api/explain', '/api/plan', '/api/advise', '/api/noam']) {
       const response = await get(path);
       expect({ path, body: await response.json() }).toEqual({ path, body: { enabled: false } });
     }
     expect(env.ASSETS.fetch).not.toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining('/api/') }));
+  });
+
+  it('answers an API path it has no handler for with a 404, not the page', async () => {
+    for (const path of ['/api/categorize', '/api/consult', '/api/nothing']) {
+      const response = await get(path);
+      expect({ path, status: response.status, body: await response.json() }).toEqual({ path, status: 404, body: { error: 'not found' } });
+    }
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
   });
 
   it('leaves every other path to the static assets', async () => {

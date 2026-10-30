@@ -4,8 +4,6 @@ import { isUsable } from './src/engine/boiMarket';
 import { handleExplain } from './worker/explain';
 import { handleExtract } from './worker/extract';
 import { handleAdvise } from './worker/advise';
-import { handleCategorize } from './worker/categorize';
-import { handleConsult } from './worker/consult';
 import { handleNoam } from './worker/noam';
 import { handlePlan } from './worker/plan';
 import { readMarket } from './worker/market';
@@ -39,9 +37,7 @@ function marketApi(): Plugin {
     '/api/extract': handleExtract,
     '/api/explain': handleExplain,
     '/api/plan': handlePlan,
-    '/api/categorize': handleCategorize,
     '/api/advise': handleAdvise,
-    '/api/consult': handleConsult,
     '/api/noam': handleNoam,
   };
   const extract: Connect.NextHandleFunction = (request, response, next) => {
