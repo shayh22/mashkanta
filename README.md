@@ -421,12 +421,7 @@ balloon (only the interest each month, the balance at the end), or spread it ove
 with its monthly payment, what is left to pay at the end, and what it costs in all. The chosen moves
 join the summary's decisions with their cost written under them.
 
-**Tell the AI on every screen** (`engine/money/consultRequest.ts`, `/api/consult`). Each step has a
-box for what the numbers do not show ("August had a bonus", "the insurer charge is a pension loan")
-or a question, answered about that screen. What is sent is the screen's totals under fixed labels —
-category names and amounts, never a business name, a date or an account — and the words typed; it
-can be inspected first. What was written on each screen is kept (in memory) and handed to the
-advisor in the summary. The summary's decisions (`engine/money/decisions.ts`) count each shekel once:
+**Each shekel once.** The summary's decisions (`engine/money/decisions.ts`) count each shekel once:
 where the advisor set a target for a category, its cancellations and return-to-average are not added
 on top.
 
@@ -451,11 +446,8 @@ card company (Excel or CSV), and gets one monthly picture: what comes in, what g
   chains, utilities, insurers, fees, cash, transfers. Money that is not income (a savings fund cashed,
   a loan taken) is kept apart from income and named. The overdraft is read from the balance column:
   how many months dipped below zero, the lowest point, and the interest it cost.
-- **The borrower corrects, AI helps.** Any business can be moved to another category; the choice is
-  remembered by business name in the browser. When AI is on, "מיינו עם AI" sends the names of the
-  businesses left in "other" — names only, no amounts, dates or accounts — to `/api/categorize`
-  (`worker/categorize.ts`), which returns one category each from a fixed list; the borrower's own
-  choices always win. Same protections as the other AI endpoints.
+- **The borrower corrects.** Any business can be moved to another category; the choice is
+  remembered by business name in the browser.
 
 **Where to save** (`engine/money/savings.ts`). Under the picture, a card of ideas read off the
 statements, each with something to do: the overdraft (priced by the interest it cost, with a link
