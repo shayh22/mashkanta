@@ -85,6 +85,11 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <a
         href="#main"
+        // The address is the screen: following "#main" would leave it for an unknown one.
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
         className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2"
       >
         דילוג לתוכן
