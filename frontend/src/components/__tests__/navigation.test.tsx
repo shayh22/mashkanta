@@ -61,6 +61,22 @@ describe('navigation', () => {
     expect(await screen.findByRole('heading', { name: 'מה נסדר היום?' }, { timeout: 10_000 })).toBeTruthy();
   });
 
+  it('skips to the content without leaving the screen', async () => {
+    useQuestionnaire.setState({
+      goals: ['BUY'],
+      answers: { propertyValue: 2_000_000, segment: 'FIRST_HOME', equity: 600_000, hasEligibility: 'NO', netIncome: 22_000, hasObligations: 'NO', stability: 'BALANCED', statementsOffer: 'NO' },
+      at: 'compare',
+    });
+    window.history.replaceState(null, '', '/#/start/compare');
+    const user = userEvent.setup();
+    renderApp();
+    expect(await screen.findByRole('heading', { name: 'השוואה בין בנקים' }, { timeout: 10_000 })).toBeTruthy();
+    await user.click(screen.getByRole('link', { name: 'דילוג לתוכן' }));
+    expect(window.location.hash).toBe('#/start/compare');
+    expect(document.activeElement).toBe(screen.getByRole('main'));
+    expect(screen.getByRole('heading', { name: 'השוואה בין בנקים' })).toBeTruthy();
+  });
+
   it('toggles the dark theme from the header', async () => {
     const user = userEvent.setup();
     renderApp();
