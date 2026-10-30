@@ -249,7 +249,7 @@ function Results({
             </button>
             <ShareBar result={{ goals, answers, ...(refinance ? { refinance } : {}), ...(recovery ? { recovery } : {}) }} />
           </div>
-          <AnswersSummary steps={steps} answers={answers} goals={[]} onEdit={onEdit} onRestart={onRestart} focus={false} />
+          <AnswersSummary steps={steps} answers={answers} onEdit={onEdit} onRestart={onRestart} />
         </>
       )}
 
