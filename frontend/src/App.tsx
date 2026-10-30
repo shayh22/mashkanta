@@ -115,27 +115,12 @@ export default function App() {
 }
 
 function Header({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
-  const ref = useRef<HTMLElement>(null);
   const brand = useRef<HTMLAnchorElement>(null);
   // The opening animation lands on the header's mark; until it does, the header's own stays hidden.
   const [landed, setLanded] = useState(false);
   const onLanded = useCallback(() => setLanded(true), []);
-  // Section tabs stick directly under the header, whose height changes when the title wraps on a
-  // narrow phone; publish the real height for them as --header-h.
-  useEffect(() => {
-    const header = ref.current;
-    if (!header || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-    const observer = new ResizeObserver(() =>
-      document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`),
-    );
-    observer.observe(header);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <header ref={ref} className="no-print sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
+    <header className="no-print sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
       <Splash target={brand} onDone={onLanded} />
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
         <a ref={brand} href="#/start" aria-label={`${APP_NAME} · לדף הבית`} className={`flex min-w-0 items-center gap-2.5 ${landed ? '' : 'invisible'}`}>
