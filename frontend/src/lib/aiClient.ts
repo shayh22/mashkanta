@@ -2,8 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import type { AiDocumentKind } from '../engine/aiExtraction';
 import { toExplanation, type ExplainRequest, type MixExplanation } from '../engine/mixExplanation';
 import { toAdvice, type Advice, type AdviceRequest } from '../engine/money/adviceRequest';
-import { toCategories, type AiCategory } from '../engine/money/categorizeRequest';
-import { toConsultAnswer, type ConsultAnswer, type ConsultRequest } from '../engine/money/consultRequest';
 import { toNoamAnswer, type NoamAnswer, type NoamRequest } from '../engine/flow/noamRequest';
 import { toPlanAnswer, type PlanAnswer, type PlanRequest } from '../engine/planRequest';
 
@@ -98,30 +96,6 @@ export async function proposePlan(request: PlanRequest): Promise<PlanAnswer> {
   return answer;
 }
 
-/** A category for each business name the rules did not know; names only are sent. */
-export async function categorizePayees(payees: readonly string[]): Promise<Record<string, AiCategory>> {
-  const response = await fetch('/api/categorize', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ payees }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!response.ok) {
-    throw new Error(
-      response.status === 429
-        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
-        : response.status === 503
-          ? 'AI אינו מופעל כרגע.'
-          : `המיון לא הצליח (${response.status}). נסו שוב.`,
-    );
-  }
-  const categories = toCategories(((await response.json()) as { categories?: unknown }).categories, payees);
-  if (!categories) {
-    throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
-  }
-  return categories;
-}
-
 /** A few steps toward the household's goal, from its monthly totals; the app prices the targets. */
 export async function adviseHousehold(request: AdviceRequest): Promise<Advice> {
   const response = await fetch('/api/advise', {
@@ -144,30 +118,6 @@ export async function adviseHousehold(request: AdviceRequest): Promise<Advice> {
     throw new Error('התוכנית שהתקבלה לא תקינה. נסו שוב.');
   }
   return advice;
-}
-
-/** A short answer about one screen of the household journey, from its totals and the household's words. */
-export async function consultStep(request: ConsultRequest): Promise<ConsultAnswer> {
-  const response = await fetch('/api/consult', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!response.ok) {
-    throw new Error(
-      response.status === 429
-        ? 'הגעתם למכסת הבקשות לשעה. נסו שוב מאוחר יותר.'
-        : response.status === 503
-          ? 'AI אינו מופעל כרגע.'
-          : `לא התקבלה תשובה (${response.status}). נסו שוב.`,
-    );
-  }
-  const answer = toConsultAnswer(((await response.json()) as { answer?: unknown }).answer);
-  if (!answer) {
-    throw new Error('התשובה שהתקבלה לא תקינה. נסו שוב.');
-  }
-  return answer;
 }
 
 /** נועם's answer to a message on one screen of the questionnaire. */

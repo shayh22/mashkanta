@@ -2,8 +2,6 @@ import { isUsable } from '../src/engine/boiMarket';
 import { handleExplain } from './explain';
 import { handleExtract, type ExtractEnv } from './extract';
 import { handleAdvise } from './advise';
-import { handleCategorize } from './categorize';
-import { handleConsult } from './consult';
 import { handleNoam } from './noam';
 import { handlePlan } from './plan';
 import { readMarket } from './market';
@@ -15,9 +13,7 @@ import { readMarket } from './market';
  * - `/api/extract` reads an unrecognised document through OpenRouter (see `extract.ts`);
  * - `/api/explain` puts a priced mortgage mix into words through OpenRouter (see `explain.ts`);
  * - `/api/plan` turns a homeowner's goal into an action per mortgage track (see `plan.ts`);
- * - `/api/categorize` sorts business names from statements into spending categories (see `categorize.ts`);
  * - `/api/advise` turns a household's monthly totals and goal into a few steps (see `advise.ts`);
- * - `/api/consult` answers about one screen of the household journey (see `consult.ts`).
  * - `/api/noam` is the questionnaire's guide (see `noam.ts`).
  *
  * Market results are cached at the edge for six hours, so the statistics service sees a handful of
@@ -64,17 +60,15 @@ export default {
     if (url.pathname === '/api/plan') {
       return handlePlan(request, env, cache, fetch);
     }
-    if (url.pathname === '/api/categorize') {
-      return handleCategorize(request, env, cache, fetch);
-    }
     if (url.pathname === '/api/advise') {
       return handleAdvise(request, env, cache, fetch);
     }
-    if (url.pathname === '/api/consult') {
-      return handleConsult(request, env, cache, fetch);
-    }
     if (url.pathname === '/api/noam') {
       return handleNoam(request, env, cache, fetch);
+    }
+    // An API path with no handler — one removed, or mistyped — says so rather than serving the page.
+    if (url.pathname.startsWith('/api/') && url.pathname !== '/api/market') {
+      return json({ error: 'not found' }, 404, 'no-store');
     }
     if (url.pathname !== '/api/market') {
       return env.ASSETS.fetch(request);
