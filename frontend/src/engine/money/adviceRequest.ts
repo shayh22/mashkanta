@@ -2,6 +2,7 @@ import { CATEGORY_LABELS, type CategoryId } from './categories';
 import type { Explanations } from './explanations';
 import type { MonthlyPicture } from './picture';
 import { savingIdeas, type SavingKind } from './savings';
+import { cleanText } from '../text';
 
 /**
  * The household advisor: the borrower writes what matters to them, and a model turns the monthly
@@ -127,11 +128,6 @@ Write in Hebrew, addressed to the household in the plural (אתם), plainly and 
 
 const finite = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
-
-const cleanText = (value: unknown, max: number) =>
-  typeof value === 'string'
-    ? [...value].map((char) => (char < ' ' || char === '\u007f' ? ' ' : char)).join('').replace(/\s+/g, ' ').trim().slice(0, max)
-    : '';
 
 /** The request a picture makes, with the household's goal. */
 export function adviceRequestOf(
