@@ -77,7 +77,7 @@ export default function App() {
     useConsolidation.getState().reset();
     useQuestionnaire.getState().reset();
     useTrackPlanStore.setState({ actions: {}, answer: undefined, goal: '' });
-    useMoney.setState({ files: [], notes: {}, loans: {}, loanLinks: {}, refinance: false });
+    useMoney.setState({ files: [], loans: {}, loanLinks: {}, refinance: false });
     useMoneyCategories.setState({ explanations: {} });
   };
 

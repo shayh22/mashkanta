@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CategoryId } from '../engine/money/categories';
-import type { ConsultStep } from '../engine/money/consultRequest';
 import type { LoanPlan } from '../engine/money/decisions';
 import { overridesOf, type PayeeExplanation } from '../engine/money/explanations';
 import { monthlyPicture, type MonthlyPicture } from '../engine/money/picture';
@@ -68,9 +67,6 @@ interface MoneyState {
   /** Whether any upload is still being read; `pending` counts them, so one finishing early does not clear it. */
   reading: boolean;
   pending: number;
-  /** What the household told the AI on each screen; in memory, like the files. */
-  notes: Partial<Record<ConsultStep, string>>;
-  setNote: (step: ConsultStep, note: string) => void;
   /** Each loan's terms, as the household knows them, and the move chosen for it; by business name. */
   loans: Record<string, LoanPlan>;
   setLoan: (payee: string, patch: Partial<LoanPlan>) => void;
@@ -88,8 +84,6 @@ export const useMoney = create<MoneyState>()((set) => ({
   files: [],
   reading: false,
   pending: 0,
-  notes: {},
-  setNote: (step, note) => set((state) => ({ notes: { ...state.notes, [step]: note } })),
   loans: {},
   setLoan: (payee, patch) => set((state) => ({ loans: { ...state.loans, [payee]: { move: 'KEEP', ...state.loans[payee], ...patch } } })),
   loanLinks: {},
