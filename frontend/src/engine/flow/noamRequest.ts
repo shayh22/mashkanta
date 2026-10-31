@@ -1,5 +1,5 @@
 import { GLOSSARY, TERM_IDS, type TermId } from '../../lib/glossary';
-import { cleanText } from '../money/consultRequest';
+import { cleanText } from '../text';
 import { redact } from '../redaction';
 import { GOALS, isAnswered, type AnswerValue, type Answers, type Catalog, type Field, type Goal, type Step } from './flow';
 

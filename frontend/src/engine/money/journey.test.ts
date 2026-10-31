@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { BANK_CSV, cardXlsx } from './__fixtures__/statements';
-import { factsFor, MAX_QUESTION_LENGTH, toConsultAnswer, validateConsultRequest } from './consultRequest';
 import { decisionsOf, defaultExtendYears, freedBy, loanDecision, mortgageDecision } from './decisions';
 import { balancesOf, monthlyPicture } from './picture';
 import { parseCsv, readXlsx } from './sheets';
@@ -21,34 +20,6 @@ describe('the balance line', () => {
 
   it('has no single line for two accounts', () => {
     expect(balancesOf([bank, { ...bank, transactions: bank.transactions.map((t) => ({ ...t, id: `x${t.id}` })) }], ['2026-04'])).toEqual([]);
-  });
-});
-
-describe('the AI box on each screen', () => {
-  it('sends the screen’s totals under fixed labels, never a business name', async () => {
-    const picture = await both();
-    const spending = factsFor('spending', picture, { 'חנות הדוגמאות': { flexibility: 'CANCEL', note: 'פרטי' } });
-    expect(spending.find((fact) => fact.label === 'סופר ומזון')).toEqual({ label: 'סופר ומזון', value: 2_000 });
-    expect(spending.find((fact) => fact.label === 'אחר — אפשר לבטל')?.value).toBe(667);
-    for (const step of ['flow', 'spending', 'debts', 'savings', 'summary'] as const) {
-      const sent = JSON.stringify(factsFor(step, picture));
-      for (const secret of ['רמי לוי', 'חנות הדוגמאות', 'משכורת חברת', '2026-', '1111']) {
-        expect(sent).not.toContain(secret);
-      }
-    }
-    expect(factsFor('flow', picture).find((fact) => fact.label === 'היתרה הנמוכה ביותר')?.value).toBe(-44_360);
-  });
-
-  it('accepts exactly its shape, and holds the answer to its length', () => {
-    const facts = [{ label: 'הכנסה', value: 15_000 }];
-    expect(validateConsultRequest({ step: 'flow', question: ' בונוס\nבאוגוסט ', facts, extra: 1 })).toEqual({ step: 'flow', question: 'בונוס באוגוסט', facts });
-    expect(validateConsultRequest({ step: 'files', question: 'שאלה', facts })).toBe('bad step');
-    expect(validateConsultRequest({ step: 'flow', question: 'אב', facts })).toBe('bad question');
-    expect(validateConsultRequest({ step: 'flow', question: 'א'.repeat(MAX_QUESTION_LENGTH + 1), facts })).toBe('bad question');
-    expect(validateConsultRequest({ step: 'flow', question: 'שאלה', facts: [] })).toBe('bad facts');
-    expect(validateConsultRequest({ step: 'flow', question: 'שאלה', facts: [{ label: 'x', value: 'y' }] })).toBe('bad fact');
-    expect(toConsultAnswer({ answer: 'א'.repeat(700), points: ['1', '', '2', '3', '4'] })).toEqual({ answer: 'א'.repeat(600), points: ['1', '2', '3'] });
-    expect(toConsultAnswer({ points: [] })).toBeNull();
   });
 });
 
