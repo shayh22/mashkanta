@@ -36,6 +36,12 @@ const EDGE_TTL_SECONDS = 6 * 60 * 60;
  */
 const SCHEMA_VERSION = 3;
 const MIN_FRESH_INTERVAL_MS = 60_000;
+/**
+ * The last complete read is also kept for a week, under its own key: should the statistics service
+ * be down once the six-hour copy has expired, the app still gets the latest real figures (each with
+ * its own date) rather than none.
+ */
+const LAST_GOOD_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const json = (body: unknown, status: number, cacheControl: string) =>
   new Response(JSON.stringify(body), {
@@ -84,9 +90,10 @@ export default {
       return cached;
     }
 
+    const lastGood = new Request(`${url.origin}/api/market?v=${SCHEMA_VERSION}&last=good`);
     const market = await readMarket(fetch);
     if (!isUsable(market)) {
-      return cached ?? json({ error: 'Bank of Israel data unavailable', missing: market.missing }, 502, 'no-store');
+      return cached ?? (await cache.match(lastGood)) ?? json({ error: 'Bank of Israel data unavailable', missing: market.missing }, 502, 'no-store');
     }
     // A read that lost one of the files (a timeout, a bad day upstream) must not displace a complete
     // one for six hours: serve the complete copy if there is one, otherwise the partial one uncached.
@@ -96,7 +103,9 @@ export default {
     // The browser keeps it briefly; the edge keeps it for EDGE_TTL_SECONDS.
     const response = json(market, 200, `public, max-age=300, s-maxage=${EDGE_TTL_SECONDS}`);
     response.headers.set('x-fetched-at', String(Date.now()));
-    context.waitUntil(cache.put(key, response.clone()));
+    const kept = json(market, 200, `public, max-age=300, s-maxage=${LAST_GOOD_TTL_SECONDS}`);
+    kept.headers.set('x-fetched-at', String(Date.now()));
+    context.waitUntil(Promise.all([cache.put(key, response.clone()), cache.put(lastGood, kept)]));
     return response;
   },
 };
