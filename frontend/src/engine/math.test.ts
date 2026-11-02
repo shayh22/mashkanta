@@ -28,5 +28,18 @@ describe('mortgage math', () => {
   it('returns zero rather than a wrong answer on degenerate input', () => {
     expect(irr(0, [100])).toBe(0);
     expect(irr(100_000, [])).toBe(0);
+    // Paid back less than was lent, at any rate: no rate solves it, so no rate is claimed.
+    expect(irr(100_000, [1, 1, 1])).toBe(0);
+  });
+
+  it('has nothing left to pay once no months remain, and is worth nothing then', () => {
+    expect(payment(50_000, 0.004, 0)).toBe(50_000);
+    expect(presentValue(1_000, 0.004, 0)).toBe(0);
+  });
+
+  it('sums a level payment at a zero rate, and compounds a monthly rate into its annual one', () => {
+    expect(presentValue(1_000, 0, 120)).toBe(120_000);
+    expect(monthlyRate(0.06)).toBeCloseTo(0.005, 12);
+    expect(annualise(0.005)).toBeCloseTo(0.0616778, 6);
   });
 });

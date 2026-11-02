@@ -6,6 +6,11 @@ import { SHOCK_MONTH, whatIf } from './whatIf';
 const base = baselineScenario(0.06, 0.025, 0.04);
 
 describe('what if', () => {
+  it('has nothing to say without a track that has an amount and a term', () => {
+    expect(whatIf([], base, 0.03, 0.06)).toBeUndefined();
+    expect(whatIf([{ type: 'PRIME', amount: 0, annualRate: 0.05, termMonths: 300 }, { type: 'PRIME', amount: 100_000, annualRate: 0.05, termMonths: 0 }], base, 0.03, 0.06)).toBeUndefined();
+  });
+
   it('leaves a fixed, unlinked track as it is, whatever happens', () => {
     const result = whatIf([{ type: 'FIXED_UNLINKED', amount: 500_000, annualRate: 0.05, termMonths: 300 }], base, 0.03, 0.06)!;
     expect(paymentAt(result.shocked, SHOCK_MONTH + 1)).toBeCloseTo(paymentAt(result.base, SHOCK_MONTH + 1), 0);
