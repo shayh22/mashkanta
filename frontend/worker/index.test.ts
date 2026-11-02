@@ -48,7 +48,21 @@ describe('market worker', () => {
     expect(response.status).toBe(200);
     expect((await response.json()).missing).toEqual([]);
     expect(response.headers.get('cache-control')).toContain('s-maxage=21600');
-    expect(cache.store.size).toBe(1);
+    // The six-hour copy, and the last complete read kept for a week to fall back on.
+    expect(cache.store.size).toBe(2);
+  });
+
+  it('falls back on the last complete read when the service is down and the six-hour copy has expired', async () => {
+    vi.stubGlobal('fetch', boi());
+    const first = await (await get('/api/market')).json();
+    await Promise.all(pending.splice(0));
+    // Six hours on, the edge has dropped its copy, and nothing comes back from the service.
+    cache.store.delete('https://example.test/api/market?v=3');
+    vi.stubGlobal('fetch', boi(['/BR/', '/ZCM/', '/BIR_MRTG_99/', '/BIR/']));
+    const response = await get('/api/market');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(first);
   });
 
   it('does not let a partial read displace a complete one', async () => {
