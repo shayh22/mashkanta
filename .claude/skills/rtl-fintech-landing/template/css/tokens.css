@@ -1,0 +1,78 @@
+/* Design tokens. The whole palette comes from two hues:
+   --hue    the brand (deep + mid + tint all derive from it)  e.g. 163 spruce, 250 indigo, 25 terracotta, 300 plum
+   --ahue   the single "moving part" accent (lime by default)  e.g. 122 lime, 85 amber, 195 aqua
+   Change the two numbers and everything (glass glows, gradients, shadows) follows. */
+
+:root {
+  --hue: 163;
+  --ahue: 122;
+
+  /* type: a Hebrew grotesk with a real bold; figures in a heavier display face */
+  --font: "Heebo", "Noto Sans Hebrew", "Arial Hebrew", Arial, sans-serif;
+  --font-figure: "Rubik", "Heebo", Arial, sans-serif;
+
+  /* neutrals, tinted with the brand hue */
+  --bg: oklch(0.972 0.016 var(--hue));
+  --card: oklch(1 0 0);
+  --surface: oklch(0.972 0.009 var(--hue));
+  --line: oklch(0.9 0.02 var(--hue));
+  --line-strong: oklch(0.78 0.018 var(--hue));
+  --ink-soft: oklch(0.38 0.022 var(--hue));
+  --muted: oklch(0.47 0.02 var(--hue));
+
+  /* brand */
+  --brand: oklch(0.44 0.088 var(--hue));
+  --brand-ink: oklch(0.31 0.06 var(--hue));
+  --deep: oklch(0.255 0.045 var(--hue));          /* type, primary buttons, the deep bands */
+  --tint: oklch(0.955 0.028 var(--hue));
+  --on-deep-soft: oklch(0.86 0.035 var(--hue));
+
+  /* the accent: only on what moves or matters (progress, selected, the key number, arrows) */
+  --accent: oklch(0.89 0.175 var(--ahue));
+  --accent-ink: oklch(0.43 0.09 var(--ahue));
+  --accent-tint: oklch(0.965 0.05 var(--ahue));
+
+  --danger: oklch(0.53 0.19 27);
+  --focus: oklch(0.6 0.13 var(--hue));
+
+  /* on-glass text: near-black with a breath of the hue (brand-coloured text on glass does not read) */
+  --on-glass: oklch(0.2 0.012 var(--hue));
+  --on-glass-soft: oklch(0.5 0.01 var(--hue));
+
+  /* rhythm */
+  --gutter: clamp(16px, 4vw, 40px);
+  --pad: clamp(72px, 11vw, 200px);     /* space between sections */
+  --max: 1280px;
+  --r: 28px;
+  --r-lg: clamp(28px, 4vw, 56px);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --shadow-1: 0 1px 2px oklch(0.25 0.03 var(--hue) / 0.08), 0 1px 1px oklch(0.25 0.03 var(--hue) / 0.04);
+  --shadow-2: 0 10px 30px -12px oklch(0.25 0.05 var(--hue) / 0.28), 0 2px 6px oklch(0.25 0.03 var(--hue) / 0.08);
+  --shadow-3: 0 32px 64px -28px oklch(0.2 0.05 var(--hue) / 0.5), 0 8px 20px -8px oklch(0.2 0.04 var(--hue) / 0.18);
+  --shadow-float: 0 30px 60px -30px oklch(0.25 0.06 var(--hue) / 0.35), 0 10px 24px -14px oklch(0.25 0.05 var(--hue) / 0.25);
+
+  /* glass: light panes on the light page, dark panes on the deep bands */
+  --glass: linear-gradient(155deg, oklch(1 0 0 / 0.84) 0%, oklch(0.995 0.008 var(--hue) / 0.62) 50%, oklch(0.99 0.014 var(--hue) / 0.7) 100%);
+  --glass-clear: linear-gradient(155deg, oklch(1 0 0 / 0.72) 0%, oklch(0.995 0.008 var(--hue) / 0.4) 55%, oklch(0.99 0.014 var(--hue) / 0.5) 100%);
+  --glass-edge: oklch(1 0 0 / 0.4);
+  --glass-rim: linear-gradient(155deg, oklch(1 0 0 / 1) 0%, oklch(1 0 0 / 0.3) 40%, oklch(1 0 0 / 0.1) 65%, oklch(1 0 0 / 0.75) 100%);
+  --glass-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 1),
+    inset 0 -16px 26px -20px color-mix(in oklch, var(--brand) 26%, transparent),
+    0 28px 54px -26px color-mix(in oklch, var(--brand) 55%, transparent),
+    0 6px 14px -8px oklch(0.3 0.06 var(--hue) / 0.14);
+  --glass-blur: blur(24px) saturate(1.8) brightness(1.05);
+  --glass-dark: linear-gradient(155deg, oklch(1 0 0 / 0.15) 0%, oklch(1 0 0 / 0.05) 55%, oklch(1 0 0 / 0.09) 100%);
+  --glass-dark-edge: oklch(1 0 0 / 0.14);
+  --glass-dark-shadow: inset 0 1px 0 oklch(1 0 0 / 0.24), 0 30px 60px -30px oklch(0 0 0 / 0.65);
+}
+
+/* phones and tablets: the same look as near-opaque panes, no live blur (scrolling stays smooth) */
+@media not all and (min-width: 769px) and (pointer: fine) {
+  :root {
+    --glass: linear-gradient(155deg, oklch(1 0 0 / 0.95), oklch(0.995 0.008 var(--hue) / 0.86) 55%, oklch(0.99 0.014 var(--hue) / 0.9));
+    --glass-clear: linear-gradient(155deg, oklch(1 0 0 / 0.94), oklch(0.995 0.008 var(--hue) / 0.82) 55%, oklch(0.99 0.014 var(--hue) / 0.86));
+    --glass-blur: none;
+  }
+}

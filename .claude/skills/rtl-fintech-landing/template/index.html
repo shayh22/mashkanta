@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- DEMO CONTENT: a fictional bookkeeping service ("שקד"). Replace every visible string, keep the structure. -->
+<title>שקד · הנהלת חשבונות לעסק קטן, בלי כאב ראש</title>
+<meta name="description" content="בודקים התאמה בשתי דקות. אנחנו מסדרים את הספרים, מגישים בזמן ומלווים אתכם כל חודש.">
+<meta name="theme-color" content="#063a29">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&family=Rubik:wght@700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11.2.10/swiper-bundle.min.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/boot.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11.2.10/swiper-bundle.min.js" defer></script>
+<script src="js/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">דלגו לתוכן</a>
+
+<!-- HEADER: brand | in-page nav (centre) | secondary link + small primary CTA + burger (phones) -->
+<header class="lp-top" id="top">
+  <div class="lp-top__inner">
+    <a class="lp-brand" href="./" aria-label="שקד, לדף הבית"><span class="lp-brand__mark" aria-hidden="true">+</span>שקד</a>
+    <nav class="lp-top__nav" aria-label="בעמוד הזה">
+      <a class="lp-link" href="#how">איך זה עובד</a>
+      <a class="lp-link" href="#deliver">מה מקבלים</a>
+      <a class="lp-link" href="#price">מחיר</a>
+      <a class="lp-link" href="#faq">שאלות</a>
+    </nav>
+    <div class="lp-top__end">
+      <a class="lp-top__me lp-link" href="#">כניסה ללקוחות</a>
+      <a class="lp-btn lp-btn--primary lp-btn--sm" href="#start" data-modal-open="start-modal"><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">לבדיקת התאמה</span></span></a>
+      <button type="button" class="lp-burger" id="menu-open" aria-controls="menu" aria-expanded="false">
+        <span class="lp-burger__lines" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr">תפריט</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="lp-menu" id="menu" role="dialog" aria-modal="true" aria-label="תפריט" hidden>
+  <div class="lp-menu__panel">
+    <div class="lp-menu__head">
+      <span class="lp-brand"><span class="lp-brand__mark" aria-hidden="true">+</span>שקד</span>
+      <button type="button" class="lp-x" id="menu-close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="sr">סגירת התפריט</span></button>
+    </div>
+    <nav class="lp-menu__nav" aria-label="בעמוד הזה">
+      <a href="#how">איך זה עובד</a><a href="#deliver">מה מקבלים</a><a href="#price">מחיר</a><a href="#faq">שאלות</a>
+    </nav>
+    <a class="lp-btn lp-btn--accent lp-btn--block" href="#start" data-modal-open="start-modal"><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">לבדיקת התאמה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+  </div>
+</div>
+
+<main id="main">
+
+  <!-- 1. HERO: one huge sentence in 3 masked lines, three verbs that rotate, a note with one bold phrase, one button,
+          the product on a laptop + phone with glass chips around it -->
+  <section class="lp-hero" aria-labelledby="hero-title">
+    <div class="lp-wrap lp-hero__text">
+      <h1 class="lp-hero__title" id="hero-title">
+        <span class="lp-mask"><span class="lp-line">הספרים של העסק</span></span>
+        <span class="lp-mask"><span class="lp-line">מסודרים</span></span>
+        <span class="lp-mask"><span class="lp-line">בלי כאב ראש</span></span>
+      </h1>
+      <p class="lp-rotor" aria-label="סורקים. מסדרים. מגישים.">
+        <span class="lp-rotor__word" aria-hidden="true"><span>סורקים</span></span>
+        <span class="lp-rotor__word" aria-hidden="true"><span>מסדרים</span></span>
+        <span class="lp-rotor__word" aria-hidden="true"><span>מגישים</span></span>
+      </p>
+      <p class="lp-hero__note" data-r><mark>מעוסק פטור ועד חברה בע״מ</mark> לפי גודל העסק</p>
+      <div class="lp-hero__cta" data-r>
+        <a class="lp-btn lp-btn--primary lp-btn--lg" href="#start" data-modal-open="start-modal" data-pulse><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">לבדיקת התאמה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+        <span class="lp-hero__micro">בדיקת התאמה בשתי דקות</span>
+      </div>
+    </div>
+
+    <figure class="lp-wrap lp-devices" role="img" aria-label="האזור האישי על מחשב נייד ובטלפון: המסמכים של החודש מסודרים">
+      <div class="lp-laptop" data-parallax="-50">
+        <div class="lp-laptop__screen">
+          <div class="lp-app">
+            <div class="lp-app__bar"><span>האזור האישי</span><i class="lp-app__dots"></i></div>
+            <div class="lp-app__body">
+              <div>
+                <p class="lp-app__title">החודש של העסק</p>
+                <div class="lp-progress"><span data-fill></span></div>
+                <ul class="lp-app__list">
+                  <li data-item><span class="lp-badge lp-badge--pdf">PDF</span><span class="lp-txt"><b>חשבוניות</b><span>נסרקו ונקלטו</span></span><span class="lp-tick"></span></li>
+                  <li data-item><span class="lp-badge lp-badge--xls">XLS</span><span class="lp-txt"><b>התאמת בנק</b><span>שורה מול שורה</span></span><span class="lp-tick"></span></li>
+                  <li data-item><span class="lp-badge lp-badge--doc">DOC</span><span class="lp-txt"><b>דוח מע״מ</b><span>מוכן להגשה</span></span><span class="lp-tick"></span></li>
+                  <li data-item><span class="lp-badge lp-badge--brand">₪</span><span class="lp-txt"><b>מקדמות</b><span>שולמו בזמן</span></span><span class="lp-tick"></span></li>
+                </ul>
+              </div>
+              <div class="lp-app__side">
+                <p class="lp-app__label">הכנסות חודשיות</p>
+                <div class="lp-bars" data-bars><i style="--v:.42"></i><i style="--v:.55"></i><i style="--v:.48"></i><i style="--v:.66"></i><i style="--v:.6"></i><i style="--v:.74"></i><i style="--v:.7"></i><i style="--v:.84"></i><i style="--v:.95"></i></div>
+                <p class="lp-stamp" data-stamp><span class="lp-tick lp-tick--on"></span>נבדק ונחתם</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lp-laptop__base"></div>
+      </div>
+      <div class="lp-phone" data-parallax="-110">
+        <div class="lp-phone__screen">
+          <div class="lp-quizmock">
+            <p class="lp-quizmock__head">בדיקת התאמה</p>
+            <div class="lp-progress"><span data-level></span></div>
+            <p class="lp-quizmock__q">איזה סוג עסק יש לכם?</p>
+            <ul class="lp-quizmock__opts">
+              <li data-opt>עוסק פטור</li><li data-opt>עוסק מורשה</li><li data-opt>חברה בע״מ</li>
+            </ul>
+            <span class="lp-quizmock__next">המשך</span>
+          </div>
+        </div>
+      </div>
+      <span class="lp-chip lp-chip--a" data-float><span class="lp-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="lp-txt"><b>דוחות חודשיים</b><span>מהמספרים שלכם</span></span></span>
+      <span class="lp-chip lp-chip--b" data-float><span class="lp-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span class="lp-txt"><b>תזרים</b><span>חודש אחר חודש</span></span></span>
+      <span class="lp-chip lp-chip--c" data-float><span class="lp-ico lp-ico--accent" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><span class="lp-txt"><b>רואת החשבון שלנו</b><span>חותמת על הכול</span></span></span>
+    </figure>
+  </section>
+
+  <!-- 2. SPLIT: text (kicker, h2, lead, 3 perks, button) | a person stepping out of a card with glass tiles round them -->
+  <section class="lp-sec" id="deliver" aria-labelledby="deliver-title">
+    <div class="lp-wrap lp-split">
+      <div class="lp-split__text">
+        <p class="lp-kicker" data-r>מה מקבלים</p>
+        <h2 class="lp-h2" id="deliver-title" data-r>ספרים מסודרים כל חודש</h2>
+        <p class="lp-lead" data-r>אנחנו קולטים כל קבלה, מתאימים מול הבנק, ורואת החשבון שלנו חותמת. אתם רק מצלמים.</p>
+        <ul class="lp-perks">
+          <li data-r><span class="lp-perks__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h4"/></svg></span><span><strong>כל המסמכים במקום אחד</strong>מצלמים קבלה בנייד והיא כבר בספרים.</span></li>
+          <li data-r><span class="lp-perks__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span><strong>דוחות שמבינים</strong>הכנסות, הוצאות ותזרים, בשפה פשוטה.</span></li>
+          <li data-r><span class="lp-perks__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span><span><strong>הגשות בזמן</strong>מע״מ, מקדמות ודוח שנתי, בלי קנסות.</span></li>
+        </ul>
+        <a class="lp-btn lp-btn--primary" href="#start" data-modal-open="start-modal" data-r><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">לבדיקת התאמה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+      </div>
+      <figure class="lp-person" data-media>
+        <span class="lp-person__card" aria-hidden="true"></span>
+        <!-- swap for a transparent cut-out: <img class="lp-person__img" src="img/person-1.webp" width="480" height="880" alt="..." data-parallax="-40"> -->
+        <span class="lp-person__ph" aria-hidden="true" data-parallax="-40"></span>
+        <span class="lp-accent lp-accent--1" data-float aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg></span>
+        <span class="lp-glass lp-glass--1" data-float aria-hidden="true">מע״מ</span>
+        <span class="lp-accent lp-accent--2 lp-accent--accent" data-float aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span class="lp-glass lp-glass--2" data-float aria-hidden="true">106</span>
+        <span class="lp-glass lp-glass--3" data-float aria-hidden="true">856</span>
+        <span class="lp-tile lp-tile--1" data-float aria-hidden="true"><span class="lp-ico lp-ico--accent"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><span class="lp-txt"><b>נבדק ונחתם</b><span>על ידי רואת החשבון</span></span></span>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 3. SPLIT, FLIPPED: text | a deep card with a form that fills itself in -->
+  <section class="lp-sec lp-split--flip" aria-labelledby="sheet-title">
+    <div class="lp-wrap lp-split">
+      <div class="lp-split__text">
+        <p class="lp-kicker" data-r>דוח מע״מ</p>
+        <h2 class="lp-h2" id="sheet-title" data-r>שדה אחר שדה בלי לנחש</h2>
+        <p class="lp-lead" data-r>כל דוח מוכן ומסומן לפני שהוא יוצא. ואם רשות המסים שואלת, התשובות כבר מוכנות.</p>
+        <div class="lp-actions" data-r>
+          <a class="lp-btn lp-btn--primary" href="#start" data-modal-open="start-modal"><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">להתחיל בבדיקה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+          <a class="lp-btn lp-btn--ghost" href="#faq">יש לי שאלה</a>
+        </div>
+      </div>
+      <figure class="lp-person" data-media>
+        <span class="lp-person__card lp-person__card--deep" aria-hidden="true"></span>
+        <span class="lp-person__ph" aria-hidden="true" data-parallax="-30"></span>
+        <div class="lp-sheet" data-sheet data-float aria-hidden="true">
+          <p class="lp-sheet__head">דוח מע״מ</p>
+          <ul class="lp-sheet__rows">
+            <li data-row><span class="lp-sheet__label">עסקאות חייבות</span><span class="lp-sheet__val"><i></i></span><span class="lp-tick"></span></li>
+            <li data-row><span class="lp-sheet__label">מע״מ עסקאות</span><span class="lp-sheet__val"><i></i></span><span class="lp-tick"></span></li>
+            <li data-row><span class="lp-sheet__label">תשומות ציוד</span><span class="lp-sheet__val"><i></i></span><span class="lp-tick"></span></li>
+            <li data-row><span class="lp-sheet__label">תשומות אחרות</span><span class="lp-sheet__val"><i></i></span><span class="lp-tick"></span></li>
+            <li data-row><span class="lp-sheet__label">לתשלום</span><span class="lp-sheet__val"><i></i></span><span class="lp-tick"></span></li>
+          </ul>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 4. CAROUSEL: who it is for. Photo cards, a deep gradient rising from the foot, heavy white title + accent line -->
+  <section class="lp-sec" aria-labelledby="who-title">
+    <div class="lp-wrap lp-carousel__head">
+      <h2 class="lp-h2" id="who-title" data-r>נבנה סביב העסק שלכם</h2>
+      <div class="lp-carousel__nav" data-r>
+        <button type="button" class="lp-round" id="carousel-prev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg><span class="sr">הקודם</span></button>
+        <button type="button" class="lp-round" id="carousel-next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span class="sr">הבא</span></button>
+      </div>
+    </div>
+    <div class="swiper lp-carousel" id="carousel" data-r>
+      <ul class="swiper-wrapper">
+        <!-- swap each .lp-card__media span for <img class="lp-card__media" src="..." width="420" height="525" alt="..." loading="lazy"> -->
+        <li class="swiper-slide lp-card"><span class="lp-card__media"></span><p class="lp-card__cap"><strong>מוסך</strong><span>הוצאות חלפים מסודרות</span></p></li>
+        <li class="swiper-slide lp-card"><span class="lp-card__media"></span><p class="lp-card__cap"><strong>קליניקה</strong><span>קבלות אוטומטיות למטופלים</span></p></li>
+        <li class="swiper-slide lp-card"><span class="lp-card__media"></span><p class="lp-card__cap"><strong>חנות</strong><span>מלאי ומע״מ בשורה אחת</span></p></li>
+        <li class="swiper-slide lp-card"><span class="lp-card__media"></span><p class="lp-card__cap"><strong>סטודיו</strong><span>פרויקטים ותזרים</span></p></li>
+        <li class="swiper-slide lp-card"><span class="lp-card__media"></span><p class="lp-card__cap"><strong>מאפייה</strong><span>ספקים ותשלומים</span></p></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5. DEEP BAND: a lead line, a marquee of logo tiles (list twice, second aria-hidden), h2, three counting stats -->
+  <section class="lp-band" aria-labelledby="band-title">
+    <div class="lp-wrap"><p class="lp-band__lead" id="tools-lead" data-r>עובדים עם התוכנות שאתם כבר מכירים</p></div>
+    <div class="lp-marquee">
+      <div class="lp-marquee__track">
+        <ul class="lp-logos" aria-labelledby="tools-lead">
+          <li class="lp-logo">תוכנה א</li><li class="lp-logo">תוכנה ב</li><li class="lp-logo">בנק א</li><li class="lp-logo">בנק ב</li><li class="lp-logo">סליקה</li><li class="lp-logo">שכר</li><li class="lp-logo">מלאי</li>
+        </ul>
+        <ul class="lp-logos" aria-hidden="true">
+          <li class="lp-logo">תוכנה א</li><li class="lp-logo">תוכנה ב</li><li class="lp-logo">בנק א</li><li class="lp-logo">בנק ב</li><li class="lp-logo">סליקה</li><li class="lp-logo">שכר</li><li class="lp-logo">מלאי</li>
+        </ul>
+      </div>
+    </div>
+    <div class="lp-wrap">
+      <h2 class="lp-h2 lp-band__title" id="band-title" data-r>השירות במספרים</h2>
+      <ul class="lp-stats">
+        <li class="lp-stat lp-dark-glass" data-r><p class="lp-stat__num"><span class="lp-stat__pre">עד</span><span data-count="48">48</span><span class="lp-stat__unit">שעות</span></p><p class="lp-stat__label">מהקבלה ועד שהיא בספרים</p></li>
+        <li class="lp-stat lp-dark-glass" data-r><p class="lp-stat__num"><span data-count="12">12</span><span class="lp-stat__unit">דוחות בשנה</span></p><p class="lp-stat__label">מוגשים בזמן, בלי תזכורות</p></li>
+        <li class="lp-stat lp-dark-glass" data-r><p class="lp-stat__num"><span data-count="0">0</span><span class="lp-stat__unit">קנסות</span></p><p class="lp-stat__label">המטרה שלנו בכל חודש</p></li>
+      </ul>
+      <p class="lp-band__note" data-r>המספרים להמחשה. התוצאה בפועל תלויה בעסק.</p>
+    </div>
+  </section>
+
+  <!-- 6. STEPS: four numbered discs, the line drawn by the scroll -->
+  <section class="lp-sec" id="how" aria-labelledby="how-title">
+    <div class="lp-wrap">
+      <p class="lp-kicker" data-r>איך זה עובד</p>
+      <h2 class="lp-h2" id="how-title" data-r>ארבעה צעדים</h2>
+      <ol class="lp-steps" data-steps>
+        <li class="lp-steps__line" aria-hidden="true"><span data-line></span></li>
+        <li class="lp-step" data-step><span class="lp-step__num" aria-hidden="true">1</span><h3>בודקים התאמה</h3><p>שתי דקות, בלי התחייבות.</p></li>
+        <li class="lp-step" data-step><span class="lp-step__num" aria-hidden="true">2</span><h3>מדברים עם יועץ</h3><p>המחיר נקבע בשיחה.</p></li>
+        <li class="lp-step" data-step><span class="lp-step__num" aria-hidden="true">3</span><h3>מעבירים את הספרים</h3><p>אנחנו עושים את כל העבודה.</p></li>
+        <li class="lp-step" data-step><span class="lp-step__num" aria-hidden="true">4</span><h3>שקט כל חודש</h3><p>דוח קצר, וזהו.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 7. PROMISE BAND (huge rounded top) + PRICE PANEL -->
+  <section class="lp-promise" aria-labelledby="promise-title">
+    <div class="lp-wrap">
+      <h2 class="lp-h2 lp-promise__title" id="promise-title" data-r>הסטנדרט של שקד</h2>
+      <ul class="lp-promise__list">
+        <li data-r><span class="lp-promise__icon lp-dark-glass" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4z"/><path d="M4 11h16"/><path d="M8 15h3"/></svg></span>קנס בגללנו? אנחנו משלמים.</li>
+        <li data-r><span class="lp-promise__icon lp-dark-glass" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></span>לא מרוצים? עוזבים בכל חודש.</li>
+        <li data-r><span class="lp-promise__icon lp-dark-glass" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>רואת חשבון אמיתית חותמת.</li>
+      </ul>
+      <div class="lp-price" id="price" data-r>
+        <h2 class="lp-price__title">כמה זה עולה?</h2>
+        <p class="lp-price__pill">מ־290 ₪ בחודש</p>
+        <ul class="lp-price__lines"><li>כתוב בהסכם לפני כל תשלום.</li></ul>
+        <a class="lp-btn lp-btn--white" href="#start" data-modal-open="start-modal"><span class="lp-btn__label" data-alt="מתחילים עכשיו"><span class="lp-btn__t">לבדיקת התאמה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. FAQ on deep: title column | glass rows that open smoothly -->
+  <section class="lp-faq" id="faq" aria-labelledby="faq-title">
+    <div class="lp-wrap lp-faq__grid">
+      <h2 class="lp-h2" id="faq-title" data-r>שאלות לפני שמתחילים</h2>
+      <div>
+        <details class="lp-dark-glass"><summary>צריך להחליף רואה חשבון?</summary><div class="lp-faq__a"><div class="lp-faq__in"><p>לא חייבים. אפשר לעבוד איתנו רק על הנהלת החשבונות, ורואה החשבון שלכם ממשיך.</p></div></div></details>
+        <details class="lp-dark-glass"><summary>כמה זמן לוקח המעבר?</summary><div class="lp-faq__a"><div class="lp-faq__in"><p>בדרך כלל שבוע. אנחנו מבקשים את החומר מהגורם הקודם בשמכם.</p></div></div></details>
+        <details class="lp-dark-glass"><summary>מה אם יש לי חובות לרשויות?</summary><div class="lp-faq__a"><div class="lp-faq__in"><p>נבדוק את המצב בשיחה הראשונה ונבנה תוכנית לסגור אותם.</p></div></div></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. CLOSING: an accent card on the deep, one sentence, one deep button -->
+  <section class="lp-closing" aria-labelledby="closing-title">
+    <div class="lp-closing__inner">
+      <h2 class="lp-closing__title" id="closing-title" data-r>שתי דקות והתשובה אצלכם</h2>
+      <a class="lp-btn lp-btn--primary lp-btn--lg" href="#start" data-modal-open="start-modal" data-r><span class="lp-btn__label" data-alt="שתי דקות ויודעים"><span class="lp-btn__t">לבדיקת התאמה</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="lp-foot">
+  <div class="lp-wrap">
+    <div class="lp-foot__grid">
+      <div class="lp-foot__brand"><span class="lp-brand"><span class="lp-brand__mark" aria-hidden="true">+</span>שקד</span><p>הנהלת חשבונות לעסקים קטנים. חברה פרטית.</p></div>
+      <nav class="lp-foot__col" aria-label="בעמוד הזה"><p class="lp-foot__head">בעמוד</p><a class="lp-link" href="#how">איך זה עובד</a><a class="lp-link" href="#deliver">מה מקבלים</a><a class="lp-link" href="#price">מחיר</a><a class="lp-link" href="#faq">שאלות</a></nav>
+      <nav class="lp-foot__col" aria-label="מידע משפטי"><p class="lp-foot__head">מידע</p><a class="lp-link" href="#">מדיניות פרטיות</a><a class="lp-link" href="#">תנאי שימוש</a><a class="lp-link" href="#">הצהרת נגישות</a><button type="button" class="lp-linkbtn lp-link" id="cookie-settings">הגדרות עוגיות</button></nav>
+      <div class="lp-foot__col"><p class="lp-foot__head">דברו איתנו</p><a class="lp-link" href="#start" data-modal-open="start-modal">בדיקת התאמה</a><a class="lp-link" href="#">כניסה ללקוחות</a></div>
+    </div>
+    <div class="lp-foot__legal">
+      <p>האנשים בתמונות הם המחשה. הם לא לקוחות ולא עובדים שלנו.</p>
+      <p><strong>שקד</strong> · שם החברה בע״מ, ח.פ. 000000000</p>
+    </div>
+  </div>
+</footer>
+
+<!-- MODAL: a small centred card in two steps (dots), scrim fades in, card rises -->
+<div class="lp-modal" id="start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title" hidden>
+  <div class="lp-modal__card">
+    <button type="button" class="lp-modal__close" aria-label="סגירה">×</button>
+    <div class="lp-modal__dots" aria-hidden="true"><i></i><i></i></div>
+    <div data-step-pane>
+      <h2 class="lp-modal__title" id="start-title">נתחיל בטלפון</h2>
+      <p class="lp-modal__text">יועץ יחזור אליכם עוד היום.</p>
+      <label class="lp-field">מספר טלפון<input class="lp-input" type="tel" inputmode="tel" autocomplete="tel" dir="ltr"></label>
+      <button type="button" class="lp-btn lp-btn--primary lp-btn--block" data-step-next><span class="lp-btn__label" data-alt="עוד צעד אחד"><span class="lp-btn__t">המשך</span></span><span class="lp-btn__arrow" aria-hidden="true"></span></button>
+    </div>
+    <div data-step-pane hidden>
+      <h2 class="lp-modal__title">קיבלנו</h2>
+      <p class="lp-modal__text">נדבר בקרוב. בינתיים אפשר להמשיך לקרוא.</p>
+      <button type="button" class="lp-btn lp-btn--accent lp-btn--block" data-modal-close>סגירה</button>
+    </div>
+  </div>
+</div>
+
+<div class="lp-cookie" id="cookie" role="region" aria-label="עוגיות" hidden>
+  <p>אנחנו משתמשים בעוגיות הכרחיות כדי שהאתר יעבוד. בהסכמתכם נשתמש גם בעוגיות מדידה.</p>
+  <div class="lp-cookie__actions">
+    <button type="button" class="lp-btn lp-btn--primary lp-btn--sm" id="cookie-accept">מסכים/ה</button>
+    <button type="button" class="lp-btn lp-btn--ghost lp-btn--sm" id="cookie-reject">רק הכרחיות</button>
+  </div>
+</div>
+</body>
+</html>
