@@ -44,7 +44,7 @@ Full functional requirements are in [SPECIFICATION.md](SPECIFICATION.md).
 | Imports the bank's mortgage details statement (פרטי משכנתאות): every sub-loan, balances and the bank's own prepayment fee | `engine/statement.ts` |
 | Tests debt consolidation against the home under the 1 October 2026 PTI formula, cumulative LTV 50/70/₪200K, cumulative ⅔ variable and the ₪120K exemption | `engine/consolidation.ts` |
 | Refinances and consolidates in one move, re-testing the consolidation against the refinanced mortgage | `engine/combined.ts` |
-| Traffic-light risk dials and a prioritised action plan with print/PDF and share | `engine/risk.ts`, `engine/actionPlan.ts` |
+| What to do now, in order, ticked off on the device; a PDF report and a share link | `engine/flow/tasks.ts`, `engine/flow/share.ts` |
 
 The Java service in `backend/` exposes the same capabilities over HTTP (`/api/v1/mortgage/simulate`,
 `/optimize`, `/refinance`, `/documents/upload-approval`, `/market-baseline/current`) and is kept as
@@ -271,11 +271,8 @@ has its own address, so the browser's Back walks them; the charting library load
 first screen that draws a chart, and the PDF report lays every result screen out before it prints.
 
 **Visual language.** Quiet and monochrome: neutral greys, hairline borders, and one teal accent for the
-primary action and the figures that matter. Buttons have a 2px edge the face sinks into on press;
-segmented controls and tabs move one marker that glides to the selection. The patterns follow free
-(MIT) components from [Design for AI](https://design.yaps.ai) — Segmented Control, Underline Tabs,
-Press Depth Button and Tooltip Group — re-implemented in plain CSS transitions (`src/lib/glide.ts`)
-rather than adding their animation library, and adapted for right-to-left.
+primary action and the figures that matter. Buttons have a 2px edge the face sinks into on press. With
+the system's reduce-motion setting on, nothing slides, fades or spins.
 
 **Glossary.** Screens keep copy to a line; hard terms point to `src/lib/glossary.ts` instead. A term is
 underlined in text, or a small "?" sits after a label; resting the pointer on it (400ms, then at once
@@ -337,21 +334,21 @@ words back into logical order (`rebuildVisualText` in `documents.ts`).
 
 ## Choosing the mix: automatic or by hand
 
-Both the new-mortgage wizard and the refinance check let the borrower decide who builds the mix:
+The details of a purchase (and of a refinance) let the borrower decide who builds the mix:
 
 - **Automatic** — the optimizer above chooses it. In refinance this is the *optimal mix* option: the
   balance being refinanced (kept tracks and eligibility loans stay as they are, and their payments
   count against income) is re-mixed over the longest remaining term, using the household's income,
-  risk tolerance and absorption capacity from the wizard (`engine/refinanceOptimal.ts`).
+  risk tolerance and absorption capacity from the questionnaire (`engine/refinanceOptimal.ts`).
 - **By hand** — a percentage per track (`engine/manualMix.ts`). The editor shows the shekel amounts and
   checks the Directive 329 shape as the borrower types; shares that do not add up to 100% cannot be
   priced, a mix that breaks the shape rules can (for comparison) with a warning. The hand-built mix is
   priced at the same market rates and stress-tested exactly like the engine's, and the engine's own
-  choice is still computed beside it as a yardstick: the results say how much it would save and offer
-  to switch to it. In refinance, the hand-entered mode remains the place to type in a bank's quote.
+  choice is still computed beside it as a yardstick ("לבנות בעצמי" in `components/flow/MixTools.tsx`;
+  "של המחשבון" goes back to it). A bank's quote is typed in on the banks screen, as an offer.
 
-**Explaining the mix with AI.** When AI is switched on, the results offer a plain-Hebrew explanation of
-the mix: why it is built this way, what could make it cost more, and what to ask the bank. The AI
+**Explaining the mix with AI.** The Worker can put a mix into plain Hebrew; the questionnaire does not
+offer it at the moment (it waits on a decision whether to bring it back). The explanation covers why the mix is built this way, what could make it cost more, and what to ask the bank. The AI
 chooses nothing and computes nothing — it is given the figures the engine already produced and told to
 use only those. `/api/explain` (`worker/explain.ts`) accepts only figures and fixed codes, rebuilt field
 by field (`engine/mixExplanation.ts`): no free text, nothing identifying (a payment-to-income ratio, never
@@ -363,8 +360,8 @@ can be inspected before it is sent.
 
 A full refinance is not the only move. A track below today's market rate is usually worth keeping —
 nothing a refinance buys is cheaper — and the rest can be refinanced on its own or paid down from
-savings. The result screen of the homeowner path has a *track playground* (`components/own/TrackPlayground.tsx`):
-for every track, keep it, refinance it into another kind of track and term, or repay part of it from
+savings. With the bank's report read, the refinance details have *track by track*
+("מסלול אחר מסלול", `components/flow/MixTools.tsx`): for every track, keep it, refinance it into another kind of track and term, or repay part of it from
 savings. Tracks below their market average are marked "good rate — worth keeping", and until the
 borrower changes something the plan follows the per-track verdicts (refinance where that pays on its
 own, keep where it does not).
@@ -382,27 +379,24 @@ breakeven month follow, and the plan is set beside a full refinance into the eng
 market rate, refinance fee — nothing identifying) and gets back a strict schema of one action per track.
 The answer is held to the request on both sides (`engine/planRequest.ts`): only tracks that exist, no
 refinancing an eligibility loan, terms of 1–30 years, prepayments no larger than the balance — anything
-else becomes *keep*. The actions land in the playground, where the engine prices them; the model's
+else becomes *keep*. The actions land on the tracks, where the engine prices them; the model's
 answer is never shown as a figure. Same origin only, a goal of at most 400 characters, 20 requests an
 hour per visitor, no-retention providers.
 
 ## The recovery plan ("תוכנית הבראה"): the household's month from its statements
 
-**One screen at a time.** The path is a journey of six steps with a progress bar: the files; what
-comes in and goes out (a monthly bar chart of income against spending with the net as a line, and
-the account balance day by day from the statement's balance column, the overdraft shaded); where
-the money goes (a 10×10 waffle — each cell one shekel in a hundred — the "what is this?" card and the
-categories); loans and the mortgage (below); where to save (each category as one bar split into must / could cut / could cancel /
-not yet explained, and the saving ideas); and the summary (the decisions to tick, a slope chart from
-today to after, what each decision frees, and the advisor). The charts are plain elements except the
-two time series, which use the app's charting library, and follow light and dark.
+**Part of the questionnaire.** Choosing "לצאת מהמינוס" asks for the bank and card statements; any other
+goal offers them, so every household can see its month. The mortgage report and the loans report are
+questions of their own, read by the same local readers (AI only with consent), so each is entered once.
 
-**Every document, from every step.** The first screen and a one-line bar at the top of every step
-after it ("your documents: two statements · mortgage ✓ · one loan · add") open the same four tiles:
-bank account, credit card, mortgage report and loans report. Statements are read here; a mortgage or
-loans report goes through the homeowner path's own readers (local parsing, AI only with consent), so
-the mortgage and the loans are entered once for the whole site. Tapping a report's tile shows what the
-site holds — the mortgage's tracks, the loans — above the reader for a new report.
+**The result screens.** *Today* (`components/flow/Today.tsx`): what comes in and goes out (a monthly bar
+chart of income against spending, and the account balance day by day from the statement's balance
+column), the spending by category, the overdraft, the loans, and how much of the income goes to
+repayments against the banks' 30% and 40% lines. *Where it improves* (`components/flow/Improve.tsx`):
+the expenses by category and payee, each charge marked as a must, could cut or could cancel; a move
+for each loan; folding the loans into the mortgage; and נועם's plan for the month. *The plan*: the
+decisions to keep or leave out, what each frees a month, and before and after. The charts load with
+the first screen that draws one, and follow light and dark.
 
 **Each loan counted once** (`store/journeyLoans.ts`, `matchLoans`). A report loan is the same loan as a
 charge on the statements when the payments agree (within 5%, or 30 shekels) — whatever the charge is
@@ -411,15 +405,14 @@ repayment. That charge takes the report's balance, rate and months, and appears 
 can link a report loan to another charge, or say it is paid from an account not uploaded; only then
 is it listed on its own.
 
-**Loans and the mortgage** (`components/money/Debts.tsx`, `engine/money/loanMoves.ts`). A step of
-its own: how much of the income goes to repayments, as one bar against the banks' usual 40% ceiling;
-the mortgage — refinanced into the engine's mix, from the homeowner path's data so it is entered once,
-with its switching costs; and each loan from the statements (including one the household marked as a
+**Loans and the mortgage** (`components/flow/Improve.tsx`, `engine/money/loanMoves.ts`): the
+mortgage — refinanced into the engine's mix, entered once for the whole questionnaire, with its
+switching costs; and each loan from the statements (including one the household marked as a
 loan, like a pension-fund loan charged under the insurer's name). For a loan the household enters
 the balance, rate and months left, and sees three moves side by side: keep it, turn it into a
 balloon (only the interest each month, the balance at the end), or spread it over more years — each
 with its monthly payment, what is left to pay at the end, and what it costs in all. The chosen moves
-join the summary's decisions with their cost written under them.
+join the plan's decisions with their cost written under them.
 
 **Each shekel once.** The summary's decisions (`engine/money/decisions.ts`) count each shekel once:
 where the advisor set a target for a category, its cancellations and return-to-average are not added
@@ -572,7 +565,7 @@ either engine shows up as a failure rather than as a quiet difference in someone
 ## Configuration
 
 The static app needs none — the published anchors are seeded constants and every macro assumption is
-adjustable in the wizard.
+adjustable in the details screens.
 
 The Java service, if you run it, still reads:
 
