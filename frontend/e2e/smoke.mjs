@@ -93,10 +93,13 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
     // Content-Security-Policy (connect-src 'self') rightly blocks. Errors raised while axe runs are
     // the audit's own, not the app's; a real visitor never makes that request.
     let auditing = false;
-    page.on(
-      'console',
-      (message) => message.type() === 'error' && !auditing && problems.push(`${tag(current)} console: ${message.text()}`),
-    );
+    // A failed load's console text does not say what failed; its location does.
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !auditing) {
+        const where = message.location()?.url;
+        problems.push(`${tag(current)} console: ${message.text()}${where ? ` (${where})` : ''}`);
+      }
+    });
     page.on('pageerror', (error) => problems.push(`${tag(current)} exception: ${error.message}`));
 
     for (const screen of SCREENS) {
