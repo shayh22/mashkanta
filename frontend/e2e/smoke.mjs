@@ -95,8 +95,10 @@ for (const [device, viewport] of Object.entries(VIEWPORTS)) {
     let auditing = false;
     // A failed load's console text does not say what failed; its location does.
     page.on('console', (message) => {
-      if (message.type() === 'error' && !auditing) {
-        const where = message.location()?.url;
+      const where = message.location()?.url;
+      // Cloudflare injects its analytics beacon in production; a failed beacon (/cdn-cgi/rum) is
+      // Cloudflare's, not the app's, and a visitor never sees it.
+      if (message.type() === 'error' && !auditing && !where?.includes('/cdn-cgi/')) {
         problems.push(`${tag(current)} console: ${message.text()}${where ? ` (${where})` : ''}`);
       }
     });
