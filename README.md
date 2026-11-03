@@ -52,18 +52,19 @@ the reference implementation — see below.
 
 ## Running it
 
-The calculator is a static site — no server, no database, nothing to deploy but files.
+The app is a static site with one small Cloudflare Worker beside it, for the Bank of Israel figures and
+the optional AI — no database. Locally, `npm run dev` serves the same `/api` paths itself.
 
 ```bash
 cd frontend
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 81 tests: engine, stores, action plan end to end
+npm test             # 500+ tests: engine, stores, the questionnaire end to end, the Worker
 npm run typecheck
 npm run lint
 npm run build        # -> dist/, ready to upload anywhere
 
-# Browser smoke test: every screen of both paths with all sections open, desktop and 360px phone, light and dark, with axe-core
+# Browser smoke test: every screen of the questionnaire with all sections open, desktop and 360px phone, light and dark, with axe-core
 npx vite preview --port 4173 &
 npm run e2e
 ```
@@ -545,8 +546,8 @@ path tried to write it.
 ## Testing
 
 ```bash
-cd frontend && npm test      # 81 tests (vitest)
-cd frontend && npm run e2e   # axe-core, console errors and overflow in a real browser
+cd frontend && npm test      # 500+ tests (vitest)
+cd frontend && npm run e2e   # axe-core, console errors (with the URL that failed), overflow and reduced motion in a real browser
 cd backend  && mvn test      # 65 tests on the reference implementation
 ```
 
